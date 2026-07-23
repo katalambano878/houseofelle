@@ -10,7 +10,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.0.2",
-    "resend": "^6.9.1"
+    "resend": "^6.9.1",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.9.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -26,7 +28,10 @@
     "sharp": "^0.34.5",
     "supabase": "^2.76.0",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/pg": "^8.11.10",
+    "dotenv-cli": "^7.4.2"
   },
   "name": "storefront",
   "private": true,
@@ -43,7 +48,8 @@
     "images:compress": "node scripts/compress-images.mjs",
     "import:zip:perfume1": "node scripts/build-perfume-batch-01-zip.mjs",
     "import:zip:perfume2": "node scripts/build-perfume-batch-02-zip.mjs",
-    "import:zip:perfume3": "node scripts/generate-perfume-batch-03-csv.mjs && node scripts/build-perfume-batch-03-zip.mjs"
+    "import:zip:perfume3": "node scripts/generate-perfume-batch-03-csv.mjs && node scripts/build-perfume-batch-03-zip.mjs",
+    "start": "next start -H 0.0.0.0 -p 3000"
   },
   "version": "0.1.0"
 }

@@ -43,3 +43,13 @@ data/imports/perfume-batch-02/images/*
 data/imports/perfume-batch-03/perfume-batch-03-import.zip
 data/imports/perfume-batch-03/images/*
 !data/imports/perfume-batch-03/images/.gitkeep
+
+# local secrets
+.env*
+.env.local
+
+migration-artifacts/dumps/
+
+migration-artifacts/storage/
+
+.env.staging
