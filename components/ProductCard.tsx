@@ -1,4 +1,5 @@
 'use client';
+import { money } from '@/lib/format-money';
 
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
@@ -79,7 +80,7 @@ export default function ProductCard({
   const discount = originalPrice ? Math.round((1 - displayPrice / originalPrice) * 100) : 0;
   const MAX_SWATCHES = 5;
 
-  const formatPrice = (val: number) => `GH\u20B5${val.toFixed(2)}`;
+  const formatPrice = (val: number) => `GH\u20B5${money(val)}`;
   const renderNameWithPlainAmpersand = (text: string) =>
     text.split('&').map((part, index, arr) => (
       <Fragment key={`${part}-${index}`}>
