@@ -115,10 +115,10 @@ export default function BuySmsPage() {
 
       {billing?.configured && (
         <>
-          <div className="rounded-2xl bg-slate-700 p-6 text-white">
-            <p className="text-sm text-slate-100">SMS left</p>
-            <p className="mt-1 text-4xl font-bold">{(billing.sms_left || 0).toLocaleString('en-GH')}</p>
-            <p className="mt-2 text-sm text-slate-100">Used for customer texts and the new-order alert.</p>
+          <div className="rounded-2xl border border-blue-800 bg-blue-900 p-6 text-white shadow-sm">
+            <p className="text-sm font-medium text-blue-100">SMS left</p>
+            <p className="mt-1 text-4xl font-bold tabular-nums">{(billing.sms_left || 0).toLocaleString('en-GH')}</p>
+            <p className="mt-2 text-sm text-blue-100/90">Used for customer texts and the new-order alert.</p>
           </div>
 
           <p className="text-sm font-medium text-gray-700">Choose a package, then press Buy on it.</p>
@@ -139,20 +139,20 @@ export default function BuySmsPage() {
                       setSelectedId(pkg.id);
                     }
                   }}
-                  className={`flex cursor-pointer flex-col rounded-2xl border p-5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 ${
-                    selected ? 'border-slate-600 bg-slate-50 ring-2 ring-slate-600' : 'border-gray-200 bg-white hover:border-slate-300'
+                  className={`flex cursor-pointer flex-col rounded-2xl border p-5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2 ${
+                    selected ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-600' : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className={`text-2xl font-bold tabular-nums ${selected ? 'text-slate-950' : 'text-gray-900'}`}>{price}</p>
-                      <p className={`mt-1 text-sm ${selected ? 'text-slate-800' : 'text-gray-600'}`}>
+                      <p className="text-2xl font-bold tabular-nums text-gray-900">{price}</p>
+                      <p className="mt-1 text-sm text-gray-600">
                         {pkg.sms.toLocaleString('en-GH')} SMS
                       </p>
                     </div>
                     <span
                       className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
-                        selected ? 'border-slate-700 bg-slate-700 text-white' : 'border-gray-300 bg-white'
+                        selected ? 'border-blue-700 bg-blue-600 text-white' : 'border-gray-300 bg-white'
                       }`}
                       aria-hidden
                     >
@@ -170,10 +170,10 @@ export default function BuySmsPage() {
                       }
                       buy(pkg.id);
                     }}
-                    className={`mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 disabled:cursor-wait ${
+                    className={`mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2 disabled:cursor-wait ${
                       selected
-                        ? 'bg-slate-700 text-white shadow-sm hover:bg-slate-800'
-                        : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-400'
+                        ? 'bg-blue-700 text-white shadow-sm hover:bg-blue-800'
+                        : 'border border-gray-300 bg-white text-gray-800 hover:border-blue-500 hover:bg-blue-50'
                     }`}
                   >
                     <i className={`${paying && selected ? 'ri-loader-4-line animate-spin' : 'ri-bank-card-line'} text-base`} />
