@@ -54,7 +54,7 @@ const STATUS_LABELS: Record<BlogStatus, string> = {
 };
 
 const STATUS_COLORS: Record<BlogStatus, string> = {
-  published: 'bg-emerald-100 text-emerald-700',
+  published: 'bg-green-100 text-green-700',
   draft: 'bg-gray-100 text-gray-700',
   archived: 'bg-amber-100 text-amber-700',
 };
@@ -93,6 +93,50 @@ export default function AdminBlogPage() {
   const [slugTouched, setSlugTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  // The Blog module only controls whether this page is in the admin menu (Admin -> Modules).
+  const [blogModuleOn, setBlogModuleOn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from('store_modules')
+      .select('id, enabled')
+      .eq('id', 'blog')
+      .maybeSingle()
+      .then(({ data }) => setBlogModuleOn(!!data?.enabled));
+  }, []);
+
+  const uploadFeaturedImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file) return;
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'].includes(ext) || (file.type && !file.type.startsWith('image/'))) {
+      setFormError('Please choose a JPG, PNG, WebP, GIF or AVIF image.');
+      input.value = '';
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setFormError('The image must be 10 MB or smaller.');
+      input.value = '';
+      return;
+    }
+    setUploadingImage(true);
+    setFormError('');
+    try {
+      const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now());
+      const path = `blog-${id}.${ext}`;
+      const { error } = await supabase.storage.from('products').upload(path, file);
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(path);
+      setForm((f) => ({ ...f, featured_image: publicUrl }));
+    } catch (err: any) {
+      setFormError(`Could not upload the image: ${err?.message || 'please try again.'}`);
+    } finally {
+      setUploadingImage(false);
+      input.value = '';
+    }
+  };
 
   // Delete confirm
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
@@ -319,10 +363,17 @@ export default function AdminBlogPage() {
         </button>
       </div>
 
+      {blogModuleOn === false && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          The Blog module is turned off, so this page is hidden from the admin menu. Published posts still
+          appear on the shop&apos;s blog. The owner can turn the module on in <Link href="/admin/modules" className="font-semibold underline">Modules</Link>.
+        </div>
+      )}
+
       {notice && (
         <div
           role="status"
-          className={`rounded-lg border p-4 text-sm ${notice.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}
+          className={`rounded-lg border p-4 text-sm ${notice.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700'}`}
         >
           {notice.text}
         </div>
@@ -421,7 +472,7 @@ export default function AdminBlogPage() {
               <button
                 onClick={() => setStatus(visibleSelected, 'published')}
                 disabled={busy}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50"
+                className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50"
               >
                 Publish
               </button>
@@ -468,7 +519,7 @@ export default function AdminBlogPage() {
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="p-6 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="p-4 sm:p-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredPosts.map((post) => (
               <div key={post.id} className="border-2 border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
                 <div className="relative">
@@ -511,7 +562,7 @@ export default function AdminBlogPage() {
                         href={previewHref(post)}
                         target="_blank"
                         aria-label={`View ${post.title} on the store`}
-                        className="w-9 h-9 flex items-center justify-center border-2 border-gray-300 text-gray-700 hover:border-blue-600 hover:text-blue-600 rounded-lg transition-colors"
+                        className="w-9 h-9 flex items-center justify-center border-2 border-gray-300 text-gray-700 hover:border-blue-700 hover:text-blue-700 rounded-lg transition-colors"
                       >
                         <i className="ri-eye-line"></i>
                       </Link>
@@ -701,15 +752,26 @@ export default function AdminBlogPage() {
                   />
                 </label>
               </div>
-              <label className="block">
-                <span className="text-sm font-semibold text-gray-700">Featured image URL</span>
-                <input
-                  value={form.featured_image}
-                  onChange={(e) => setForm((f) => ({ ...f, featured_image: e.target.value }))}
-                  placeholder="https://..."
-                  className="mt-1 w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </label>
+              <div>
+                <label htmlFor="blog-featured-image" className="text-sm font-semibold text-gray-700">Featured image</label>
+                <div className="mt-1 flex flex-col sm:flex-row gap-2">
+                  <input
+                    id="blog-featured-image"
+                    value={form.featured_image}
+                    onChange={(e) => setForm((f) => ({ ...f, featured_image: e.target.value }))}
+                    placeholder="Upload an image or paste a link"
+                    className="flex-1 min-w-0 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <label className={`inline-flex items-center justify-center px-4 py-2 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 ${uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <i className={`${uploadingImage ? 'ri-loader-4-line animate-spin' : 'ri-upload-2-line'} mr-2`}></i>
+                    {uploadingImage ? 'Uploading...' : 'Upload'}
+                    <input type="file" accept="image/*" className="sr-only" onChange={uploadFeaturedImage} disabled={uploadingImage} />
+                  </label>
+                </div>
+                {form.featured_image && (
+                  <img src={form.featured_image} alt="" className="mt-2 h-24 rounded-lg object-cover border border-gray-200" />
+                )}
+              </div>
               <label className="block">
                 <span className="text-sm font-semibold text-gray-700">Excerpt</span>
                 <textarea
@@ -769,7 +831,7 @@ export default function AdminBlogPage() {
               </button>
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || uploadingImage}
                 className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Create Post'}

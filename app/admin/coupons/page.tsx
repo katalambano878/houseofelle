@@ -56,7 +56,7 @@ const CODE_RE = /^[A-Z0-9_-]{2,40}$/;
 const TYPE_LABELS: Record<CouponType, string> = {
   percentage: 'Percentage',
   fixed_amount: 'Fixed amount',
-  free_shipping: 'Free shipping',
+  free_shipping: 'Free delivery',
 };
 
 function couponStatus(c: Coupon): CouponStatus {
@@ -334,7 +334,7 @@ export default function AdminCouponsPage() {
       return `${Number(c.value)}%${c.maximum_discount != null ? ` (max GH₵ ${money(c.maximum_discount)})` : ''}`;
     }
     if (c.type === 'fixed_amount') return `GH₵ ${money(c.value)}`;
-    return 'Free shipping';
+    return 'Free delivery';
   };
 
   const inputClass =
@@ -368,19 +368,19 @@ export default function AdminCouponsPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Total Coupons</p>
           <p className="text-2xl font-bold text-gray-900">{coupons.length}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Active now</p>
           <p className="text-2xl font-bold text-green-700">{activeCount}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Scheduled</p>
           <p className="text-2xl font-bold text-blue-700">{scheduledCount}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Total Uses</p>
           <p className="text-2xl font-bold text-gray-900">{totalUses}</p>
         </div>
@@ -395,6 +395,7 @@ export default function AdminCouponsPage() {
                 <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                 <input
                   type="search"
+                  aria-label="Search coupons"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search code or description"
@@ -402,6 +403,7 @@ export default function AdminCouponsPage() {
                 />
               </div>
               <select
+                aria-label="Filter by status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as 'all' | CouponStatus)}
                 className="px-4 py-2 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium cursor-pointer"
@@ -414,6 +416,7 @@ export default function AdminCouponsPage() {
                 <option value="Disabled">Disabled</option>
               </select>
               <select
+                aria-label="Sort coupons"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                 className="px-4 py-2 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium cursor-pointer"
@@ -493,7 +496,7 @@ export default function AdminCouponsPage() {
                         {coupon.usage_limit != null && coupon.usage_limit > 0 && (
                           <div className="w-24 h-2 bg-gray-200 rounded-full mt-2">
                             <div
-                              className="h-full bg-blue-600 rounded-full"
+                              className="h-full bg-blue-700 rounded-full"
                               style={{ width: `${Math.min((used / coupon.usage_limit) * 100, 100)}%` }}
                             ></div>
                           </div>
@@ -553,10 +556,13 @@ export default function AdminCouponsPage() {
           <form
             onSubmit={handleSave}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="coupon-form-title"
             className="bg-white rounded-xl max-w-xl w-full max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">{editingId ? 'Edit Coupon' : 'Create Coupon'}</h2>
+              <h2 id="coupon-form-title" className="text-xl font-bold text-gray-900">{editingId ? 'Edit Coupon' : 'Create Coupon'}</h2>
               <button type="button" onClick={closeForm} aria-label="Close" className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded-lg cursor-pointer">
                 <i className="ri-close-line text-xl"></i>
               </button>
@@ -603,8 +609,14 @@ export default function AdminCouponsPage() {
                   >
                     <option value="percentage">Percentage</option>
                     <option value="fixed_amount">Fixed amount (GH₵)</option>
-                    <option value="free_shipping">Free shipping</option>
+                    <option value="free_shipping">Free delivery</option>
                   </select>
+                  {form.type === 'free_shipping' && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Delivery fees are agreed by phone, not charged at checkout, so this code takes no money off online.
+                      The order shows the code; waive the fee when you call the customer.
+                    </p>
+                  )}
                 </div>
                 {form.type !== 'free_shipping' && (
                   <div>

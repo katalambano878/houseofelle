@@ -99,7 +99,19 @@ export async function POST(request: Request) {
             if (!order || !status) {
                 return NextResponse.json({ error: 'Missing order or status' }, { status: 400 });
             }
-            await sendOrderStatusUpdate(order, status);
+            // Message the contact details saved on the order, never ones the caller supplies.
+            if (typeof order.id !== 'string') {
+                return NextResponse.json({ error: 'Missing order id' }, { status: 400 });
+            }
+            const { data: savedOrder } = await supabaseAdmin
+                .from('orders')
+                .select('id, order_number, email, phone, shipping_address, metadata')
+                .eq('id', order.id)
+                .maybeSingle();
+            if (!savedOrder) {
+                return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+            }
+            await sendOrderStatusUpdate(savedOrder, status);
             return NextResponse.json({ success: true, message: 'Status update sent' });
         }
 

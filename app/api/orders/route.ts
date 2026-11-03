@@ -6,6 +6,7 @@ import { verifyRecaptcha } from '@/lib/recaptcha';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
 import { evaluateCoupon, recordCouponUse } from '@/lib/coupons';
 import { DELIVERY_METHOD_IDS } from '@/lib/delivery';
+import { syncCampaigns } from '@/lib/discounts';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -108,6 +109,9 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // Start or end any sale that is due, so the price charged matches the sale on now.
+  await syncCampaigns();
 
   const { data: products, error: productError } = await supabaseAdmin
     .from('products')

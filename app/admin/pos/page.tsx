@@ -3,7 +3,15 @@ import { money } from '@/lib/format-money';
 import { DELIVERY_OPTIONS, deliveryLabel, type DeliveryMethod } from '@/lib/delivery';
 
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+
+/** Round to whole pesewas so totals like 3 x 19.99 compare exactly with cash tendered. */
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/** Strip characters that would break a PostgREST or() filter. */
+const orSafe = (v: string) => v.replace(/[,()"'\\*%]/g, ' ').trim();
 import { supabase } from '@/lib/supabase';
+import { currentStaffActor, recordStaffAction } from '@/lib/staff-audit';
 
 interface Variant {
     id: string;
@@ -69,6 +77,7 @@ export default function POSPage() {
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [customerSearch, setCustomerSearch] = useState('');
+    const [customerMatches, setCustomerMatches] = useState<Customer[] | null>(null);
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [amountTendered, setAmountTendered] = useState<string>('');
     const [processing, setProcessing] = useState(false);
@@ -236,22 +245,46 @@ export default function POSPage() {
         });
     }, [products, searchQuery, activeCategory]);
 
+    // Only the first 200 customers are preloaded, so search the whole list on the server.
+    useEffect(() => {
+        const q = orSafe(customerSearch);
+        if (q.length < 2) {
+            setCustomerMatches(null);
+            return;
+        }
+        let cancelled = false;
+        const t = setTimeout(async () => {
+            const { data, error } = await supabase
+                .from('customers')
+                .select('id, full_name, email, phone')
+                .or(`full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
+                .order('full_name')
+                .limit(50);
+            if (!cancelled && !error) setCustomerMatches((data || []) as Customer[]);
+        }, 250);
+        return () => {
+            cancelled = true;
+            clearTimeout(t);
+        };
+    }, [customerSearch]);
+
     // Filter customers by search
     const filteredCustomers = useMemo(() => {
         if (!customerSearch.trim()) return customers;
+        if (customerMatches) return customerMatches;
         const q = customerSearch.toLowerCase();
         return customers.filter(c =>
             c.full_name?.toLowerCase().includes(q) ||
             c.email?.toLowerCase().includes(q) ||
             c.phone?.includes(q)
         );
-    }, [customers, customerSearch]);
+    }, [customers, customerSearch, customerMatches]);
 
-    const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0);
-    const tax = cartTotal * 0.0;
-    const deliveryFeeAmount = deliveryMethod === 'pickup' ? 0 : Math.max(0, Math.round((parseFloat(deliveryFee) || 0) * 100) / 100);
-    const grandTotal = cartTotal + tax + deliveryFeeAmount;
-    const changeDue = amountTendered ? (parseFloat(amountTendered) - grandTotal) : 0;
+    const cartTotal = round2(cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0));
+    const tax = 0;
+    const deliveryFeeAmount = deliveryMethod === 'pickup' ? 0 : Math.max(0, round2(parseFloat(deliveryFee) || 0));
+    const grandTotal = round2(cartTotal + tax + deliveryFeeAmount);
+    const changeDue = amountTendered ? round2(parseFloat(amountTendered) - grandTotal) : 0;
 
     // Get the customer email and phone for the order
     const getOrderEmail = () => {
@@ -279,7 +312,7 @@ export default function POSPage() {
         }
 
         if (paymentMethod === 'cash') {
-            const tendered = parseFloat(amountTendered || '0');
+            const tendered = round2(parseFloat(amountTendered || '0') || 0);
             if (tendered < grandTotal) return 'Insufficient amount tendered';
         }
 
@@ -318,6 +351,8 @@ export default function POSPage() {
             const customerPhone = getOrderPhone();
 
             const isCashOrCard = paymentMethod === 'cash' || paymentMethod === 'card';
+            // Who rang up the sale, for Admin → Staff activity.
+            const seller = await currentStaffActor();
 
             // Build shipping/billing address
             const addressData = selectedCustomer ? {
@@ -363,6 +398,8 @@ export default function POSPage() {
                     metadata: {
                         source: 'pos',
                         pos_sale: true,
+                        sold_by_id: seller?.id ?? null,
+                        sold_by_name: seller?.name ?? null,
                         first_name: addressData.firstName,
                         last_name: addressData.lastName,
                         phone: customerPhone
@@ -396,6 +433,19 @@ export default function POSPage() {
                 await supabase.from('orders').delete().eq('id', order.id);
                 throw itemsError;
             }
+
+            recordStaffAction({
+                action: 'pos_sale',
+                entityType: 'orders',
+                entityId: order.id,
+                actor: seller,
+                details: {
+                    label: orderNumber,
+                    total: grandTotal,
+                    items: cart.reduce((sum, item) => sum + item.cartQuantity, 0),
+                    payment_method: paymentMethod,
+                },
+            });
 
             // 3. Upsert Customer Record (email is required in customers table)
             const hasRealEmail = customerEmail && customerEmail !== 'pos-walkin@store.local';
@@ -440,8 +490,13 @@ export default function POSPage() {
                 }
 
                 // Success — show completed
-                const change = paymentMethod === 'cash' ? Math.max(0, (parseFloat(amountTendered || '0') || 0) - grandTotal) : 0;
-                setCompletedOrder({ id: order.id, orderNumber, total: grandTotal, items: cart, stockWarning, change });
+                const tendered = paymentMethod === 'cash' ? round2(parseFloat(amountTendered || '0') || 0) : 0;
+                const change = paymentMethod === 'cash' ? Math.max(0, round2(tendered - grandTotal)) : 0;
+                setCompletedOrder({
+                    id: order.id, orderNumber, total: grandTotal, subtotal: cartTotal, deliveryFee: deliveryFeeAmount,
+                    deliveryMethod, items: cart, stockWarning, change, tendered, paymentMethod,
+                    customerName, customerPhone, soldBy: seller?.name || '', createdAt: new Date().toISOString(),
+                });
                 setCart([]);
                 // Reflect the new stock levels in the grid.
                 fetchData();
@@ -491,7 +546,15 @@ export default function POSPage() {
                     id: order.id,
                     orderNumber,
                     total: grandTotal,
+                    subtotal: cartTotal,
+                    deliveryFee: deliveryFeeAmount,
+                    deliveryMethod,
                     items: cart,
+                    paymentMethod,
+                    customerName,
+                    customerPhone,
+                    soldBy: seller?.name || '',
+                    createdAt: new Date().toISOString(),
                     paymentUrl: paymentResult.url,
                     paymentPending: true
                 });
@@ -512,6 +575,7 @@ export default function POSPage() {
         setAmountTendered('');
         setSelectedCustomer(null);
         setCustomerSearch('');
+        setCustomerMatches(null);
         setCheckoutError(null);
         setPaymentMethod('cash');
         setDeliveryMethod('pickup');
@@ -527,17 +591,81 @@ export default function POSPage() {
         });
     };
 
+    const paymentLabel = (m: string) => (m === 'momo' ? 'Mobile Money' : m === 'card' ? 'Card' : 'Cash');
+
+    // Printed receipt: rendered straight into <body> so print CSS can hide the rest of the admin.
+    const receipt = completedOrder && typeof document !== 'undefined' ? createPortal(
+        <div className="pos-receipt-root" aria-hidden="true">
+            <style>{`
+                .pos-receipt-root { display: none; }
+                @media print {
+                    @page { margin: 6mm; }
+                    body > *:not(.pos-receipt-root) { display: none !important; }
+                    .pos-receipt-root { display: block !important; width: 72mm; margin: 0 auto; font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #000; }
+                    .pos-receipt-root table { width: 100%; border-collapse: collapse; }
+                    .pos-receipt-root td { padding: 2px 0; vertical-align: top; }
+                }
+            `}</style>
+            <div style={{ textAlign: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>House of Elle</div>
+                <div>Spintex Lashibi, Accra</div>
+                <div>0553347531</div>
+            </div>
+            <div>Receipt: {completedOrder.orderNumber}</div>
+            <div>{new Date(completedOrder.createdAt || Date.now()).toLocaleString('en-GB')}</div>
+            {completedOrder.customerName && <div>Customer: {completedOrder.customerName}</div>}
+            {completedOrder.soldBy && <div>Served by: {completedOrder.soldBy}</div>}
+            <hr style={{ border: 0, borderTop: '1px dashed #000', margin: '6px 0' }} />
+            <table>
+                <tbody>
+                    {(completedOrder.items || []).map((item: CartItem) => (
+                        <tr key={item.key}>
+                            <td>
+                                {item.name}{item.variantName ? ` (${item.variantName})` : ''}
+                                <div>{item.cartQuantity} x GH₵{money(item.price)}</div>
+                            </td>
+                            <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>GH₵{money(round2(item.price * item.cartQuantity))}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            <hr style={{ border: 0, borderTop: '1px dashed #000', margin: '6px 0' }} />
+            <table>
+                <tbody>
+                    <tr><td>Subtotal</td><td style={{ textAlign: 'right' }}>GH₵{money(completedOrder.subtotal)}</td></tr>
+                    {Number(completedOrder.deliveryFee) > 0 && (
+                        <tr><td>{deliveryLabel(completedOrder.deliveryMethod)} fee</td><td style={{ textAlign: 'right' }}>GH₵{money(completedOrder.deliveryFee)}</td></tr>
+                    )}
+                    <tr><td style={{ fontWeight: 700 }}>Total</td><td style={{ textAlign: 'right', fontWeight: 700 }}>GH₵{money(completedOrder.total)}</td></tr>
+                    <tr><td>Payment</td><td style={{ textAlign: 'right' }}>{paymentLabel(completedOrder.paymentMethod)}{completedOrder.paymentPending ? ' (awaiting payment)' : ''}</td></tr>
+                    {completedOrder.paymentMethod === 'cash' && (
+                        <>
+                            <tr><td>Cash received</td><td style={{ textAlign: 'right' }}>GH₵{money(completedOrder.tendered)}</td></tr>
+                            <tr><td>Change</td><td style={{ textAlign: 'right' }}>GH₵{money(completedOrder.change)}</td></tr>
+                        </>
+                    )}
+                </tbody>
+            </table>
+            {completedOrder.deliveryMethod && completedOrder.deliveryMethod !== 'pickup' && (
+                <div style={{ marginTop: 6 }}>Delivery: {deliveryLabel(completedOrder.deliveryMethod)}</div>
+            )}
+            <div style={{ textAlign: 'center', marginTop: 10 }}>Thank you for shopping with House of Elle!</div>
+        </div>,
+        document.body
+    ) : null;
+
     return (
         <div className="flex flex-col lg:flex-row h-[calc(100vh-90px)] -m-4 lg:-m-6 overflow-hidden bg-gray-100 relative">
 
             {/* LEFT: Product Grid */}
             <div className={`flex-1 flex flex-col h-full min-w-0 ${isMobileCartOpen ? 'hidden lg:flex' : 'flex'}`}>
                 {/* Header / Search */}
-                <div className="bg-white p-4 border-b border-gray-200 flex items-center justify-between space-x-4 shrink-0">
-                    <div className="relative flex-1 max-w-lg">
+                <div className="bg-white p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0">
+                    <div className="relative w-full sm:flex-1 sm:max-w-lg">
                         <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                         <input
-                            type="text"
+                            type="search"
+                            aria-label="Search products by name, SKU or option"
                             placeholder="Search products..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -545,10 +673,12 @@ export default function POSPage() {
                             autoFocus
                         />
                     </div>
-                    <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar">
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0" role="group" aria-label="Category">
                         {categories.map(cat => (
                             <button
                                 key={cat}
+                                type="button"
+                                aria-pressed={activeCategory === cat}
                                 onClick={() => setActiveCategory(cat)}
                                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat
                                     ? 'bg-blue-700 text-white shadow-md'
@@ -585,10 +715,12 @@ export default function POSPage() {
                     ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-20 lg:pb-4">
                             {filteredProducts.map(product => (
-                                <div
+                                <button
+                                    type="button"
                                     key={product.id}
                                     onClick={() => addToCart(product)}
-                                    className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden border border-gray-100 group flex flex-col h-full"
+                                    aria-label={`Add ${product.name} to the order${product.variants.length > 0 ? ' (choose an option)' : ''}`}
+                                    className="text-left bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden border border-gray-100 group flex flex-col h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                                 >
                                     <div className="aspect-square relative bg-gray-50 shrink-0">
                                         <img
@@ -613,12 +745,12 @@ export default function POSPage() {
                                                     ? `From GH₵${money(Math.min(...product.variants.map(v => v.price)))}`
                                                     : `GH₵${money(product.variants[0]?.price ?? product.price)}`}
                                             </span>
-                                            <button className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-700 group-hover:text-white transition-colors">
+                                            <span aria-hidden="true" className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-700 group-hover:text-white transition-colors">
                                                 <i className="ri-add-line"></i>
-                                            </button>
+                                            </span>
                                         </div>
                                     </div>
-                                </div>
+                                </button>
                             ))}
                         </div>
                     )}
@@ -646,7 +778,7 @@ export default function POSPage() {
             <div className={`w-full lg:w-96 bg-white border-l border-gray-200 flex flex-col h-full shadow-lg z-20 absolute inset-0 lg:relative ${isMobileCartOpen ? 'flex' : 'hidden lg:flex'}`}>
                 <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
                     <div className="flex items-center">
-                        <button onClick={() => setIsMobileCartOpen(false)} className="lg:hidden mr-3 p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-full transition-colors">
+                        <button onClick={() => setIsMobileCartOpen(false)} aria-label="Back to products" className="lg:hidden mr-3 p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-full transition-colors">
                             <i className="ri-arrow-left-line text-xl"></i>
                         </button>
                         <h2 className="text-lg font-bold text-gray-900 flex items-center">
@@ -665,7 +797,7 @@ export default function POSPage() {
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
                             <i className="ri-shopping-cart-line text-5xl opacity-20"></i>
                             <p className="text-sm">Cart is empty</p>
-                            <button onClick={() => setIsMobileCartOpen(false)} className="lg:hidden text-blue-600 font-medium hover:underline">
+                            <button onClick={() => setIsMobileCartOpen(false)} className="lg:hidden text-blue-700 font-medium hover:underline">
                                 Start Adding Products
                             </button>
                         </div>
@@ -687,11 +819,11 @@ export default function POSPage() {
                                     </div>
                                     <div className="flex items-center justify-between mt-2">
                                         <div className="flex items-center space-x-2 bg-white rounded border border-gray-200 px-1 py-0.5">
-                                            <button onClick={() => updateQuantity(item.key, -1)} aria-label="Decrease quantity" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded">
+                                            <button onClick={() => updateQuantity(item.key, -1)} aria-label={`Decrease quantity of ${item.name}`} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded">
                                                 <i className="ri-subtract-line text-xs"></i>
                                             </button>
                                             <span className="text-sm font-semibold w-6 text-center">{item.cartQuantity}</span>
-                                            <button onClick={() => updateQuantity(item.key, 1)} aria-label="Increase quantity" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded">
+                                            <button onClick={() => updateQuantity(item.key, 1)} aria-label={`Increase quantity of ${item.name}`} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded">
                                                 <i className="ri-add-line text-xs"></i>
                                             </button>
                                         </div>
@@ -733,7 +865,7 @@ export default function POSPage() {
                         <button
                             onClick={() => { setShowCheckoutModal(true); setCheckoutError(null); }}
                             disabled={cart.length === 0}
-                            className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-4 py-3 bg-blue-700 text-white rounded-lg hover:bg-blue-800 font-bold text-sm shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Charge GH₵{money(grandTotal)}
                         </button>
@@ -805,7 +937,7 @@ export default function POSPage() {
                                         <i className="ri-printer-line mr-2"></i>
                                         Print Receipt
                                     </button>
-                                    <button onClick={resetCheckout} className="py-3 px-4 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+                                    <button onClick={resetCheckout} className="py-3 px-4 bg-blue-700 text-white rounded-xl font-semibold hover:bg-blue-800 transition-colors">
                                         New Order
                                     </button>
                                 </div>
@@ -815,7 +947,7 @@ export default function POSPage() {
                             <>
                                 <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
                                     <h3 className="text-xl font-bold text-gray-900">Finalize Payment</h3>
-                                    <button onClick={() => setShowCheckoutModal(false)} className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500">
+                                    <button onClick={() => setShowCheckoutModal(false)} aria-label="Close checkout" className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500">
                                         <i className="ri-close-line text-xl"></i>
                                     </button>
                                 </div>
@@ -837,13 +969,14 @@ export default function POSPage() {
 
                                     {/* Customer Select */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Customer</label>
+                                        <label htmlFor="pos-customer" className="block text-sm font-semibold text-gray-700 mb-2">Customer</label>
 
                                         {/* Customer search input */}
                                         <div className="relative mb-2">
                                             <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
                                             <input
-                                                type="text"
+                                                type="search"
+                                                aria-label="Search customers"
                                                 placeholder="Search customers by name, email, or phone..."
                                                 value={customerSearch}
                                                 onChange={(e) => setCustomerSearch(e.target.value)}
@@ -852,13 +985,19 @@ export default function POSPage() {
                                         </div>
 
                                         <select
+                                            id="pos-customer"
                                             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none mb-2"
                                             onChange={(e) => {
-                                                setSelectedCustomer(customers.find(c => c.id === e.target.value) || null);
+                                                setSelectedCustomer(filteredCustomers.find(c => c.id === e.target.value) || customers.find(c => c.id === e.target.value) || null);
                                             }}
                                             value={selectedCustomer?.id || ''}
                                         >
-                                            <option value="">Walk-in Customer / New Guest</option>
+                                            <option value="">
+                                                {customerSearch.trim() && filteredCustomers.length === 0 ? 'No matching customers. Walk-in / New Guest' : 'Walk-in Customer / New Guest'}
+                                            </option>
+                                            {selectedCustomer && !filteredCustomers.some(c => c.id === selectedCustomer.id) && (
+                                                <option value={selectedCustomer.id}>{selectedCustomer.full_name || 'No Name'} — {selectedCustomer.phone || selectedCustomer.email}</option>
+                                            )}
                                             {filteredCustomers.map(c => (
                                                 <option key={c.id} value={c.id}>
                                                     {c.full_name || 'No Name'} — {c.phone || c.email}
@@ -874,6 +1013,7 @@ export default function POSPage() {
                                                 </div>
                                                 <button
                                                     onClick={() => setSelectedCustomer(null)}
+                                                    aria-label="Remove selected customer"
                                                     className="text-gray-400 hover:text-red-500 text-sm"
                                                 >
                                                     <i className="ri-close-line"></i>
@@ -890,13 +1030,15 @@ export default function POSPage() {
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <input
                                                         type="text"
-                                                        placeholder="First Name *"
+                                                        aria-label="First name"
+                                                        placeholder="First Name"
                                                         value={guestDetails.firstName}
                                                         onChange={e => setGuestDetails({ ...guestDetails, firstName: e.target.value })}
                                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                                                     />
                                                     <input
                                                         type="text"
+                                                        aria-label="Last name"
                                                         placeholder="Last Name"
                                                         value={guestDetails.lastName}
                                                         onChange={e => setGuestDetails({ ...guestDetails, lastName: e.target.value })}
@@ -906,6 +1048,7 @@ export default function POSPage() {
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <input
                                                         type="email"
+                                                        aria-label="Email"
                                                         placeholder="Email"
                                                         value={guestDetails.email}
                                                         onChange={e => setGuestDetails({ ...guestDetails, email: e.target.value })}
@@ -913,6 +1056,7 @@ export default function POSPage() {
                                                     />
                                                     <input
                                                         type="tel"
+                                                        aria-label={paymentMethod === 'momo' ? 'Phone (required for Mobile Money)' : 'Phone'}
                                                         placeholder={paymentMethod === 'momo' ? 'Phone (Required) *' : 'Phone'}
                                                         value={guestDetails.phone}
                                                         onChange={e => setGuestDetails({ ...guestDetails, phone: e.target.value })}
@@ -926,12 +1070,13 @@ export default function POSPage() {
 
                                     {/* Delivery Method */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Delivery Method</label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <p id="pos-delivery-label" className="block text-sm font-semibold text-gray-700 mb-2">Delivery Method</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" role="group" aria-labelledby="pos-delivery-label">
                                             {DELIVERY_OPTIONS.map((option) => (
                                                 <button
                                                     key={option.id}
                                                     type="button"
+                                                    aria-pressed={deliveryMethod === option.id}
                                                     onClick={() => setDeliveryMethod(option.id)}
                                                     className={`p-3 rounded-lg border transition-all flex items-center space-x-3 ${deliveryMethod === option.id
                                                         ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
@@ -974,6 +1119,7 @@ export default function POSPage() {
                                                 </h4>
                                                 <input
                                                     type="text"
+                                                    aria-label="Street address or location"
                                                     placeholder="Street Address / Location *"
                                                     value={guestDetails.address}
                                                     onChange={e => setGuestDetails({ ...guestDetails, address: e.target.value })}
@@ -982,12 +1128,14 @@ export default function POSPage() {
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <input
                                                         type="text"
+                                                        aria-label="City or town"
                                                         placeholder="City / Town *"
                                                         value={guestDetails.city}
                                                         onChange={e => setGuestDetails({ ...guestDetails, city: e.target.value })}
                                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                                                     />
                                                     <select
+                                                        aria-label="Region"
                                                         value={guestDetails.region}
                                                         onChange={e => setGuestDetails({ ...guestDetails, region: e.target.value })}
                                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
@@ -1004,15 +1152,17 @@ export default function POSPage() {
 
                                     {/* Payment Method */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Method</label>
-                                        <div className="grid grid-cols-3 gap-3">
+                                        <p id="pos-payment-label" className="block text-sm font-semibold text-gray-700 mb-2">Payment Method</p>
+                                        <div className="grid grid-cols-3 gap-3" role="group" aria-labelledby="pos-payment-label">
                                             {[
-                                                { key: 'cash', label: 'Cash', icon: 'ri-money-cny-circle-line' },
+                                                { key: 'cash', label: 'Cash', icon: 'ri-money-dollar-box-line' },
                                                 { key: 'card', label: 'Card', icon: 'ri-bank-card-line' },
                                                 { key: 'momo', label: 'MoMo', icon: 'ri-smartphone-line' }
                                             ].map(method => (
                                                 <button
                                                     key={method.key}
+                                                    type="button"
+                                                    aria-pressed={paymentMethod === method.key}
                                                     onClick={() => setPaymentMethod(method.key)}
                                                     className={`py-3 rounded-lg font-medium border transition-all flex flex-col items-center space-y-1 ${paymentMethod === method.key
                                                         ? 'border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600'
@@ -1029,20 +1179,24 @@ export default function POSPage() {
                                     {/* Cash Tendered */}
                                     {paymentMethod === 'cash' && (
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Amount Tendered</label>
+                                            <label htmlFor="pos-tendered" className="block text-sm font-semibold text-gray-700 mb-2">Amount Tendered</label>
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">GH₵</span>
                                                 <input
+                                                    id="pos-tendered"
                                                     type="number"
+                                                    inputMode="decimal"
+                                                    min="0"
+                                                    step="0.01"
                                                     value={amountTendered}
                                                     onChange={(e) => setAmountTendered(e.target.value)}
-                                                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg"
+                                                    className="w-full pl-16 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg"
                                                     placeholder="0.00"
                                                     autoFocus
                                                 />
                                             </div>
                                             {changeDue > 0 && (
-                                                <p className="text-right text-blue-600 font-bold mt-2">Change: GH₵{money(changeDue)}</p>
+                                                <p className="text-right text-blue-700 font-bold mt-2">Change: GH₵{money(changeDue)}</p>
                                             )}
                                             {changeDue < 0 && amountTendered && (
                                                 <p className="text-right text-red-500 font-medium mt-2">Insufficient amount</p>
@@ -1052,7 +1206,8 @@ export default function POSPage() {
                                                 {[grandTotal, Math.ceil(grandTotal / 10) * 10, Math.ceil(grandTotal / 50) * 50, Math.ceil(grandTotal / 100) * 100].filter((v, i, a) => a.indexOf(v) === i).map(amount => (
                                                     <button
                                                         key={amount}
-                                                        onClick={() => setAmountTendered(amount.toString())}
+                                                        type="button"
+                                                        onClick={() => setAmountTendered(amount.toFixed(2))}
                                                         className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
                                                     >
                                                         GH₵{money(amount)}
@@ -1118,6 +1273,8 @@ export default function POSPage() {
                     </div>
                 </div>
             )}
+
+            {receipt}
 
             {/* Variant Picker */}
             {variantPicker && (

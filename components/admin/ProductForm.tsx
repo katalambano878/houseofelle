@@ -5,10 +5,13 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { adminFetch } from '@/lib/admin-fetch';
+import { recordStaffAction } from '@/lib/staff-audit';
 
 const ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'];
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGES = 10;
 
 /** Returns an error message when the file can't be uploaded, or null when it is fine. */
 function validateImageFile(file: File): string | null {
@@ -42,6 +45,15 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
     const [categoryId, setCategoryId] = useState(initialData?.category_id || '');
     const [price, setPrice] = useState(initialData?.price || '');
     const [comparePrice, setComparePrice] = useState(initialData?.compare_at_price || '');
+    // Set when this product is in a live sale, so the price fields can explain themselves.
+    const [liveSale, setLiveSale] = useState<{ id: string; name: string; percent_off: number; original_price: number } | null>(null);
+
+    useEffect(() => {
+        if (!initialData?.id) return;
+        adminFetch<{ sale: typeof liveSale }>(`/api/admin/discounts?product=${initialData.id}`)
+            .then((d) => setLiveSale(d.sale))
+            .catch(() => setLiveSale(null));
+    }, [initialData?.id]);
     const [sku, setSku] = useState(initialData?.sku || '');
     const [stock, setStock] = useState(initialData?.quantity || '');
     const [moq, setMoq] = useState(initialData?.moq || '1');
@@ -231,19 +243,16 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
         { id: 'seo', label: 'SEO', icon: 'ri-search-line' }
     ];
 
-    // Fetch categories on mount
+    // Fetch categories once. A product's current category stays listed even if it was made inactive.
     useEffect(() => {
         async function fetchCategories() {
-            const { data } = await supabase.from('categories').select('id, name').eq('status', 'active');
+            const { data } = await supabase.from('categories').select('id, name, status').order('name');
             if (data) {
-                setCategories(data);
-                if (data.length > 0 && !categoryId) {
-                    setCategoryId(data[0].id);
-                }
+                setCategories(data.filter((c: any) => c.status === 'active' || c.id === initialData?.category_id));
             }
         }
         fetchCategories();
-    }, [categoryId]);
+    }, [initialData?.category_id]);
 
     // Auto-generate slug from name if not manually edited
     useEffect(() => {
@@ -263,6 +272,10 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
         const input = e.target;
         try {
             if (!input.files || input.files.length === 0) return;
+            if (images.length >= MAX_IMAGES) {
+                alert(`A product can have up to ${MAX_IMAGES} images. Remove one first.`);
+                return;
+            }
 
             const file = input.files[0];
             const invalid = validateImageFile(file);
@@ -299,9 +312,39 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
         setImages(images.filter((_, idx) => idx !== indexToRemove));
     };
 
+    /** Moves an image to the front, making it the one shown in the shop and on the POS. */
+    const handleMakePrimary = (index: number) => {
+        if (index === 0) return;
+        setImages((prev) => [prev[index], ...prev.filter((_, idx) => idx !== index)]);
+    };
+
+    /** Returns what must be fixed before saving, or null when the form is ready. */
+    const validate = (): string | null => {
+        if (!productName.trim()) return 'Please enter a product name.';
+        // Drafts may be saved before they are priced; anything on sale needs a real price.
+        const selling = status === 'active';
+        const priceValue = parseFloat(price);
+        if (price !== '' && price != null && !(priceValue >= 0)) return 'The price must be a number.';
+        if (selling && !(priceValue > 0)) return 'Please enter a price above GH₵ 0, or save the product as a Draft.';
+        if (comparePrice !== '' && comparePrice != null && !(parseFloat(comparePrice) >= 0)) return 'The compare-at price must be a number.';
+        if (variants.length === 0 && stock !== '' && parseInt(stock) < 0) return 'Stock cannot be below 0.';
+        for (const v of variants) {
+            const label = [v.color, v.name].filter(Boolean).join(' / ');
+            if (selling && !(parseFloat(v.price) > 0)) return `Please enter a price above GH₵ 0 for ${label}.`;
+            if (parseInt(v.stock) < 0) return `Stock for ${label} cannot be below 0.`;
+        }
+        if (!(parseInt(moq) >= 1)) return 'The minimum order quantity must be at least 1.';
+        return null;
+    };
+
     // Variant helpers removed — variants are now auto-generated from selectedColors × selectedSizes
 
     const handleSubmit = async () => {
+        const invalid = validate();
+        if (invalid) {
+            alert(invalid);
+            return;
+        }
         try {
             setLoading(true);
 
@@ -312,7 +355,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                 : parseInt(stock) || 0;
 
             const productData = {
-                name: productName,
+                name: productName.trim(),
                 slug: urlSlug || productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
                 description,
                 category_id: categoryId || null,
@@ -358,6 +401,13 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
             if (error) throw error;
 
             if (!productId) throw new Error('The product was not saved. Please try again.');
+
+            recordStaffAction({
+                action: isEditMode ? 'update' : 'create',
+                entityType: 'products',
+                entityId: productId,
+                details: { label: productData.name, price: productData.price, quantity: productData.quantity },
+            });
 
             const problems: string[] = [];
 
@@ -489,7 +539,12 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
 
         } catch (err: any) {
             console.error('Error saving product:', err);
-            alert(`Error: ${err.message}`);
+            const message = String(err?.message || '');
+            alert(
+                /duplicate|unique/i.test(message) && /slug/i.test(message)
+                    ? 'Another product already uses this URL slug. Change it on the SEO tab and save again.'
+                    : `Could not save the product: ${message || 'unknown error'}`
+            );
         } finally {
             setLoading(false);
         }
@@ -497,16 +552,17 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center space-x-4">
                     <Link
                         href="/admin/products"
-                        className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
+                        aria-label="Back to products"
+                        className="w-10 h-10 shrink-0 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
                     >
                         <i className="ri-arrow-left-line text-xl text-gray-700"></i>
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                             {isEditMode ? 'Edit Product' : 'Add New Product'}
                         </h1>
                         <p className="text-gray-600 mt-1">
@@ -515,10 +571,10 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                     </div>
                 </div>
 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-3">
                     {isEditMode && (
                         <Link
-                            href={`/product/${initialData?.id}`}
+                            href={`/product/${initialData?.slug || initialData?.id}`}
                             target="_blank"
                             className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:border-gray-400 transition-colors font-semibold whitespace-nowrap cursor-pointer flex items-center"
                         >
@@ -552,8 +608,10 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
+                                type="button"
+                                aria-pressed={activeTab === tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center space-x-2 px-6 py-4 font-semibold whitespace-nowrap transition-colors border-b-2 cursor-pointer ${activeTab === tab.id
+                                className={`flex items-center space-x-2 px-4 sm:px-6 py-4 font-semibold whitespace-nowrap transition-colors border-b-2 cursor-pointer ${activeTab === tab.id
                                     ? 'border-blue-700 text-blue-700 bg-blue-50'
                                     : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                                     }`}
@@ -565,14 +623,15 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                     </div>
                 </div>
 
-                <div className="p-8">
+                <div className="p-4 sm:p-8">
                     {activeTab === 'general' && (
                         <div className="space-y-6 max-w-3xl">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                <label htmlFor="pf-name" className="block text-sm font-semibold text-gray-900 mb-2">
                                     Product Name *
                                 </label>
                                 <input
+                                    id="pf-name"
                                     type="text"
                                     value={productName}
                                     onChange={(e) => setProductName(e.target.value)}
@@ -582,10 +641,11 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                <label htmlFor="pf-description" className="block text-sm font-semibold text-gray-900 mb-2">
                                     Description
                                 </label>
                                 <textarea
+                                    id="pf-description"
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     rows={6}
@@ -598,16 +658,16 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
 
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                        Category *
+                                    <label htmlFor="pf-category" className="block text-sm font-semibold text-gray-900 mb-2">
+                                        Category
                                     </label>
                                     <select
+                                        id="pf-category"
                                         value={categoryId}
                                         onChange={(e) => setCategoryId(e.target.value)}
                                         className="w-full px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
                                     >
-                                        {categories.length === 0 && <option value="">Loading categories...</option>}
-                                        {categories.length > 0 && <option value="">Select a category</option>}
+                                        <option value="">{categories.length === 0 ? 'No categories yet' : 'No category'}</option>
                                         {categories.map(cat => (
                                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                                         ))}
@@ -615,10 +675,11 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                    <label htmlFor="pf-status" className="block text-sm font-semibold text-gray-900 mb-2">
                                         Status
                                     </label>
                                     <select
+                                        id="pf-status"
                                         value={status}
                                         onChange={(e) => setStatus(e.target.value)}
                                         className="w-full px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
@@ -632,26 +693,28 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
 
                             <div className="flex items-center space-x-3">
                                 <input
+                                    id="pf-featured"
                                     type="checkbox"
                                     checked={featured}
                                     onChange={(e) => setFeatured(e.target.checked)}
                                     className="w-5 h-5 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                                 />
-                                <label className="text-gray-900 font-medium">
+                                <label htmlFor="pf-featured" className="text-gray-900 font-medium cursor-pointer">
                                     Feature this product on homepage
                                 </label>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                <label htmlFor="pf-preorder" className="block text-sm font-semibold text-gray-900 mb-2">
                                     Pre-order / Estimated Shipping
                                 </label>
                                 <input
+                                    id="pf-preorder"
                                     type="text"
                                     value={preorderShipping}
                                     onChange={(e) => setPreorderShipping(e.target.value)}
                                     placeholder="e.g., Ships in 14 days, Available March 15"
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Leave empty if product ships immediately. Otherwise, enter estimated shipping time.</p>
                             </div>
@@ -660,15 +723,28 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
 
                     {activeTab === 'pricing' && (
                         <div className="space-y-6 max-w-3xl">
+                            {liveSale && (
+                                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                    <i className="ri-price-tag-3-line text-lg leading-none mt-0.5" aria-hidden="true"></i>
+                                    <p>
+                                        This product is in the <span className="font-semibold">{liveSale.name}</span> sale at {liveSale.percent_off}% off, so the price below is the sale price.
+                                        Its regular price, GH₵ {money(liveSale.original_price)}, comes back when the sale ends. If you change the price here, your new price is kept instead.{' '}
+                                        <Link href={`/admin/discounts/${liveSale.id}`} className="font-semibold underline">Manage the sale</Link>
+                                    </p>
+                                </div>
+                            )}
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                    <label htmlFor="pf-price" className="block text-sm font-semibold text-gray-900 mb-2">
                                         Price (GH₵) *
                                     </label>
                                     <div className="relative">
                                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">GH₵</span>
                                         <input
+                                            id="pf-price"
                                             type="number"
+                                            min="0"
+                                            inputMode="decimal"
                                             value={price}
                                             onChange={(e) => setPrice(e.target.value)}
                                             className="w-full pl-16 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -679,13 +755,16 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                    <label htmlFor="pf-compare" className="block text-sm font-semibold text-gray-900 mb-2">
                                         Compare at Price (GH₵)
                                     </label>
                                     <div className="relative">
                                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">GH₵</span>
                                         <input
+                                            id="pf-compare"
                                             type="number"
+                                            min="0"
+                                            inputMode="decimal"
                                             value={comparePrice}
                                             onChange={(e) => setComparePrice(e.target.value)}
                                             className="w-full pl-16 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -693,7 +772,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                             placeholder="0.00"
                                         />
                                     </div>
-                                    <p className="text-sm text-gray-500 mt-2">Show original price for comparison</p>
+                                    <p className="text-sm text-gray-500 mt-2">Optional. Shown crossed out next to the price when it is higher.</p>
                                 </div>
                             </div>
 
@@ -716,11 +795,12 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
 
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                        <label htmlFor="pf-sku" className="block text-sm font-semibold text-gray-900 mb-2">
                                             SKU (Auto-generated)
                                         </label>
                                         <div className="flex gap-2">
                                             <input
+                                                id="pf-sku"
                                                 type="text"
                                                 value={sku}
                                                 onChange={(e) => setSku(e.target.value)}
@@ -733,6 +813,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                                 onClick={() => setSku(generateSku())}
                                                 className="px-4 py-3 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer"
                                                 title="Generate new SKU"
+                                                aria-label="Generate a new SKU"
                                             >
                                                 <i className="ri-refresh-line text-lg"></i>
                                             </button>
@@ -741,25 +822,28 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                            Stock Quantity *
+                                        <label htmlFor="pf-stock" className="block text-sm font-semibold text-gray-900 mb-2">
+                                            Stock Quantity
                                         </label>
                                         {variants.length > 0 ? (
                                             <div>
                                                 <input
+                                                    id="pf-stock"
                                                     type="number"
                                                     value={variants.reduce((sum: number, v: any) => sum + (parseInt(v.stock) || 0), 0)}
                                                     readOnly
                                                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
                                                 />
-                                                <p className="text-sm text-amber-600 mt-1 flex items-center">
+                                                <p className="text-sm text-amber-700 mt-1 flex items-center">
                                                     <i className="ri-information-line mr-1"></i>
                                                     Stock is managed per variant. Edit stock in the Variants tab.
                                                 </p>
                                             </div>
                                         ) : (
                                             <input
+                                                id="pf-stock"
                                                 type="number"
+                                                min="0"
                                                 value={stock}
                                                 onChange={(e) => setStock(e.target.value)}
                                                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -771,10 +855,11 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
 
                                 <div className="grid md:grid-cols-2 gap-6 mt-6">
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                        <label htmlFor="pf-moq" className="block text-sm font-semibold text-gray-900 mb-2">
                                             Minimum Order Quantity (MOQ)
                                         </label>
                                         <input
+                                            id="pf-moq"
                                             type="number"
                                             value={moq}
                                             onChange={(e) => setMoq(e.target.value)}
@@ -786,16 +871,18 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                        <label htmlFor="pf-low-stock" className="block text-sm font-semibold text-gray-900 mb-2">
                                             Low Stock Threshold
                                         </label>
                                         <input
+                                            id="pf-low-stock"
+                                            min="0"
                                             type="number"
                                             value={lowStockThreshold}
                                             onChange={(e) => setLowStockThreshold(e.target.value)}
                                             className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         />
-                                        <p className="text-sm text-gray-500 mt-1">Get notified when stock falls below this number</p>
+                                        <p className="text-sm text-gray-500 mt-1">Marked as low stock on the dashboard and inventory at or below this number</p>
                                     </div>
                                 </div>
                             </div>
@@ -828,6 +915,8 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         return (
                                             <button
                                                 key={color.name}
+                                                type="button"
+                                                aria-pressed={isSelected}
                                                 onClick={() => toggleColor(color)}
                                                 className={`flex items-center space-x-2 px-3 py-2 rounded-lg border-2 transition-all text-sm font-medium ${isSelected
                                                         ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
@@ -852,21 +941,24 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         type="color"
                                         value={customColorHex}
                                         onChange={(e) => setCustomColorHex(e.target.value)}
-                                        className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5"
+                                        className="w-10 h-10 shrink-0 rounded-lg border border-gray-300 cursor-pointer p-0.5"
                                         title="Pick a swatch colour"
+                                        aria-label="Swatch colour for the custom scent or colour"
                                     />
                                     <input
                                         type="text"
+                                        aria-label="Custom scent or colour name"
                                         value={customColorName}
                                         onChange={(e) => setCustomColorName(e.target.value)}
                                         placeholder="Custom scent / colour"
                                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                        onKeyDown={(e) => e.key === 'Enter' && addCustomColor()}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomColor(); } }}
                                     />
                                     <button
+                                        type="button"
                                         onClick={addCustomColor}
                                         disabled={!customColorName.trim()}
-                                        className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        className="shrink-0 px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                     >
                                         Add Scent / Colour
                                     </button>
@@ -879,7 +971,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                             <span key={color.name} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm shadow-sm">
                                                 <span className="w-3.5 h-3.5 rounded-full border border-gray-300" style={{ backgroundColor: color.hex }}></span>
                                                 {color.name}
-                                                <button onClick={() => toggleColor(color)} className="text-gray-400 hover:text-red-500 ml-1">
+                                                <button type="button" onClick={() => toggleColor(color)} aria-label={`Remove ${color.name}`} className="text-gray-400 hover:text-red-500 ml-1">
                                                     <i className="ri-close-line text-sm"></i>
                                                 </button>
                                             </span>
@@ -891,7 +983,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                             {/* STEP 2: Sizes */}
                             <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                                 <h4 className="text-sm font-bold text-gray-900 mb-1 flex items-center">
-                                    <i className="ri-ruler-line mr-2 text-lg text-blue-600"></i>
+                                    <i className="ri-ruler-line mr-2 text-lg text-blue-700"></i>
                                     Step 2: Select Sizes
                                     {selectedSizes.length > 0 && (
                                         <span className="ml-2 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
@@ -907,6 +999,8 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         return (
                                             <button
                                                 key={size}
+                                                type="button"
+                                                aria-pressed={isSelected}
                                                 onClick={() => toggleSize(size)}
                                                 className={`px-5 py-2.5 rounded-lg border-2 font-semibold text-sm transition-all ${isSelected
                                                         ? 'border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600'
@@ -924,16 +1018,18 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                 <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
                                     <input
                                         type="text"
+                                        aria-label="Custom size"
                                         value={customSize}
                                         onChange={(e) => setCustomSize(e.target.value)}
                                         placeholder="Custom size (e.g. 75ml, Travel Size)"
                                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                        onKeyDown={(e) => e.key === 'Enter' && addCustomSize()}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSize(); } }}
                                     />
                                     <button
+                                        type="button"
                                         onClick={addCustomSize}
                                         disabled={!customSize.trim()}
-                                        className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        className="shrink-0 px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                     >
                                         Add Size
                                     </button>
@@ -945,7 +1041,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         {selectedSizes.map(size => (
                                             <span key={size} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm shadow-sm font-medium">
                                                 {size}
-                                                <button onClick={() => toggleSize(size)} className="text-gray-400 hover:text-red-500 ml-1">
+                                                <button type="button" onClick={() => toggleSize(size)} aria-label={`Remove ${size}`} className="text-gray-400 hover:text-red-500 ml-1">
                                                     <i className="ri-close-line text-sm"></i>
                                                 </button>
                                             </span>
@@ -957,15 +1053,16 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                             {/* STEP 3: Variant Grid */}
                             {variantCombinations.length > 0 && (
                                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                                    <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                                    <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                         <div>
                                             <h4 className="text-sm font-bold text-gray-900 flex items-center">
-                                                <i className="ri-grid-line mr-2 text-lg text-purple-600"></i>
+                                                <i className="ri-grid-line mr-2 text-lg text-blue-700"></i>
                                                 Step 3: Set Price & Stock ({variantCombinations.length} variant{variantCombinations.length > 1 ? 's' : ''})
                                             </h4>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
+                                                type="button"
                                                 onClick={() => {
                                                     const val = prompt('Set price for ALL variants:', price?.toString() || '0');
                                                     if (val !== null) bulkSetField('price', val);
@@ -975,6 +1072,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                                 Bulk Set Price
                                             </button>
                                             <button
+                                                type="button"
                                                 onClick={() => {
                                                     const val = prompt('Set stock for ALL variants:', '0');
                                                     if (val !== null) bulkSetField('stock', val);
@@ -1026,6 +1124,8 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                                             <td className="py-3 px-4">
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
+                                                                    aria-label={`Price for ${[combo.color, combo.size].filter(Boolean).join(' / ')}`}
                                                                     value={d.price}
                                                                     onChange={(e) => updateVariantField(combo.key, 'price', e.target.value)}
                                                                     className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
@@ -1036,6 +1136,8 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                                             <td className="py-3 px-4">
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
+                                                                    aria-label={`Stock for ${[combo.color, combo.size].filter(Boolean).join(' / ')}`}
                                                                     value={d.stock}
                                                                     onChange={(e) => updateVariantField(combo.key, 'stock', e.target.value)}
                                                                     className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
@@ -1073,12 +1175,12 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-lg font-bold text-gray-900 mb-1">Product Images</h3>
-                                <p className="text-gray-600">Add up to 10 images. First image will be the primary image.</p>
+                                <p className="text-gray-600">Add up to {MAX_IMAGES} images. The first image is the primary one shown in the shop. Images are saved when you save the product.</p>
                             </div>
 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {images.map((img: any, index: number) => (
-                                    <div key={index} className="relative group">
+                                    <div key={img.id || img.url || index} className="relative group">
                                         <div className="aspect-square bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200">
                                             <img src={img.url} alt={`Product ${index + 1}`} className="w-full h-full object-cover" />
                                         </div>
@@ -1087,12 +1189,25 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                                 Primary
                                             </span>
                                         )}
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2 rounded-xl">
-                                            <a href={img.url} target="_blank" rel="noreferrer" className="w-9 h-9 flex items-center justify-center bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                                        <div className="absolute inset-x-0 bottom-0 sm:inset-0 bg-black/50 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2 rounded-b-xl sm:rounded-xl">
+                                            <a href={img.url} target="_blank" rel="noreferrer" aria-label={`Open image ${index + 1}`} className="w-9 h-9 flex items-center justify-center bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                                                 <i className="ri-eye-line"></i>
                                             </a>
+                                            {index > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleMakePrimary(index)}
+                                                    aria-label={`Make image ${index + 1} the primary image`}
+                                                    title="Make primary"
+                                                    className="w-9 h-9 flex items-center justify-center bg-white text-blue-700 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                                                >
+                                                    <i className="ri-star-line"></i>
+                                                </button>
+                                            )}
                                             <button
+                                                type="button"
                                                 onClick={() => handleRemoveImage(index)}
+                                                aria-label={`Remove image ${index + 1}`}
                                                 className="w-9 h-9 flex items-center justify-center bg-white text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
                                             >
                                                 <i className="ri-delete-bin-line"></i>
@@ -1101,7 +1216,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                     </div>
                                 ))}
 
-                                <label className={`aspect-square border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-700 hover:bg-blue-50 transition-colors flex flex-col items-center justify-center space-y-2 text-gray-600 hover:text-blue-700 cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                {images.length < MAX_IMAGES && <label className={`aspect-square border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-700 hover:bg-blue-50 transition-colors flex flex-col items-center justify-center space-y-2 text-gray-600 hover:text-blue-700 cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                     {uploading ? (
                                         <i className="ri-loader-4-line animate-spin text-3xl"></i>
                                     ) : (
@@ -1115,7 +1230,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         onChange={handleImageUpload}
                                         disabled={uploading}
                                     />
-                                </label>
+                                </label>}
                             </div>
 
                             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
@@ -1135,57 +1250,61 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                <label htmlFor="pf-seo-title" className="block text-sm font-semibold text-gray-900 mb-2">
                                     Page Title
                                 </label>
                                 <input
+                                    id="pf-seo-title"
                                     type="text"
                                     value={seoTitle}
                                     onChange={(e) => setSeoTitle(e.target.value)}
                                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Seo friendly title"
+                                    placeholder={productName ? `${productName} | House of Elle` : 'Leave empty to use the product name'}
                                 />
-                                <p className="text-sm text-gray-500 mt-2">60 characters recommended</p>
+                                <p className="text-sm text-gray-500 mt-2">{seoTitle.length}/60 characters recommended</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                <label htmlFor="pf-seo-description" className="block text-sm font-semibold text-gray-900 mb-2">
                                     Meta Description
                                 </label>
                                 <textarea
+                                    id="pf-seo-description"
                                     rows={3}
                                     maxLength={500}
                                     value={metaDescription}
                                     onChange={(e) => setMetaDescription(e.target.value)}
                                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                                    placeholder="Seo friendly description"
+                                    placeholder="One or two sentences shown under the product in Google results"
                                 />
-                                <p className="text-sm text-gray-500 mt-2">160 characters recommended</p>
+                                <p className="text-sm text-gray-500 mt-2">{metaDescription.length}/160 characters recommended</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                <label htmlFor="pf-slug" className="block text-sm font-semibold text-gray-900 mb-2">
                                     URL Slug
                                 </label>
                                 <div className="flex items-center">
-                                    <span className="text-gray-600 bg-gray-100 px-4 py-3 border-2 border-r-0 border-gray-300 rounded-l-lg">
-                                        store.com/product/
+                                    <span className="text-gray-600 bg-gray-100 px-3 sm:px-4 py-3 border-2 border-r-0 border-gray-300 rounded-l-lg whitespace-nowrap">
+                                        /product/
                                     </span>
                                     <input
+                                        id="pf-slug"
                                         type="text"
                                         value={urlSlug}
-                                        onChange={(e) => setUrlSlug(e.target.value)}
-                                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        onChange={(e) => setUrlSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-'))}
+                                        className="flex-1 min-w-0 px-4 py-3 border-2 border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="product-slug"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                <label htmlFor="pf-keywords" className="block text-sm font-semibold text-gray-900 mb-2">
                                     Keywords
                                 </label>
                                 <input
+                                    id="pf-keywords"
                                     type="text"
                                     value={keywords}
                                     onChange={(e) => setKeywords(e.target.value)}

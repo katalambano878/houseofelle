@@ -69,7 +69,7 @@ export default function CustomerInsightsPage() {
       supabase.from('customers').select('*'),
       supabase
         .from('orders')
-        .select('user_id, email, phone, total, created_at, payment_status')
+        .select('user_id, email, phone, total, created_at, payment_status, status')
         .eq('payment_status', 'paid'),
     ]);
 
@@ -91,7 +91,8 @@ export default function CustomerInsightsPage() {
       if (list) list.push(o);
       else m.set(k, [o]);
     };
-    (orders || []).forEach((o: any, idx: number) => {
+    // Paid orders that were later cancelled or refunded are not money the customer spent.
+    (orders || []).filter((o: any) => o.status !== 'cancelled' && o.status !== 'refunded').forEach((o: any, idx: number) => {
       const po = { idx, total: Number(o.total) || 0, created_at: o.created_at };
       push(byUser, o.user_id || '', po);
       push(byEmail, normEmail(o.email), po);
@@ -143,7 +144,8 @@ export default function CustomerInsightsPage() {
       return {
         id: c.id,
         name,
-        email: c.email || '',
+        // POS sales without an email are stored as <phone>@pos.local; that is not a real address.
+        email: c.email && !String(c.email).toLowerCase().endsWith('.local') ? c.email : '',
         phone: c.phone || '-',
         segment,
         totalSpent,
@@ -208,7 +210,7 @@ export default function CustomerInsightsPage() {
 
   function getSegmentBadge(segment: string) {
     const badges: Record<string, string> = {
-      vip: 'bg-purple-100 text-purple-700',
+      vip: 'bg-yellow-100 text-yellow-800',
       returning: 'bg-blue-100 text-blue-700',
       new: 'bg-amber-100 text-amber-700',
       'at-risk': 'bg-red-100 text-red-700',
@@ -230,7 +232,7 @@ export default function CustomerInsightsPage() {
 
   const getRiskBadge = (risk: string) => {
     const badges: Record<string, string> = {
-      low: 'bg-blue-100 text-blue-700',
+      low: 'bg-green-100 text-green-700',
       medium: 'bg-amber-100 text-amber-700',
       high: 'bg-red-100 text-red-700'
     };
@@ -278,8 +280,8 @@ export default function CustomerInsightsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg">
                 <i className="ri-vip-crown-line text-2xl text-blue-700"></i>
@@ -290,7 +292,7 @@ export default function CustomerInsightsPage() {
             <p className="text-sm text-blue-700 font-semibold mt-2">Spent &gt; GH₵1,000</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg">
                 <i className="ri-refresh-line text-2xl text-blue-700"></i>
@@ -301,7 +303,7 @@ export default function CustomerInsightsPage() {
             <p className="text-sm text-blue-700 font-semibold mt-2">More than 1 order</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 flex items-center justify-center bg-red-100 rounded-lg">
                 <i className="ri-alert-line text-2xl text-red-700"></i>
@@ -312,26 +314,27 @@ export default function CustomerInsightsPage() {
             <p className="text-sm text-red-700 font-semibold mt-2">Inactive &gt; 90 days</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 flex items-center justify-center bg-purple-100 rounded-lg">
-                <i className="ri-line-chart-line text-2xl text-purple-700"></i>
+              <div className="w-12 h-12 flex items-center justify-center bg-blue-50 rounded-lg">
+                <i className="ri-line-chart-line text-2xl text-blue-600"></i>
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-1">Avg. Lifetime Value</p>
-            <p className="text-3xl font-bold text-gray-900">{formatCurrency(stats.avgCLV)}</p>
+            <p className="text-2xl md:text-3xl font-bold text-gray-900 break-words">{formatCurrency(stats.avgCLV)}</p>
             <p className="text-sm text-gray-500 mt-2">Per paying customer</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
             <div className="flex-1 max-w-md">
               <div className="relative">
                 <i className="ri-search-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl"></i>
                 <input
-                  type="text"
-                  placeholder="Search customers by name or email..."
+                  type="search"
+                  aria-label="Search customers"
+                  placeholder="Search by name, email or phone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
@@ -350,6 +353,8 @@ export default function CustomerInsightsPage() {
               ].map((segment) => (
                 <button
                   key={segment.value}
+                  type="button"
+                  aria-pressed={selectedSegment === segment.value}
                   onClick={() => setSelectedSegment(segment.value)}
                   className={`px-3 py-2 rounded-md font-medium text-sm transition-colors whitespace-nowrap flex-grow sm:flex-grow-0 ${selectedSegment === segment.value
                     ? 'bg-white text-gray-900 shadow-sm'
@@ -365,15 +370,15 @@ export default function CustomerInsightsPage() {
 
         <div className="grid grid-cols-1 gap-6">
           {filteredCustomers.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl">
-              <p className="text-gray-500">No customers found matching this criteria.</p>
+            <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+              <p className="text-gray-500">{customers.length === 0 ? 'No customers yet.' : 'No customers match this search or segment.'}</p>
             </div>
           ) : (
             filteredCustomers.map((customer) => (
-              <div key={customer.id} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
+              <div key={customer.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-start space-x-4">
-                    <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700 rounded-full text-white text-2xl font-bold">
+                  <div className="flex items-start space-x-4 min-w-0">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700 rounded-full text-white text-2xl font-bold">
                       {customer.name?.charAt(0).toUpperCase() || 'U'}
                     </div>
                     <div>
@@ -381,24 +386,26 @@ export default function CustomerInsightsPage() {
                         <Link href={`/admin/customers/${customer.id}`} className="hover:text-blue-700">{customer.name}</Link>
                       </h3>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-gray-600">
-                        <span className="flex items-center">
-                          <i className="ri-mail-line mr-1"></i>
-                          {customer.email}
-                        </span>
+                        {customer.email && (
+                          <span className="flex items-center break-all">
+                            <i className="ri-mail-line mr-1"></i>
+                            {customer.email}
+                          </span>
+                        )}
                         <span className="flex items-center">
                           <i className="ri-phone-line mr-1"></i>
                           {customer.phone}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-2 mt-3">
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${getSegmentBadge(customer.segment)} whitespace-nowrap`}>
                           {getSegmentLabel(customer.segment)}
                         </span>
                         {customer.riskLevel !== 'none' && (
                           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getRiskBadge(customer.riskLevel)} whitespace-nowrap`}>
-                            {customer.riskLevel === 'low' && 'Low Risk'}
-                            {customer.riskLevel === 'medium' && 'Medium Risk'}
-                            {customer.riskLevel === 'high' && 'High Risk'}
+                            {customer.riskLevel === 'low' && 'Bought recently'}
+                            {customer.riskLevel === 'medium' && 'No order in 60+ days'}
+                            {customer.riskLevel === 'high' && 'No order in 120+ days'}
                           </span>
                         )}
                       </div>
@@ -408,7 +415,7 @@ export default function CustomerInsightsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-1">Total Spent (paid)</p>
+                    <p className="text-sm text-gray-600 mb-1">Total Spent</p>
                     <p className="text-2xl font-bold text-gray-900">{formatCurrency(customer.totalSpent)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4">
@@ -422,7 +429,7 @@ export default function CustomerInsightsPage() {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                  <div className="flex items-center space-x-6 text-sm text-gray-600">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-gray-600">
                     <span>
                       <span className="font-medium">Joined:</span> {customer.joinDate ? new Date(customer.joinDate).toLocaleDateString('en-GB') : '-'}
                     </span>

@@ -25,7 +25,9 @@ A curated Accra fragrance and body care house: a hand-picked selection rather th
 
 ## Capabilities and Constraints
 - Storefront: shop, categories, product pages, cart, guest or account checkout, order tracking, account with order history and invoices, reviews, contact form.
-- Admin: products (including bulk ZIP/CSV import and catalog PDF), inventory, orders, POS, customers, coupons, reviews, notifications/campaigns, analytics, store modules, SMS credit.
+- Admin: products (including bulk ZIP/CSV import and catalog PDF), inventory, orders (website vs POS, delivery method), POS, end-of-day close, customers, coupons, reviews, notifications/campaigns, analytics, expenses, profit margins, store modules, SMS credit and resend, image watermark.
+- Discounts & Sales: named campaigns (e.g. Black Friday) with a per-product percentage; while live, sale prices are written onto products so every price reader charges them, and regular prices return when the campaign ends. Each campaign drives the storefront's moving banner, welcome popup and `/sale` page.
+- Team: the owner adds staff and chooses which admin screens each can open (Roles & access); staff actions and POS sales are logged in Staff activity.
 - Brand name in all customer messages: **House of Elle**.
 
 ## Brand Commitments

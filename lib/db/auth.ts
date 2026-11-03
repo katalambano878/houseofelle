@@ -199,17 +199,30 @@ export async function signInWithPassword(
   return { session, error: null };
 }
 
+/** Shared sign-up checks. Returns an error message, or null when the input is usable. */
+function signUpInputError(email: string, password: string): string | null {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return "Enter a valid email address";
+  }
+  return passwordError(password);
+}
+
+function passwordError(password: string): string | null {
+  if (!password || password.length < 8 || password.length > 200) {
+    return "Password must be at least 8 characters";
+  }
+  return null;
+}
+
 export async function signUpWithPassword(opts: {
   email: string;
   password: string;
   data?: Record<string, unknown>;
 }): Promise<{ session: SessionTokens | null; user: AuthUser | null; error: string | null }> {
   const email = opts.email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
-    return { session: null, user: null, error: "Enter a valid email address" };
-  }
-  if (!opts.password || opts.password.length < 8 || opts.password.length > 200) {
-    return { session: null, user: null, error: "Password must be at least 8 characters" };
+  const inputError = signUpInputError(email, opts.password);
+  if (inputError) {
+    return { session: null, user: null, error: inputError };
   }
 
   const existing = await query(`SELECT id FROM auth.users WHERE lower(email) = $1 LIMIT 1`, [
@@ -252,6 +265,73 @@ export async function signUpWithPassword(opts: {
   const { rows } = await query(`SELECT * FROM auth.users WHERE id = $1`, [id]);
   const session = await mintSession(rows[0]);
   return { session, user: session.user, error: null };
+}
+
+/**
+ * Owner-only: creates a team member who can sign in straight away (email is
+ * treated as confirmed). Same checks and bcrypt cost as signUpWithPassword.
+ */
+export async function createTeamMember(opts: {
+  email: string;
+  password: string;
+  role: "admin" | "staff";
+  fullName: string;
+  phone?: string | null;
+}): Promise<{ userId: string | null; error: string | null }> {
+  const email = opts.email.trim().toLowerCase();
+  const inputError = signUpInputError(email, opts.password);
+  if (inputError) return { userId: null, error: inputError };
+  if (opts.role !== "admin" && opts.role !== "staff") {
+    return { userId: null, error: "Choose Admin or Staff" };
+  }
+
+  const existing = await query(`SELECT id FROM auth.users WHERE lower(email) = $1 LIMIT 1`, [
+    email,
+  ]);
+  if (existing.rows[0]) return { userId: null, error: "That email already has an account" };
+
+  const id = randomUUID();
+  const hash = await bcrypt.hash(opts.password, 10);
+  const fullName = opts.fullName.trim().slice(0, 200);
+  const meta = cleanMetadata({ full_name: fullName, phone: opts.phone || undefined });
+
+  await query(
+    `INSERT INTO auth.users (
+       id, instance_id, aud, role, email, encrypted_password,
+       email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+       created_at, updated_at, confirmation_token, recovery_token,
+       email_change_token_new, email_change
+     ) VALUES (
+       $1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+       $2, $3, now(), '{"provider":"email","providers":["email"]}'::jsonb, $4::jsonb,
+       now(), now(), '', '', '', ''
+     )`,
+    [id, email, hash, JSON.stringify(meta)]
+  );
+
+  // The on_auth_user_created trigger may already have made a customer profile; overwrite it.
+  await query(
+    `INSERT INTO profiles (id, email, full_name, phone, role, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5::user_role, now(), now())
+     ON CONFLICT (id) DO UPDATE
+       SET email = EXCLUDED.email, full_name = EXCLUDED.full_name,
+           phone = EXCLUDED.phone, role = EXCLUDED.role, updated_at = now()`,
+    [id, email, fullName || email.split("@")[0], opts.phone || null, opts.role]
+  );
+
+  return { userId: id, error: null };
+}
+
+/** Owner-only: replaces a user's password (same rules as sign-up). */
+export async function setUserPassword(userId: string, password: string): Promise<string | null> {
+  const error = passwordError(password);
+  if (error) return error;
+  const hash = await bcrypt.hash(password, 10);
+  const { rowCount } = await query(
+    `UPDATE auth.users SET encrypted_password = $2, updated_at = now() WHERE id = $1`,
+    [userId, hash]
+  );
+  return rowCount ? null : "User not found";
 }
 
 export async function refreshSession(

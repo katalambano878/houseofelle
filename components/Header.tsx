@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCMS } from '@/context/CMSContext';
 import AnnouncementBar from './AnnouncementBar';
+import { usePromo } from '@/hooks/usePromo';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -18,6 +19,9 @@ export default function Header() {
 
   const { cartCount, isCartOpen, setIsCartOpen } = useCart();
   const { getSetting } = useCMS();
+  const promo = usePromo();
+  // A live sale with products gets its own menu link.
+  const saleLink = promo?.live && promo.product_count > 0 ? [{ label: 'Sale', href: '/sale' }] : [];
 
   const siteName = getSetting('site_name') || 'House of Elle';
   const headerLogo = getSetting('site_logo') || '/house-of-elle-logo.png';
@@ -81,6 +85,7 @@ export default function Header() {
                 {[
                   { label: 'Home', href: '/' },
                   { label: 'Shop', href: '/shop' },
+                  ...saleLink,
                   { label: 'Categories', href: '/categories' },
                   { label: 'About', href: '/about' },
                   { label: 'Contact', href: '/contact' },
@@ -88,7 +93,7 @@ export default function Header() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="group relative px-4 py-2 text-xs uppercase tracking-[0.2em] font-semibold text-brand-black transition-colors hover:text-brand-gold"
+                    className={`group relative px-4 py-2 text-xs uppercase tracking-[0.2em] font-semibold transition-colors hover:text-brand-gold ${link.href === '/sale' ? 'text-red-700' : 'text-brand-black'}`}
                   >
                     {link.label}
                     <span className="absolute left-4 right-4 -bottom-0.5 h-[2px] scale-x-0 bg-brand-gold transition-transform duration-300 ease-out group-hover:scale-x-100" />
@@ -223,6 +228,7 @@ export default function Header() {
               {[
                 { label: 'Home', href: '/' },
                 { label: 'Shop', href: '/shop' },
+                ...saleLink,
                 { label: 'Categories', href: '/categories' },
                 { label: 'About', href: '/about' },
                 { label: 'Contact', href: '/contact' },
@@ -230,7 +236,7 @@ export default function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="block py-3 text-sm uppercase tracking-[0.2em] font-semibold text-brand-black hover:text-brand-gold transition-colors"
+                  className={`block py-3 text-sm uppercase tracking-[0.2em] font-semibold hover:text-brand-gold transition-colors ${link.href === '/sale' ? 'text-red-700' : 'text-brand-black'}`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {link.label}

@@ -4,6 +4,7 @@ import { money } from '@/lib/format-money';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { orderSource } from '@/lib/delivery';
 import { PieChart, Pie, AreaChart, Area, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 /** CSV cell: always quoted, inner quotes doubled, formula-looking values defused. */
@@ -31,6 +32,7 @@ export default function AnalyticsPage() {
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
 
   const [metrics, setMetrics] = useState({ revenue: 0, orders: 0, aov: 0 });
+  const [channels, setChannels] = useState({ web: { revenue: 0, orders: 0 }, pos: { revenue: 0, orders: 0 } });
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
@@ -45,13 +47,12 @@ export default function AnalyticsPage() {
     if (timeRange === '90days') startDate.setDate(startDate.getDate() - 89);
     if (timeRange === 'year') startDate.setMonth(0, 1);
 
-    // Only paid, non-cancelled orders count as revenue.
+    // Only paid orders that were not cancelled or refunded count as revenue.
     const { data: orders, error: orderError } = await supabase
       .from('orders')
-      .select('id, created_at, total')
+      .select('id, created_at, total, status, metadata, shipping_address')
       .gte('created_at', startDate.toISOString())
       .eq('payment_status', 'paid')
-      .neq('status', 'cancelled')
       .order('created_at');
 
     if (orderError) {
@@ -60,8 +61,15 @@ export default function AnalyticsPage() {
       return;
     }
 
-    const paid = orders || [];
+    const paid = (orders || []).filter((o: any) => o.status !== 'cancelled' && o.status !== 'refunded');
     const totalRevenue = paid.reduce((sum, o: any) => sum + (Number(o.total) || 0), 0);
+    const split = { web: { revenue: 0, orders: 0 }, pos: { revenue: 0, orders: 0 } };
+    paid.forEach((o: any) => {
+      const s = split[orderSource(o)];
+      s.revenue += Number(o.total) || 0;
+      s.orders += 1;
+    });
+    setChannels(split);
     const totalOrders = paid.length;
     setMetrics({
       revenue: totalRevenue,
@@ -144,6 +152,10 @@ export default function AnalyticsPage() {
       ['Revenue (GHS)', metrics.revenue.toFixed(2)],
       ['Paid orders', metrics.orders],
       ['Avg order value (GHS)', metrics.aov.toFixed(2)],
+      ['Website revenue (GHS)', channels.web.revenue.toFixed(2)],
+      ['Website orders', channels.web.orders],
+      ['POS revenue (GHS)', channels.pos.revenue.toFixed(2)],
+      ['POS orders', channels.pos.orders],
       [],
       ['Date', 'Sales (GHS)', 'Orders'],
       ...salesData.map((p) => [p.day, p.sales.toFixed(2), p.orders]),
@@ -166,7 +178,9 @@ export default function AnalyticsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+  // Brand gold, brown, nude, black, ivory-gold and a neutral, so slices stay on palette.
+  const COLORS = ['#C89B3C', '#6B4F3A', '#D8A48F', '#2A2623', '#E8CFAA', '#9ca3af'];
+  const ghs = (v: unknown) => `GH₵${money(v)}`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -178,6 +192,7 @@ export default function AnalyticsPage() {
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <select
+              aria-label="Date range"
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
               className="px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium pr-8 cursor-pointer bg-white"
@@ -218,8 +233,8 @@ export default function AnalyticsPage() {
         {loading && <p className="mb-4 text-sm text-gray-500">Loading analytics...</p>}
 
         {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg">
                 <i className="ri-money-dollar-circle-line text-2xl text-blue-700"></i>
@@ -229,7 +244,7 @@ export default function AnalyticsPage() {
             <p className="text-3xl font-bold text-gray-900">GH₵{metrics.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg">
                 <i className="ri-shopping-cart-line text-2xl text-blue-700"></i>
@@ -239,10 +254,10 @@ export default function AnalyticsPage() {
             <p className="text-3xl font-bold text-gray-900">{metrics.orders}</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 flex items-center justify-center bg-purple-100 rounded-lg">
-                <i className="ri-bar-chart-box-line text-2xl text-purple-700"></i>
+              <div className="w-12 h-12 flex items-center justify-center bg-blue-50 rounded-lg">
+                <i className="ri-bar-chart-box-line text-2xl text-blue-600"></i>
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-1">Avg. Order Value</p>
@@ -251,8 +266,28 @@ export default function AnalyticsPage() {
 
         </div>
 
+        {/* Website vs POS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+          {([['web', 'Website', 'ri-global-line'], ['pos', 'POS (in store)', 'ri-store-3-line']] as const).map(([key, label, icon]) => {
+            const share = metrics.revenue > 0 ? Math.round((channels[key].revenue / metrics.revenue) * 100) : 0;
+            return (
+              <div key={key} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-700"><i className={`${icon} mr-2 text-blue-700`}></i>{label}</p>
+                  <span className="text-xs font-semibold text-gray-500">{share}% of revenue</span>
+                </div>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{ghs(channels[key].revenue)}</p>
+                <p className="text-sm text-gray-500">{channels[key].orders} paid order{channels[key].orders === 1 ? '' : 's'}</p>
+                <div className="h-2 bg-gray-100 rounded-full mt-3" aria-hidden="true">
+                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${share}%` }}></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
         {/* Charts */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900">Revenue & Performance Trends</h2>
           </div>
@@ -261,16 +296,16 @@ export default function AnalyticsPage() {
               <AreaChart data={salesData.length > 0 ? salesData : [{ date: 'No Data', sales: 0 }]}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#C89B3C" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#C89B3C" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="date" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip />
+                <YAxis stroke="#6b7280" tickFormatter={(v) => `GH₵${v}`} width={70} />
+                <Tooltip formatter={(value) => [ghs(value), 'Sales']} />
                 <Legend />
-                <Area type="monotone" dataKey="sales" stroke="#10b981" fillOpacity={1} fill="url(#colorSales)" name="Sales (GH₵)" />
+                <Area type="monotone" dataKey="sales" stroke="#A47B30" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" name="Sales (GH₵)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -278,8 +313,9 @@ export default function AnalyticsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Pie Chart */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Revenue by Category</h2>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Revenue by Category</h2>
+            <p className="text-xs text-gray-500 mb-5">Item prices before coupons and delivery fees</p>
             <div className="flex items-center justify-center mb-6">
               <div style={{ width: '100%', height: 250 }}>
                 <ResponsiveContainer>
@@ -293,11 +329,13 @@ export default function AnalyticsPage() {
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      {categoryRevenue.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
+                      {categoryRevenue.length > 0
+                        ? categoryRevenue.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))
+                        : <Cell fill="#e5e7eb" />}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip formatter={(value, name) => [categoryRevenue.length > 0 ? ghs(value) : '—', name]} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -306,7 +344,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Top Products */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Top Performing Products</h2>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -322,10 +360,10 @@ export default function AnalyticsPage() {
                     <tr key={`${product.name}-${index}`}>
                       <td className="py-3 text-sm font-medium text-gray-900">{product.name}</td>
                       <td className="py-3 text-right text-sm text-gray-600">{product.units}</td>
-                      <td className="py-3 text-right text-sm font-semibold text-blue-600">GH₵{money(product.revenue)}</td>
+                      <td className="py-3 text-right text-sm font-semibold text-blue-700 whitespace-nowrap">GH₵{money(product.revenue)}</td>
                     </tr>
                   ))}
-                  {topProducts.length === 0 && <tr><td colSpan={3} className="text-center py-4 text-gray-500">No sales data yet.</td></tr>}
+                  {topProducts.length === 0 && <tr><td colSpan={3} className="text-center py-4 text-gray-500">No paid sales in this period.</td></tr>}
                 </tbody>
               </table>
             </div>

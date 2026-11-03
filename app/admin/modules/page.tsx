@@ -13,15 +13,14 @@ interface Module {
   category: string;
 }
 
+// Only colours that exist in the store palette (tailwind.config.js).
 const colorMap: Record<string, string> = {
   red: 'bg-red-100 text-red-600',
-  blue: 'bg-blue-100 text-blue-600',
-  purple: 'bg-purple-100 text-purple-600',
-  teal: 'bg-teal-100 text-teal-600',
-  orange: 'bg-orange-100 text-orange-600',
-  amber: 'bg-amber-100 text-amber-600',
-  yellow: 'bg-yellow-100 text-yellow-600',
-  indigo: 'bg-indigo-100 text-indigo-600',
+  blue: 'bg-blue-100 text-blue-700',
+  gold: 'bg-blue-50 text-blue-600',
+  green: 'bg-green-100 text-green-700',
+  amber: 'bg-amber-100 text-amber-700',
+  yellow: 'bg-yellow-100 text-yellow-700',
   gray: 'bg-gray-100 text-gray-600'
 };
 
@@ -30,7 +29,7 @@ const MODULE_DEFINITIONS: Omit<Module, 'enabled'>[] = [
   {
     id: 'notifications',
     name: 'Marketing Notifications',
-    description: 'Send Email and SMS campaigns to customers',
+    description: 'Adds the Notifications page for email and SMS campaigns to customers',
     icon: 'ri-notification-3-line',
     color: 'red',
     category: 'Marketing'
@@ -38,17 +37,17 @@ const MODULE_DEFINITIONS: Omit<Module, 'enabled'>[] = [
   {
     id: 'blog',
     name: 'Blog Management',
-    description: 'Create and manage blog posts',
+    description: 'Adds the Blog page for writing posts. Published posts show on the shop blog either way.',
     icon: 'ri-article-line',
-    color: 'teal',
+    color: 'green',
     category: 'Marketing'
   },
   {
     id: 'customer-insights',
     name: 'Customer Insights',
-    description: 'Segments, lifetime value and at-risk customers',
+    description: 'Adds the Customer Insights page: segments, lifetime value and at-risk customers',
     icon: 'ri-user-search-line',
-    color: 'orange',
+    color: 'gold',
     category: 'Analytics'
   }
 ];
@@ -139,11 +138,11 @@ export default function ModulesPage() {
     <div className="min-h-screen bg-gray-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Modules & Features</h1>
-        <p className="text-gray-600 mb-8">Enable or disable features to customize your admin dashboard.</p>
+        <p className="text-gray-600 mb-8">Turn optional admin pages on or off. A page that is off is hidden from the admin menu.</p>
 
         {!loading && !isAdmin && (
           <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            Only an admin can turn modules on or off. You can see their current state below.
+            Only the store owner can turn modules on or off. You can see their current state below.
           </div>
         )}
         {saveError && (
@@ -161,7 +160,8 @@ export default function ModulesPage() {
             <div className="flex-1 relative">
               <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
               <input
-                type="text"
+                type="search"
+                aria-label="Search modules"
                 placeholder="Search modules..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -169,6 +169,7 @@ export default function ModulesPage() {
               />
             </div>
             <select
+              aria-label="Filter by category"
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
               className="p-2 border border-gray-300 rounded-lg outline-none"
@@ -179,15 +180,17 @@ export default function ModulesPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">Loading modules...</div>
+          <div className="text-center py-12 text-gray-500">Loading modules...</div>
+        ) : filteredModules.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">No modules match your search.</div>
         ) : (
           <div className="space-y-10">
             {Object.entries(groupedModules).map(([category, items]) => (
               <div key={category}>
-                <h2 className="text-xl font-bold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">{category}</h2>
+                <h2 className="text-xl font-bold text-gray-800 mb-4 border-l-4 border-blue-700 pl-3">{category}</h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {items.map(module => (
-                    <div key={module.id} className={`bg-white rounded-xl border-2 p-6 transition-all ${module.enabled ? 'border-blue-500 shadow-md' : 'border-gray-200 opacity-75'}`}>
+                    <div key={module.id} className={`bg-white rounded-xl border-2 p-6 transition-all ${module.enabled ? 'border-blue-500 shadow-md' : 'border-gray-200'}`}>
                       <div className="flex justify-between items-start mb-4">
                         <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${colorMap[module.color] || 'bg-gray-100 text-gray-600'}`}>
                           <i className={`${module.icon} text-2xl`}></i>
@@ -199,15 +202,15 @@ export default function ModulesPage() {
                           aria-label={`${module.enabled ? 'Disable' : 'Enable'} ${module.name}`}
                           onClick={() => toggleModule(module.id, module.enabled)}
                           disabled={!isAdmin || savingId === module.id}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${module.enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${module.enabled ? 'bg-blue-700' : 'bg-gray-300'}`}
                         >
                           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${module.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
                         </button>
                       </div>
                       <h3 className="text-lg font-bold text-gray-900">{module.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1 h-10">{module.description}</p>
+                      <p className="text-sm text-gray-500 mt-1">{module.description}</p>
                       <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
-                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${module.enabled ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${module.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                           {module.enabled ? 'Enabled' : 'Disabled'}
                         </span>
                       </div>

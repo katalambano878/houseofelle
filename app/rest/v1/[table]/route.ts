@@ -143,7 +143,7 @@ export async function POST(
   if (!decision.ok) return denied(decision);
 
   const rows = (Array.isArray(body) ? body : [body]).map((row) =>
-    shapeWrite(caller, decision, row || {}, "insert")
+    shapeWrite(caller, decision, row || {}, "insert", table)
   );
   if (!isStaff(caller) && rows.length > 20) return jsonError("Too many rows in one request");
 
@@ -191,7 +191,7 @@ export async function PATCH(
   if (!decision.ok) return denied(decision);
   if (!hasRowFilter(req.nextUrl.searchParams, caller)) return jsonError("Add a filter to choose rows");
 
-  const patch = shapeWrite(caller, decision, body, "update");
+  const patch = shapeWrite(caller, decision, body, "update", table);
   if (Object.keys(patch).length === 0) return jsonError("Nothing you can change in this request", 403);
 
   const client = createClient();

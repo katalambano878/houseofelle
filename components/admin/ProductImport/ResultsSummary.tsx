@@ -53,11 +53,11 @@ export default function ResultsSummary({ summary, errors, warnings, onImportMore
           </div>
           <div className="bg-blue-50 rounded-lg p-4">
             <p className="text-2xl font-bold text-blue-700">{summary.imagesUploaded}</p>
-            <p className="text-sm text-blue-600">Images uploaded</p>
+            <p className="text-sm text-blue-700">Images uploaded</p>
           </div>
-          <div className="bg-indigo-50 rounded-lg p-4">
-            <p className="text-2xl font-bold text-indigo-700">{summary.variantsCreated}</p>
-            <p className="text-sm text-indigo-600">Variants created</p>
+          <div className="bg-yellow-50 rounded-lg p-4">
+            <p className="text-2xl font-bold text-yellow-800">{summary.variantsCreated}</p>
+            <p className="text-sm text-yellow-700">Variants created</p>
           </div>
           <div className="bg-red-50 rounded-lg p-4">
             <p className="text-2xl font-bold text-red-700">{summary.errors}</p>
@@ -81,7 +81,7 @@ export default function ResultsSummary({ summary, errors, warnings, onImportMore
                 <a
                   href={`data:text/csv;charset=utf-8,${encodeURIComponent(errorCsv)}`}
                   download="import-errors.csv"
-                  className="text-sm text-blue-600 hover:underline"
+                  className="text-sm text-blue-700 hover:underline"
                 >
                   Download error report
                 </a>
@@ -119,7 +119,7 @@ export default function ResultsSummary({ summary, errors, warnings, onImportMore
         <div className="flex flex-wrap gap-3 pt-2">
           <Link
             href="/admin/products"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors"
           >
             <i className="ri-list-check-2" />
             View Products

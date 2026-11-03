@@ -34,7 +34,7 @@ export default function FraudDetectionAlert({
   const getRiskColor = () => {
     switch (riskLevel) {
       case 'low': return 'bg-green-50 border-green-200 text-green-800';
-      case 'medium': return 'bg-orange-50 border-orange-200 text-orange-800';
+      case 'medium': return 'bg-amber-50 border-amber-200 text-amber-800';
       case 'high': return 'bg-red-50 border-red-200 text-red-800';
     }
   };
@@ -42,7 +42,7 @@ export default function FraudDetectionAlert({
   const getRiskIcon = () => {
     switch (riskLevel) {
       case 'low': return 'ri-shield-check-line text-green-600';
-      case 'medium': return 'ri-error-warning-line text-orange-600';
+      case 'medium': return 'ri-error-warning-line text-amber-600';
       case 'high': return 'ri-alarm-warning-line text-red-600';
     }
   };
@@ -82,7 +82,7 @@ export default function FraudDetectionAlert({
           )}
 
           {riskLevel !== 'low' && hasActions && (
-            <div className={`mt-3 pt-3 border-t ${riskLevel === 'high' ? 'border-red-300' : 'border-orange-300'}`}>
+            <div className={`mt-3 pt-3 border-t ${riskLevel === 'high' ? 'border-red-300' : 'border-amber-300'}`}>
               <p className="text-sm font-medium mb-2">Recommended Actions:</p>
               <div className="flex flex-wrap gap-2">
                 {phone && (

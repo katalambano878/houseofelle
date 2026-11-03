@@ -4,6 +4,7 @@ import { money } from '@/lib/format-money';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { currentStaffActor, recordStaffAction } from '@/lib/staff-audit';
 import ProductSalesStats from './ProductSalesStats';
 import { DELIVERY_OPTIONS, deliveryLabel, orderSource } from '@/lib/delivery';
 
@@ -168,8 +169,8 @@ export default function AdminOrdersPage() {
   const statusColors: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-700 border-amber-200',
     'processing': 'bg-blue-100 text-blue-700 border-blue-200',
-    'shipped': 'bg-purple-100 text-purple-700 border-purple-200',
-    'delivered': 'bg-blue-100 text-blue-700 border-blue-200',
+    'shipped': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    'delivered': 'bg-green-100 text-green-700 border-green-200',
     'cancelled': 'bg-red-100 text-red-700 border-red-200',
     'awaiting_payment': 'bg-gray-100 text-gray-700 border-gray-200',
     'refunded': 'bg-gray-100 text-gray-700 border-gray-200'
@@ -195,15 +196,18 @@ export default function AdminOrdersPage() {
       return `${first} ${last}`.trim();
     }
     if (order.profiles?.full_name) return order.profiles.full_name;
-    if (order.email) {
+    if (order.email && !order.email.toLowerCase().endsWith('.local')) {
       const name = order.email.split('@')[0];
       return name.charAt(0).toUpperCase() + name.slice(1);
     }
     return 'Guest';
   };
 
+  // POS walk-in sales carry placeholder addresses such as pos-walkin@store.local; show the phone instead.
   const getCustomerEmail = (order: Order) => {
-    return order.email || order.profiles?.email || 'N/A';
+    const email = order.email || order.profiles?.email || '';
+    if (email && !email.toLowerCase().endsWith('.local')) return email;
+    return order.phone || order.shipping_address?.phone || 'No contact details';
   };
 
   const getCustomerAvatar = (order: Order) => {
@@ -303,7 +307,15 @@ export default function AdminOrdersPage() {
         }))
       );
 
+      const actor = await currentStaffActor();
       changing.forEach(order => {
+        recordStaffAction({
+          action: 'status_change',
+          entityType: 'orders',
+          entityId: order.id,
+          actor,
+          details: { label: order.order_number, from: order.status, changes: { status: newStatus }, bulk: true },
+        });
         fetch('/api/notifications', {
           method: 'POST',
           headers: {
@@ -353,12 +365,15 @@ export default function AdminOrdersPage() {
         })
       });
       
-      if (!response.ok) throw new Error('Failed to send');
-      
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || 'Failed to send');
+      }
+
       alert(`Payment link sent to ${order.phone || order.email}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending payment link:', error);
-      alert('Failed to send payment link');
+      alert(`Failed to send payment link: ${error?.message || 'unknown error'}`);
     } finally {
       setSendingPaymentLink(null);
     }
@@ -449,10 +464,10 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* View Tabs: Confirmed Orders vs Abandoned Carts */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 overflow-x-auto">
         <button
           onClick={() => switchTab('confirmed')}
-          className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors cursor-pointer ${
+          className={`px-4 sm:px-6 py-3 font-semibold text-sm border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
             orderViewTab === 'confirmed'
               ? 'border-blue-700 text-blue-700'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -463,7 +478,7 @@ export default function AdminOrdersPage() {
         </button>
         <button
           onClick={() => switchTab('abandoned')}
-          className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors cursor-pointer ${
+          className={`px-4 sm:px-6 py-3 font-semibold text-sm border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
             orderViewTab === 'abandoned'
               ? 'border-amber-600 text-amber-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -521,27 +536,30 @@ export default function AdminOrdersPage() {
               <div className="relative">
                 <i className="ri-search-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg w-5 h-5 flex items-center justify-center"></i>
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search orders"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by order ID, customer name, or email..."
+                  placeholder="Search by order ID, name, email or phone..."
                   className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
+                aria-expanded={showFilters}
                 className="px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:border-gray-400 transition-colors font-medium whitespace-nowrap cursor-pointer"
               >
                 <i className="ri-filter-line mr-2"></i>
                 Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
               </button>
               <select
+                aria-label="Filter by product"
                 value={productFilter}
                 onChange={(e) => setProductFilter(e.target.value)}
-                className="px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium cursor-pointer"
+                className="max-w-full sm:max-w-xs px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium cursor-pointer"
               >
                 <option value="all">All Products</option>
                 {availableProducts.map((name) => (
@@ -549,6 +567,7 @@ export default function AdminOrdersPage() {
                 ))}
               </select>
               <select
+                aria-label="Sort orders"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium cursor-pointer"
@@ -614,24 +633,31 @@ export default function AdminOrdersPage() {
         </div>
 
         {selectedOrders.length > 0 && (
-          <div className="p-4 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+          <div className="p-4 bg-blue-50 border-b border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-blue-800 font-semibold">
               {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
             </p>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => handleBulkAction('Mark as Processing', 'processing')}
                 disabled={bulkBusy}
-                className="disabled:opacity-50 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
+                className="disabled:opacity-50 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
               >
                 Mark Processing
               </button>
               <button
                 onClick={() => handleBulkAction('Mark as Packaged', 'shipped')}
                 disabled={bulkBusy}
-                className="disabled:opacity-50 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
+                className="disabled:opacity-50 px-4 py-2 bg-yellow-700 hover:bg-yellow-800 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
               >
                 Mark Packaged
+              </button>
+              <button
+                onClick={() => handleBulkAction('Mark as Delivered', 'delivered')}
+                disabled={bulkBusy}
+                className="disabled:opacity-50 px-4 py-2 bg-green-700 hover:bg-green-800 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
+              >
+                Mark Delivered
               </button>
               <button
                 onClick={() => handleBulkAction('Export')}
@@ -682,6 +708,7 @@ export default function AdminOrdersPage() {
                 <th className="py-4 px-6">
                   <input
                     type="checkbox"
+                    aria-label="Select all orders shown"
                     checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
                     onChange={handleSelectAll}
                     className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
@@ -711,7 +738,13 @@ export default function AdminOrdersPage() {
                   <td colSpan={10} className="py-12 text-center text-gray-500">
                     <i className="ri-inbox-line text-4xl text-gray-300"></i>
                     <p className="mt-2">No orders found</p>
-                    <p className="text-sm">Orders will appear here when customers place them</p>
+                    <p className="text-sm">
+                      {tabOrders.length > 0
+                        ? 'No orders match these filters. Try clearing the search or filters.'
+                        : orderViewTab === 'abandoned'
+                          ? 'Unpaid orders will appear here.'
+                          : 'Orders will appear here when customers place them.'}
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -720,6 +753,7 @@ export default function AdminOrdersPage() {
                     <td className="py-4 px-6">
                       <input
                         type="checkbox"
+                        aria-label={`Select order ${order.order_number || order.id.substring(0, 8)}`}
                         checked={selectedOrders.includes(order.id)}
                         onChange={() => handleSelectOrder(order.id)}
                         className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
@@ -776,15 +810,17 @@ export default function AdminOrdersPage() {
                           href={`/admin/orders/${order.id}`}
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                           title="View Order"
+                          aria-label={`View order ${order.order_number || order.id.substring(0, 8)}`}
                         >
                           <i className="ri-eye-line text-lg w-4 h-4 flex items-center justify-center"></i>
                         </Link>
-                        {orderViewTab === 'abandoned' && order.payment_status !== 'paid' && (
+                        {orderViewTab === 'abandoned' && order.payment_status !== 'paid' && order.status !== 'cancelled' && (
                           <button
                             onClick={() => handleResendPaymentLink(order)}
                             disabled={sendingPaymentLink === order.id}
                             className="w-8 h-8 flex items-center justify-center text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                             title="Resend Payment Link"
+                            aria-label={`Resend payment link for ${order.order_number || order.id.substring(0, 8)}`}
                           >
                             {sendingPaymentLink === order.id ? (
                               <i className="ri-loader-4-line text-lg w-4 h-4 flex items-center justify-center animate-spin"></i>
@@ -797,6 +833,7 @@ export default function AdminOrdersPage() {
                           onClick={() => handlePrintInvoice(order.id)}
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                           title="Print Invoice"
+                          aria-label={`Print invoice for ${order.order_number || order.id.substring(0, 8)}`}
                         >
                           <i className="ri-printer-line text-lg w-4 h-4 flex items-center justify-center"></i>
                         </button>
@@ -811,7 +848,7 @@ export default function AdminOrdersPage() {
 
         {filteredOrders.length > 0 && (
           <div className="p-6 border-t border-gray-200 flex items-center justify-between">
-            <p className="text-gray-600">Showing {filteredOrders.length} of {orders.length} orders</p>
+            <p className="text-gray-600">Showing {filteredOrders.length} of {tabOrders.length} {orderViewTab === 'abandoned' ? 'unpaid' : 'confirmed'} orders</p>
           </div>
         )}
       </div>

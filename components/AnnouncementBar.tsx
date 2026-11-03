@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { promoHref, usePromo } from '@/hooks/usePromo';
 
 interface Banner {
     id: string;
@@ -18,6 +19,7 @@ export default function AnnouncementBar() {
     const [banners, setBanners] = useState<Banner[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+    const promo = usePromo();
 
     useEffect(() => {
         fetchBanners();
@@ -70,6 +72,11 @@ export default function AnnouncementBar() {
     };
 
     const visibleBanners = banners.filter(b => !dismissed.has(b.id));
+
+    // A running or announced sale takes over the bar as a moving banner.
+    if (promo?.banner_text) {
+        return <PromoMarquee text={promo.banner_text} href={promoHref(promo)} />;
+    }
 
     if (visibleBanners.length === 0) {
         // Show default banner if no custom banners
@@ -138,5 +145,33 @@ export default function AnnouncementBar() {
                 </div>
             )}
         </div>
+    );
+}
+
+/** Continuous right-to-left sale banner. Pauses on hover or keyboard focus; static when motion is reduced. */
+function PromoMarquee({ text, href }: { text: string; href: string }) {
+    // Two identical halves, each repeated enough to overfill wide screens, so the loop is seamless.
+    const half = (key: string) => (
+        <span key={key} className="inline-flex shrink-0" aria-hidden={key === 'b' ? true : undefined}>
+            {Array.from({ length: 6 }).map((_, i) => (
+                <span key={i} className="inline-flex items-center gap-4 px-8">
+                    <i className="ri-flashlight-fill text-blue-500" aria-hidden="true"></i>
+                    <span className="font-medium tracking-wide">{text}</span>
+                    <span className="text-blue-500 font-semibold underline-offset-4">Shop now</span>
+                </span>
+            ))}
+        </span>
+    );
+    return (
+        <Link
+            href={href}
+            className="promo-marquee block bg-blue-800 text-white py-2 text-sm overflow-hidden whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+            aria-label={`${text}. Shop now`}
+        >
+            <span className="promo-marquee-track inline-flex">
+                {half('a')}
+                {half('b')}
+            </span>
+        </Link>
     );
 }

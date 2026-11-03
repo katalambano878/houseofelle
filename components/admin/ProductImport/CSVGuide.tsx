@@ -10,6 +10,7 @@ export default function CSVGuide() {
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         className="w-full flex items-center justify-between px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
       >
         <span>CSV column specification and format guide</span>
@@ -34,7 +35,7 @@ export default function CSVGuide() {
           </p>
           <p>
             <strong>ZIP structure:</strong> Place products.csv at the root and put images in an images/ folder.
-            Reference filenames in the images column (e.g. bottle.jpg;box.jpg). Images can be JPG, PNG, WebP, GIF or AVIF.
+            Reference filenames in the images column (e.g. bottle.jpg;box.jpg). Images can be JPG, PNG, WebP or GIF (up to 10 MB each).
           </p>
         </div>
       )}

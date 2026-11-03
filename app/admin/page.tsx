@@ -6,11 +6,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-type StatCard = { title: string; value: string; note?: string; icon: string; tone: 'blue' | 'purple' | 'amber' };
+type StatCard = { title: string; value: string; note?: string; icon: string; tone: 'blue' | 'gold' | 'green' | 'amber' };
 
 const TONE_CLASSES: Record<StatCard['tone'], string> = {
   blue: 'bg-blue-100 text-blue-700',
-  purple: 'bg-purple-100 text-purple-700',
+  gold: 'bg-blue-50 text-blue-600',
+  green: 'bg-green-100 text-green-700',
   amber: 'bg-amber-100 text-amber-700',
 };
 
@@ -38,7 +39,7 @@ export default function AdminDashboard() {
     async function fetchDashboardData() {
       setLoadError('');
       const [ordersRes, customersRes, recentRes, stockRes, productsRes] = await Promise.all([
-        supabase.from('orders').select('total, payment_status, created_at'),
+        supabase.from('orders').select('total, status, payment_status, created_at'),
         supabase.from('customers').select('id', { count: 'exact', head: true }),
         supabase
           .from('orders')
@@ -48,14 +49,12 @@ export default function AdminDashboard() {
           .limit(5),
         supabase
           .from('products')
-          .select('id, name, quantity, metadata')
+          .select('id, name, quantity, continue_selling, metadata, product_variants(quantity)')
           .eq('status', 'active')
-          .eq('track_quantity', true)
-          .order('quantity', { ascending: true })
-          .limit(50),
+          .eq('track_quantity', true),
         supabase
           .from('products')
-          .select('id, name, quantity, product_images(url, position)')
+          .select('id, name, quantity, product_images(url, position), product_variants(quantity)')
           .order('created_at', { ascending: false })
           .limit(4),
       ]);
@@ -67,22 +66,22 @@ export default function AdminDashboard() {
       }
 
       const allOrders = ordersRes.data || [];
-      // Only PAID orders count toward revenue and average order value.
+      // Only paid orders that were not later cancelled or refunded count as revenue.
       const paid = allOrders
-        .filter((o: any) => o.payment_status === 'paid')
+        .filter((o: any) => o.payment_status === 'paid' && o.status !== 'cancelled' && o.status !== 'refunded')
         .map((o: any) => ({ total: Number(o.total) || 0, created_at: o.created_at as string }));
       const totalRevenue = paid.reduce((sum, o) => sum + o.total, 0);
       const avgOrderValue = paid.length > 0 ? totalRevenue / paid.length : 0;
       setPaidOrders(paid);
 
       setStats([
-        { title: 'Total Revenue', value: `GH₵ ${money(totalRevenue)}`, note: 'Paid orders, all time', icon: 'ri-money-dollar-circle-line', tone: 'blue' },
-        { title: 'Orders', value: allOrders.length.toString(), note: `${paid.length} paid`, icon: 'ri-shopping-bag-line', tone: 'blue' },
+        { title: 'Total Revenue', value: `GH₵ ${money(totalRevenue)}`, note: 'Paid orders, all time (excludes cancelled and refunded)', icon: 'ri-money-dollar-circle-line', tone: 'blue' },
+        { title: 'Orders', value: allOrders.length.toString(), note: `${paid.length} paid, ${allOrders.length - paid.length} unpaid or cancelled`, icon: 'ri-shopping-bag-line', tone: 'gold' },
         {
           title: 'Customers',
           value: customersRes.error ? '-' : String(customersRes.count ?? 0),
           icon: 'ri-group-line',
-          tone: 'purple',
+          tone: 'green',
         },
         { title: 'Avg Order Value', value: `GH₵ ${money(avgOrderValue)}`, note: 'Paid orders', icon: 'ri-line-chart-line', tone: 'amber' },
       ]);
@@ -90,10 +89,12 @@ export default function AdminDashboard() {
       setRecentOrders(
         (recentRes.data || []).map((o: any) => {
           const addr = o.shipping_address || {};
-          const email: string = o.email || '';
+          // POS walk-in sales carry placeholder addresses such as pos-walkin@store.local.
+          const rawEmail: string = o.email || '';
+          const email = rawEmail.toLowerCase().endsWith('.local') ? '' : rawEmail;
           const customerName = (addr.firstName && addr.lastName)
             ? `${String(addr.firstName).trim()} ${String(addr.lastName).trim()}`
-            : addr.full_name || addr.firstName || email.split('@')[0] || 'Guest';
+            : addr.full_name || addr.firstName || email.split('@')[0] || 'Walk-in customer';
           return {
             id: o.id,
             displayId: o.order_number || o.id.slice(0, 8),
@@ -106,14 +107,19 @@ export default function AdminDashboard() {
         })
       );
 
+      // Products with variants are stocked per variant, so add those up.
+      const stockOf = (p: any) =>
+        Array.isArray(p.product_variants) && p.product_variants.length > 0
+          ? p.product_variants.reduce((sum: number, v: any) => sum + (Number(v.quantity) || 0), 0)
+          : Number(p.quantity ?? 0);
       setLowStockProducts(
         (stockRes.data || [])
-          .filter((p: any) => Number(p.quantity ?? 0) <= lowStockThreshold(p))
+          .filter((p: any) => !p.continue_selling)
+          .map((p: any) => ({ p, stock: stockOf(p) }))
+          .filter(({ p, stock }) => stock <= lowStockThreshold(p))
+          .sort((a, b) => a.stock - b.stock)
           .slice(0, 5)
-          .map((p: any) => {
-            const stock = Number(p.quantity ?? 0);
-            return { id: p.id, name: p.name, stock, status: stock <= 0 ? 'critical' : 'low' };
-          })
+          .map(({ p, stock }) => ({ id: p.id, name: p.name, stock, status: stock <= 0 ? 'critical' : 'low' }))
       );
 
       setTopProducts(
@@ -124,7 +130,7 @@ export default function AdminDashboard() {
             id: p.id,
             name: p.name,
             image: images[0]?.url || '/house-of-elle-logo.png',
-            stock: Number(p.quantity ?? 0),
+            stock: stockOf(p),
           };
         })
       );
@@ -157,8 +163,8 @@ export default function AdminDashboard() {
   const statusColors: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-700',
     'processing': 'bg-blue-100 text-blue-700',
-    'shipped': 'bg-purple-100 text-purple-700',
-    'delivered': 'bg-blue-100 text-blue-700',
+    'shipped': 'bg-yellow-100 text-yellow-800',
+    'delivered': 'bg-green-100 text-green-700',
     'cancelled': 'bg-red-100 text-red-700',
     'awaiting_payment': 'bg-amber-100 text-amber-700',
     'refunded': 'bg-gray-100 text-gray-700'
@@ -212,6 +218,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Revenue Trend</h2>
               <select
+                aria-label="Revenue period"
                 className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value as '7days' | '30days')}
@@ -225,8 +232,8 @@ export default function AdminDashboard() {
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#C89B3C" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#C89B3C" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -236,7 +243,7 @@ export default function AdminDashboard() {
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     formatter={(value) => [`GH₵${money(value as number)}`, 'Revenue']}
                   />
-                  <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                  <Area type="monotone" dataKey="revenue" stroke="#A47B30" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -279,7 +286,7 @@ export default function AdminDashboard() {
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 overflow-hidden">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Recent Orders</h2>
+              <h2 className="text-xl font-bold text-gray-900">Recent Paid Orders</h2>
               <Link href="/admin/orders" className="text-blue-700 hover:text-blue-800 font-medium text-sm whitespace-nowrap cursor-pointer">
                 View All <i className="ri-arrow-right-line ml-1"></i>
               </Link>
@@ -347,8 +354,8 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               )}
-              <Link href="/admin/products?filter=low-stock" className="block text-center mt-4 text-blue-700 hover:text-blue-800 font-medium text-sm whitespace-nowrap cursor-pointer">
-                View All Products <i className="ri-arrow-right-line ml-1"></i>
+              <Link href="/admin/inventory?filter=low" className="block text-center mt-4 text-blue-700 hover:text-blue-800 font-medium text-sm whitespace-nowrap cursor-pointer">
+                View Inventory <i className="ri-arrow-right-line ml-1"></i>
               </Link>
             </div>
           </div>
@@ -362,7 +369,7 @@ export default function AdminDashboard() {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {topProducts.map((product) => (
               <div key={product.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
                 <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-3">

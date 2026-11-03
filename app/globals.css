@@ -704,3 +704,33 @@ img {
   writing-mode: vertical-rl;
   text-orientation: mixed;
 }
+/* Sale banner: two identical halves scroll left forever, so the loop has no seam. */
+@keyframes promoMarquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+.promo-marquee-track {
+  animation: promoMarquee 32s linear infinite;
+  will-change: transform;
+}
+.promo-marquee:hover .promo-marquee-track,
+.promo-marquee:focus-within .promo-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Sale popup: backdrop fades, card rises from slightly below and scaled down. */
+@keyframes promoBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes promoCardIn {
+  from { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.96); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.promo-backdrop-in { animation: promoBackdropIn 240ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.promo-card-in { animation: promoCardIn 320ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .promo-marquee-track { animation: none; }
+  .promo-backdrop-in, .promo-card-in { animation-duration: 1ms; }
+}

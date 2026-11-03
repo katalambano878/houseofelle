@@ -69,6 +69,13 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
+  // The admin runs on the bare domain only, so its uploads and photo requests stay same-origin.
+  const host = request.headers.get('host') || '';
+  if (pathname.startsWith('/admin') && host.startsWith('www.')) {
+    const proto = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol.replace(':', '');
+    return NextResponse.redirect(`${proto}://${host.slice(4)}${pathname}${request.nextUrl.search}`, 308);
+  }
+
   if (pathname.startsWith('/admin')) {
     response.headers.set('X-Robots-Tag', 'noindex, nofollow');
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -153,7 +160,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/') ||
     pathname.startsWith('/rest/') ||
     pathname.startsWith('/auth/v1') ||
-    pathname.startsWith('/storage/')
+    // Public product photos set their own cache headers (see the public object route).
+    (pathname.startsWith('/storage/') && !pathname.startsWith('/storage/v1/object/public/'))
   ) {
     response.headers.set('Cache-Control', 'no-store');
   }

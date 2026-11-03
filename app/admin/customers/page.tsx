@@ -49,10 +49,12 @@ export default function AdminCustomersPage() {
     setLoading(true);
     setLoadError('');
     // The customers table holds both guests and registered shoppers (filled from orders).
-    const { data: customerData, error: cError } = await supabase
-      .from('customers')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Its stored order counters miss POS sales and cancellations, so totals are worked out
+    // from the orders themselves, matched the same way the customer page matches them.
+    const [{ data: customerData, error: cError }, { data: orderRows }] = await Promise.all([
+      supabase.from('customers').select('*').order('created_at', { ascending: false }),
+      supabase.from('orders').select('email, phone, user_id, total, status, payment_status, created_at'),
+    ]);
 
     if (cError) {
       setLoadError(cError.message || 'Could not load customers.');
@@ -61,9 +63,30 @@ export default function AdminCustomersPage() {
       return;
     }
 
+    const byKey = new Map<string, any[]>();
+    const keyOf = (kind: string, v: unknown) => (v ? `${kind}:${String(v).trim().toLowerCase()}` : '');
+    (orderRows || []).forEach((o: any) => {
+      if (o.payment_status !== 'paid' || o.status === 'cancelled' || o.status === 'refunded') return;
+      for (const key of [keyOf('e', o.email), keyOf('p', o.phone), keyOf('u', o.user_id)]) {
+        if (!key) continue;
+        const list = byKey.get(key) || [];
+        list.push(o);
+        byKey.set(key, list);
+      }
+    });
+
     const processed = (customerData || []).map((customer: any) => {
-      const totalSpent = Number(customer.total_spent) || 0;
-      const totalOrders = Number(customer.total_orders) || 0;
+      const matched = new Set<any>();
+      for (const key of [
+        keyOf('e', customer.email), keyOf('e', customer.secondary_email),
+        keyOf('p', customer.phone), keyOf('p', customer.secondary_phone), keyOf('u', customer.user_id),
+      ]) {
+        if (key) (byKey.get(key) || []).forEach((o) => matched.add(o));
+      }
+      const paidOrders = Array.from(matched);
+      const totalSpent = paidOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      const totalOrders = paidOrders.length;
+      const lastOrderAt = paidOrders.reduce<string>((latest, o) => (o.created_at > latest ? o.created_at : latest), '');
       const tags: string[] = Array.isArray(customer.tags) ? customer.tags : [];
       const isVipTagged = tags.some((t) => String(t).toLowerCase() === 'vip');
 
@@ -76,7 +99,8 @@ export default function AdminCustomersPage() {
         (customer.first_name && customer.last_name ? `${customer.first_name} ${customer.last_name}` : null) ||
         customer.first_name ||
         'No Name';
-      const email = customer.email || '';
+      // POS sales without an email are stored as <phone>@pos.local; that is not a real address.
+      const email = customer.email && isMailable(customer.email) ? customer.email : '';
       const joinedAt = customer.created_at ? new Date(customer.created_at) : new Date(0);
 
       return {
@@ -88,13 +112,13 @@ export default function AdminCustomersPage() {
         orders: totalOrders,
         totalSpent,
         joined: customer.created_at ? joinedAt.toLocaleDateString() : '',
-        lastOrder: customer.last_order_at ? timeAgo(new Date(customer.last_order_at)) : 'Never',
-        lastOrderAt: customer.last_order_at || '',
+        lastOrder: lastOrderAt ? timeAgo(new Date(lastOrderAt)) : 'Never',
+        lastOrderAt,
         status,
         tags,
         isVipTagged,
         rawJoined: joinedAt,
-        rawLastOrder: customer.last_order_at ? new Date(customer.last_order_at) : null,
+        rawLastOrder: lastOrderAt ? new Date(lastOrderAt) : null,
         isGuest: !customer.user_id
       };
     });
@@ -122,13 +146,13 @@ export default function AdminCustomersPage() {
     if (interval > 1) return Math.floor(interval) + " days ago";
     interval = seconds / 3600;
     if (interval > 1) return Math.floor(interval) + " hours ago";
-    return "Just now";
+    return "Today";
   }
 
   const statusColors: any = {
     'New': 'bg-blue-100 text-blue-700',
-    'Active': 'bg-blue-100 text-blue-700',
-    'VIP': 'bg-purple-100 text-purple-700',
+    'Active': 'bg-green-100 text-green-700',
+    'VIP': 'bg-yellow-100 text-yellow-800',
     'Inactive': 'bg-gray-100 text-gray-700'
   };
 
@@ -187,7 +211,7 @@ export default function AdminCustomersPage() {
       setNotice({ type: 'error', text: 'No customers to export.' });
       return;
     }
-    const header = ['Name', 'Email', 'Phone', 'Orders', 'Total spent (GHS)', 'Last order', 'Joined', 'Status', 'Guest', 'Tags'];
+    const header = ['Name', 'Email', 'Phone', 'Paid orders', 'Total spent (GHS)', 'Last order', 'Joined', 'Status', 'Guest', 'Tags'];
     const data = rows.map(c => [
       c.name,
       c.email,
@@ -256,7 +280,7 @@ export default function AdminCustomersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
           <p className="text-gray-600 mt-1">Manage your customer base and relationships</p>
@@ -286,19 +310,19 @@ export default function AdminCustomersPage() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Total Customers</p>
           <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">New This Month</p>
           <p className="text-2xl font-bold text-blue-700">{stats.newThisMonth}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">VIP Customers</p>
-          <p className="text-2xl font-bold text-purple-700">{stats.vip}</p>
+          <p className="text-2xl font-bold text-yellow-800">{stats.vip}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Avg Lifetime Value</p>
           <p className="text-2xl font-bold text-gray-900">GH₵ {stats.avgLTV.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
         </div>
@@ -311,7 +335,8 @@ export default function AdminCustomersPage() {
               <div className="relative">
                 <i className="ri-search-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg flex items-center justify-center"></i>
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search customers"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by name, email, or phone..."
@@ -320,8 +345,9 @@ export default function AdminCustomersPage() {
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-3">
               <select
+                aria-label="Filter by customer status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium cursor-pointer"
@@ -333,6 +359,7 @@ export default function AdminCustomersPage() {
                 <option>Inactive</option>
               </select>
               <select
+                aria-label="Sort customers"
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value)}
                 className="px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium cursor-pointer"
@@ -347,14 +374,14 @@ export default function AdminCustomersPage() {
         </div>
 
         {selectedCustomers.length > 0 && (
-          <div className="p-4 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+          <div className="p-4 bg-blue-50 border-b border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-blue-800 font-semibold">
               {selectedCustomers.length} customer{selectedCustomers.length > 1 ? 's' : ''} selected
             </p>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={emailSelected}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
+                className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
               >
                 <i className="ri-mail-line mr-2"></i>
                 Send Email
@@ -362,7 +389,7 @@ export default function AdminCustomersPage() {
               <button
                 onClick={toggleVipForSelected}
                 disabled={bulkBusy}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-yellow-700 hover:bg-yellow-800 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
               >
                 <i className="ri-vip-crown-line mr-2"></i>
                 {bulkBusy ? 'Saving...' : allSelectedAreVip ? 'Remove VIP' : 'Mark as VIP'}
@@ -385,6 +412,7 @@ export default function AdminCustomersPage() {
                 <th className="py-4 px-6">
                   <input
                     type="checkbox"
+                    aria-label="Select all customers shown"
                     checked={filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomers.includes(c.id))}
                     onChange={handleSelectAll}
                     className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
@@ -392,7 +420,7 @@ export default function AdminCustomersPage() {
                 </th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Customer</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Contact</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Orders</th>
+                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Paid Orders</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Total Spent</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Last Order</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Status</th>
@@ -410,13 +438,14 @@ export default function AdminCustomersPage() {
                   </td>
                 </tr>
               ) : filteredCustomers.length === 0 ? (
-                <tr><td colSpan={8} className="p-10 text-center text-gray-500">No customers found.</td></tr>
+                <tr><td colSpan={8} className="p-10 text-center text-gray-500">{customers.length === 0 ? 'No customers yet. They are added when someone orders online or at the POS.' : 'No customers match this search or filter.'}</td></tr>
               ) : (
                 filteredCustomers.map((customer) => (
                   <tr key={customer.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6">
                       <input
                         type="checkbox"
+                        aria-label={`Select ${customer.name}`}
                         checked={selectedCustomers.includes(customer.id)}
                         onChange={() => handleSelectCustomer(customer.id)}
                         className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
@@ -424,7 +453,7 @@ export default function AdminCustomersPage() {
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full font-semibold">
+                        <div className="w-10 h-10 shrink-0 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full font-semibold">
                           {customer.avatar}
                         </div>
                         <div>
@@ -458,6 +487,8 @@ export default function AdminCustomersPage() {
                       <div className="flex items-center space-x-2">
                         <Link
                           href={`/admin/customers/${customer.id}`}
+                          aria-label={`View ${customer.name}`}
+                          title="View customer"
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                           <i className="ri-eye-line text-lg"></i>

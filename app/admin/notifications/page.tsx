@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { currentStaffActor } from '@/lib/staff-audit';
 
 type Audience = 'all' | 'newsletter' | 'buyers' | 'vip';
 
 const AUDIENCE_LABELS: Record<Audience, string> = {
     all: 'All Customers',
     newsletter: 'Newsletter Subscribers',
-    buyers: 'Customers who have ordered',
+    buyers: 'Customers with a paid order',
     vip: 'VIP Customers',
 };
 
@@ -19,10 +20,18 @@ const isMailable = (email: string) =>
 const hasTag = (tags: unknown, tag: string) =>
     Array.isArray(tags) && tags.some((t) => String(t).toLowerCase() === tag);
 
+const lastDigits = (p: unknown) => (typeof p === 'string' ? p.replace(/\D/g, '').slice(-9) : '');
+
 export default function NotificationsPage() {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
+    // Campaigns cost SMS credit and speak for the store, so the API only lets the owner send them.
+    const [role, setRole] = useState<string | null>(null);
+
+    useEffect(() => {
+        currentStaffActor().then((actor) => setRole(actor?.role || null)).catch(() => setRole(null));
+    }, []);
 
     const [form, setForm] = useState({
         subject: '',
@@ -49,14 +58,34 @@ export default function NotificationsPage() {
             // 2. Fetch Recipients from the customers table (includes secondary contacts)
             const { data: customers, error: fetchError } = await supabase
                 .from('customers')
-                .select('email, phone, full_name, secondary_phone, secondary_email, tags, total_orders');
+                .select('email, phone, full_name, secondary_phone, secondary_email, tags, user_id');
 
             if (fetchError) throw fetchError;
+
+            // "Has ordered" comes from paid orders, because the stored counters miss POS sales.
+            const buyerKeys = new Set<string>();
+            if (form.audience === 'buyers') {
+                const { data: paidOrders, error: ordersError } = await supabase
+                    .from('orders')
+                    .select('email, phone, user_id, status')
+                    .eq('payment_status', 'paid');
+                if (ordersError) throw ordersError;
+                (paidOrders || []).forEach((o: any) => {
+                    if (o.status === 'cancelled' || o.status === 'refunded') return;
+                    if (o.email) buyerKeys.add(`e:${String(o.email).trim().toLowerCase()}`);
+                    if (lastDigits(o.phone)) buyerKeys.add(`p:${lastDigits(o.phone)}`);
+                    if (o.user_id) buyerKeys.add(`u:${o.user_id}`);
+                });
+            }
+            const isBuyer = (c: any) =>
+                [c.email, c.secondary_email].some((e) => e && buyerKeys.has(`e:${String(e).trim().toLowerCase()}`)) ||
+                [c.phone, c.secondary_phone].some((p) => lastDigits(p) && buyerKeys.has(`p:${lastDigits(p)}`)) ||
+                (!!c.user_id && buyerKeys.has(`u:${c.user_id}`));
 
             const audience = (customers || []).filter((c: any) => {
                 if (form.audience === 'newsletter') return hasTag(c.tags, 'newsletter');
                 if (form.audience === 'vip') return hasTag(c.tags, 'vip');
-                if (form.audience === 'buyers') return (Number(c.total_orders) || 0) > 0;
+                if (form.audience === 'buyers') return isBuyer(c);
                 return true;
             });
 
@@ -119,6 +148,9 @@ export default function NotificationsPage() {
             let totalSms = 0;
             let totalErrors = 0;
 
+            const partial = () =>
+                totalEmail + totalSms > 0 ? ` ${totalEmail} emails and ${totalSms} SMS were already sent before this error; do not resend to everyone.` : '';
+
             for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
                 const batch = recipients.slice(i, i + BATCH_SIZE);
 
@@ -147,10 +179,10 @@ export default function NotificationsPage() {
                     data = await res.json();
                 } else {
                     const text = await res.text();
-                    throw new Error(`Server error (batch ${Math.floor(i / BATCH_SIZE) + 1}): ${text.slice(0, 100)}`);
+                    throw new Error(`Server error (batch ${Math.floor(i / BATCH_SIZE) + 1}): ${text.slice(0, 100)}.${partial()}`);
                 }
 
-                if (!res.ok) throw new Error(data.error || 'Failed to send');
+                if (!res.ok) throw new Error(`${data.error || 'Failed to send'}${partial()}`);
 
                 // Parse results from response
                 const msg = data.message || '';
@@ -166,7 +198,7 @@ export default function NotificationsPage() {
             if (totalEmail > 0) resultParts.push(`${totalEmail} emails`);
             if (totalSms > 0) resultParts.push(`${totalSms} SMS`);
             const errorNote = totalErrors > 0 ? ` (${totalErrors} failed)` : '';
-            setSuccess(`Campaign sent successfully! ${resultParts.join(', ')} sent.${errorNote}`);
+            setSuccess(`Campaign sent: ${resultParts.join(', ') || 'nothing'} sent.${errorNote}`);
             setForm(prev => ({ ...prev, subject: '', message: '' }));
         } catch (err: any) {
             setError(err.message);
@@ -177,13 +209,21 @@ export default function NotificationsPage() {
 
     return (
         <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">Marketing & Notifications</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Marketing & Notifications</h1>
+            <p className="text-gray-600 mb-6">Send an email and/or SMS message to a group of customers.</p>
 
-            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+            {role && role !== 'admin' && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg mb-6 text-sm">
+                    Only the store owner can send campaigns, because SMS messages use the store&apos;s paid credit.
+                    Ask the owner to send this message.
+                </div>
+            )}
+
+            <div className="bg-white p-4 sm:p-8 rounded-xl shadow-sm border border-gray-200">
                 <h2 className="text-xl font-semibold mb-6">Send New Campaign</h2>
 
-                {success && <div className="bg-blue-50 text-blue-700 p-4 rounded-lg mb-4">{success}</div>}
-                {error && <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4">{error}</div>}
+                {success && <div role="status" className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg mb-4">{success}</div>}
+                {error && <div role="alert" className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4">{error}</div>}
 
                 <form onSubmit={handleSend} className="space-y-6">
                     <div>
@@ -200,13 +240,14 @@ export default function NotificationsPage() {
                         </select>
                     </div>
 
-                    <div className="flex gap-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <fieldset className="flex flex-wrap gap-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                        <legend className="sr-only">Channels</legend>
                         <label className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={form.channels.email}
                                 onChange={e => setForm({ ...form, channels: { ...form.channels, email: e.target.checked } })}
-                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                className="w-5 h-5 text-blue-700 rounded focus:ring-blue-500 cursor-pointer"
                             />
                             <span className="font-medium text-gray-900">Send Email</span>
                         </label>
@@ -215,16 +256,17 @@ export default function NotificationsPage() {
                                 type="checkbox"
                                 checked={form.channels.sms}
                                 onChange={e => setForm({ ...form, channels: { ...form.channels, sms: e.target.checked } })}
-                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                className="w-5 h-5 text-blue-700 rounded focus:ring-blue-500 cursor-pointer"
                             />
                             <span className="font-medium text-gray-900">Send SMS</span>
                         </label>
-                    </div>
+                    </fieldset>
 
                     {form.channels.email && (
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Email Subject</label>
+                            <label htmlFor="campaign-subject" className="block text-sm font-semibold text-gray-700 mb-2">Email Subject</label>
                             <input
+                                id="campaign-subject"
                                 type="text"
                                 value={form.subject}
                                 onChange={e => setForm({ ...form, subject: e.target.value })}
@@ -236,8 +278,9 @@ export default function NotificationsPage() {
                     )}
 
                     <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Message Content</label>
+                        <label htmlFor="campaign-message" className="block text-sm font-semibold text-gray-700 mb-2">Message Content</label>
                         <textarea
+                            id="campaign-message"
                             value={form.message}
                             onChange={e => setForm({ ...form, message: e.target.value })}
                             className="w-full p-3 border border-gray-300 rounded-lg h-40 outline-none focus:ring-2 focus:ring-blue-500"
@@ -252,7 +295,7 @@ export default function NotificationsPage() {
 
                     <button
                         type="submit"
-                        disabled={loading || (!form.channels.email && !form.channels.sms)}
+                        disabled={loading || (!form.channels.email && !form.channels.sms) || (!!role && role !== 'admin')}
                         className="w-full bg-blue-700 text-white py-4 rounded-lg font-bold text-lg hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                         {loading ? (

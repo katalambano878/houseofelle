@@ -13,6 +13,8 @@ export default function AdminCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [productCounts, setProductCounts] = useState<Record<string, number>>({});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -32,15 +34,22 @@ export default function AdminCategoriesPage() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('created_at', { ascending: false });
+      setLoadError('');
+      const [{ data, error }, { data: productRows }] = await Promise.all([
+        supabase.from('categories').select('*').order('created_at', { ascending: false }),
+        supabase.from('products').select('category_id'),
+      ]);
 
       if (error) throw error;
       if (data) setCategories(data);
-    } catch (err) {
+      const counts: Record<string, number> = {};
+      (productRows || []).forEach((p: any) => {
+        if (p.category_id) counts[p.category_id] = (counts[p.category_id] || 0) + 1;
+      });
+      setProductCounts(counts);
+    } catch (err: any) {
       console.error('Error fetching categories:', err);
+      setLoadError(err?.message || 'Could not load categories.');
     } finally {
       setLoading(false);
     }
@@ -69,7 +78,12 @@ export default function AdminCategoriesPage() {
       );
       return;
     }
-    if (!confirm('Are you sure you want to delete this category? Products in it will have no category.')) return;
+    const inUse = productCounts[categoryId] || 0;
+    if (!confirm(
+      inUse > 0
+        ? `Delete this category? Its ${inUse} product${inUse === 1 ? '' : 's'} will be left without a category.`
+        : 'Delete this category?'
+    )) return;
     try {
       // products.category_id has no ON DELETE action, so products must be unlinked before the
       // category row can go. Remember which ones we unlinked so we can put them back if the delete fails.
@@ -96,6 +110,7 @@ export default function AdminCategoriesPage() {
         throw error;
       }
       setCategories(categories.filter((c) => c.id !== categoryId));
+      setProductCounts((prev) => ({ ...prev, [categoryId]: 0 }));
       alert('Category deleted successfully');
     } catch (err: any) {
       alert('Error deleting: ' + (err?.message ?? 'Please try again.'));
@@ -148,21 +163,28 @@ export default function AdminCategoriesPage() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.slug) {
+    if (!formData.name.trim() || !formData.slug.trim()) {
       alert('Name and Slug are required');
+      return;
+    }
+    const slugTaken = categories.some((c) => c.slug === formData.slug.trim() && c.id !== editingCategory?.id);
+    if (slugTaken) {
+      alert('Another category already uses this URL slug. Please choose a different one.');
       return;
     }
 
     setSaving(true);
     try {
       const payload = {
-        name: formData.name,
-        slug: formData.slug,
+        name: formData.name.trim(),
+        slug: formData.slug.trim(),
         description: formData.description,
-        image_url: formData.image_url,
+        image_url: formData.image_url || null,
         parent_id: formData.parent_id || null, // Handle empty string as null
         status: formData.status,
+        // Keep any other settings stored on the category.
         metadata: {
+          ...(showEditModal && editingCategory?.metadata ? editingCategory.metadata : {}),
           featured: formData.featured
         }
       };
@@ -196,6 +218,18 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  /** True when `id` is `rootId` or sits somewhere beneath it. */
+  const isSelfOrDescendant = (id: string, rootId: string): boolean => {
+    let current: any = categories.find((c) => c.id === id);
+    const seen = new Set<string>();
+    while (current && !seen.has(current.id)) {
+      if (current.id === rootId) return true;
+      seen.add(current.id);
+      current = categories.find((c) => c.id === current.parent_id);
+    }
+    return false;
+  };
+
   // Auto-generate slug
   useEffect(() => {
     if (showAddModal && formData.name && !editingCategory) {
@@ -209,7 +243,7 @@ export default function AdminCategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
           <p className="text-gray-600 mt-1">Organize your products into categories</p>
@@ -227,16 +261,16 @@ export default function AdminCategoriesPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Total Categories</p>
           <p className="text-2xl font-bold text-gray-900">{categories.length}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Active</p>
           <p className="text-2xl font-bold text-blue-700">{categories.filter(c => c.status === 'active').length}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Featured</p>
           <p className="text-2xl font-bold text-blue-700">{categories.filter(c => c.metadata?.featured).length}</p>
         </div>
@@ -250,6 +284,7 @@ export default function AdminCategoriesPage() {
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Category</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Slug</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Parent</th>
+                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Products</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Status</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Featured</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Actions</th>
@@ -257,15 +292,22 @@ export default function AdminCategoriesPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-500">Loading categories...</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Loading categories...</td></tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-red-600">
+                    <p className="mb-3">{loadError}</p>
+                    <button onClick={fetchCategories} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">Try again</button>
+                  </td>
+                </tr>
               ) : categories.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-500">No categories found. Create one to get started!</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-gray-500">No categories yet. Add one to start organising products.</td></tr>
               ) : (
                 categories.map((category) => (
                   <tr key={category.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-4">
                       <div className="flex items-center space-x-3">
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                        <div className="w-16 h-16 shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                           {category.image_url ? (
                             <img src={category.image_url} alt={category.name} className="w-full h-full object-cover" />
                           ) : (
@@ -281,8 +323,9 @@ export default function AdminCategoriesPage() {
                     <td className="py-4 px-4 text-sm text-gray-600">
                       {categories.find(c => c.id === category.parent_id)?.name || '-'}
                     </td>
+                    <td className="py-4 px-4 text-sm text-gray-700">{productCounts[category.id] || 0}</td>
                     <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap capitalize ${category.status === 'active' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap capitalize ${category.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                         }`}>
                         {category.status}
                       </span>
@@ -300,12 +343,16 @@ export default function AdminCategoriesPage() {
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleEdit(category)}
+                          aria-label={`Edit ${category.name}`}
+                          title="Edit"
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                         >
                           <i className="ri-edit-line text-lg w-4 h-4 flex items-center justify-center"></i>
                         </button>
                         <button
                           onClick={() => handleDelete(category.id)}
+                          aria-label={`Delete ${category.name}`}
+                          title="Delete"
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                         >
                           <i className="ri-delete-bin-line text-lg w-4 h-4 flex items-center justify-center"></i>
@@ -322,9 +369,9 @@ export default function AdminCategoriesPage() {
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-labelledby="category-modal-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 id="category-modal-title" className="text-2xl font-bold text-gray-900">
                 {showAddModal ? 'Add New Category' : 'Edit Category'}
               </h2>
               <button
@@ -333,6 +380,7 @@ export default function AdminCategoriesPage() {
                   setShowEditModal(false);
                   setEditingCategory(null);
                 }}
+                aria-label="Close"
                 className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
               >
                 <i className="ri-close-line text-2xl w-6 h-6 flex items-center justify-center"></i>
@@ -342,10 +390,11 @@ export default function AdminCategoriesPage() {
             <div className="p-6 space-y-5">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  <label htmlFor="cat-name" className="block text-sm font-semibold text-gray-900 mb-2">
                     Category Name *
                   </label>
                   <input
+                    id="cat-name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -355,17 +404,19 @@ export default function AdminCategoriesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  <label htmlFor="cat-parent" className="block text-sm font-semibold text-gray-900 mb-2">
                     Parent Category (Optional)
                   </label>
                   <select
+                    id="cat-parent"
                     value={formData.parent_id || ''}
                     onChange={(e) => setFormData({ ...formData, parent_id: e.target.value || null })}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">None (Top Level)</option>
                     {categories
-                      .filter(c => c.id !== editingCategory?.id) // Prevent self-parenting
+                      // A category cannot sit under itself or under one of its own sub-categories.
+                      .filter(c => !editingCategory || !isSelfOrDescendant(c.id, editingCategory.id))
                       .map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))
@@ -375,23 +426,25 @@ export default function AdminCategoriesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label htmlFor="cat-slug" className="block text-sm font-semibold text-gray-900 mb-2">
                   URL Slug *
                 </label>
                 <input
+                  id="cat-slug"
                   type="text"
                   value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-') })}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="category-url-slug"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label htmlFor="cat-description" className="block text-sm font-semibold text-gray-900 mb-2">
                   Description
                 </label>
                 <textarea
+                  id="cat-description"
                   rows={3}
                   maxLength={500}
                   value={formData.description}
@@ -414,19 +467,26 @@ export default function AdminCategoriesPage() {
                   ) : formData.image_url ? (
                     <div className="relative group">
                       <img src={formData.image_url} alt="Category" className="h-40 mx-auto object-contain rounded-lg shadow-sm" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg">
-                        <label className="cursor-pointer bg-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-100">
+                      <div className="mt-3 flex items-center justify-center gap-2">
+                        <label className="cursor-pointer bg-white border border-gray-300 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-100 focus-within:ring-2 focus-within:ring-blue-500">
                           Change Image
-                          <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleImageUpload} />
+                          <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,image/jpeg,image/png,image/webp,image/gif,image/avif" className="sr-only" onChange={handleImageUpload} />
                         </label>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, image_url: '' })}
+                          className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-red-50"
+                        >
+                          Remove
+                        </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="cursor-pointer block">
+                    <label className="cursor-pointer block focus-within:ring-2 focus-within:ring-blue-500 rounded-lg">
                       <i className="ri-upload-cloud-line text-4xl text-gray-400 mb-2 w-10 h-10 flex items-center justify-center mx-auto"></i>
                       <p className="text-gray-700 font-medium">Click to upload image</p>
                       <p className="text-sm text-gray-500 mt-1">Square (1:1) Recommended (e.g., 800x800px)</p>
-                      <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleImageUpload} />
+                      <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,image/jpeg,image/png,image/webp,image/gif,image/avif" className="sr-only" onChange={handleImageUpload} />
                     </label>
                   )}
                 </div>
@@ -434,8 +494,9 @@ export default function AdminCategoriesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Status</label>
+                  <label htmlFor="cat-status" className="block text-sm font-semibold text-gray-900 mb-2">Status</label>
                   <select
+                    id="cat-status"
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
@@ -446,12 +507,13 @@ export default function AdminCategoriesPage() {
                 </div>
                 <div className="flex items-center space-x-3 mt-6">
                   <input
+                    id="cat-featured"
                     type="checkbox"
                     checked={formData.featured}
                     onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
                     className="w-5 h-5 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                   />
-                  <label className="text-gray-900 font-medium">
+                  <label htmlFor="cat-featured" className="text-gray-900 font-medium cursor-pointer">
                     Feature on homepage
                   </label>
                 </div>

@@ -109,7 +109,8 @@ export default function BuySmsPage() {
 
       {billing && !billing.configured && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          SMS buying is not connected on this store yet. Once the Taysend key is set, the packages appear here.
+          SMS buying is not connected on this store yet. Once the SMS provider is connected, the packages appear here.
+          Order texts keep working from any credit the store already has.
         </div>
       )}
 
@@ -121,7 +122,13 @@ export default function BuySmsPage() {
             <p className="mt-2 text-sm text-blue-100/90">Used for customer texts and the new-order alert.</p>
           </div>
 
+          {(billing.packages || []).length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600">
+              No SMS packages are available right now. Please try again later.
+            </div>
+          ) : (
           <p className="text-sm font-medium text-gray-700">Choose a package, then press Buy on it.</p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="SMS packages">
             {(billing.packages || []).map((pkg) => {
               const selected = pkg.id === selectedId;

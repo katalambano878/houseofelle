@@ -23,6 +23,10 @@ export async function testSmsAction(phone: string, message: string, authToken: s
             error: 'Unauthorized: ' + (auth.error || 'Admin access required')
         };
     }
+    // Test texts spend the store's SMS credit, and this page is owner-only in the admin menu.
+    if (auth.role !== 'admin') {
+        return { success: false, error: 'Only the store owner can send test SMS.' };
+    }
 
     if (!phone || typeof phone !== 'string') {
         return { success: false, error: 'Enter a phone number.' };

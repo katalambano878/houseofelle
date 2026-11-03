@@ -53,7 +53,9 @@ function AdminLoginForm() {
         password
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(/invalid login credentials/i.test(error.message) ? 'The email or password is not correct.' : error.message);
+      }
 
       if (data.session) {
         const secureAttr = window.location.protocol === 'https:' ? '; Secure' : '';
@@ -88,7 +90,7 @@ function AdminLoginForm() {
             </div>
           )}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
+            <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
               <i className="ri-error-warning-line text-red-600 text-xl mt-0.5"></i>
               <div>
                 <p className="text-red-800 font-semibold">Login Failed</p>
@@ -99,30 +101,35 @@ function AdminLoginForm() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
+              <label htmlFor="admin-login-email" className="block text-sm font-semibold text-gray-900 mb-2">
                 Email Address
               </label>
               <div className="relative">
-                <i className="ri-mail-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
+                <i className="ri-mail-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" aria-hidden="true"></i>
                 <input
+                  id="admin-login-email"
                   type="email"
+                  autoComplete="username"
+                  inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="admin@example.com"
+                  placeholder="you@houseofelle.com"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
+              <label htmlFor="admin-login-password" className="block text-sm font-semibold text-gray-900 mb-2">
                 Password
               </label>
               <div className="relative">
-                <i className="ri-lock-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
+                <i className="ri-lock-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" aria-hidden="true"></i>
                 <input
+                  id="admin-login-password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-12 pr-12 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -132,6 +139,8 @@ function AdminLoginForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 w-5 h-5 flex items-center justify-center"
                 >
                   <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-lg`}></i>

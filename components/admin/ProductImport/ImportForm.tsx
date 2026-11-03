@@ -23,6 +23,7 @@ export default function ImportForm() {
   const [warnings, setWarnings] = useState<ImportError[]>([]);
   const [streamError, setStreamError] = useState<string | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
   const imagesInputRef = useRef<HTMLInputElement>(null);
 
   const canSubmit =
@@ -42,6 +43,7 @@ export default function ImportForm() {
     setConfirmOpen(false);
     setLoading(false);
     if (csvInputRef.current) csvInputRef.current.value = '';
+    if (zipInputRef.current) zipInputRef.current.value = '';
     if (imagesInputRef.current) imagesInputRef.current.value = '';
   };
 
@@ -187,8 +189,9 @@ export default function ImportForm() {
           <button
             type="button"
             onClick={() => setTab('zip')}
+            aria-pressed={tab === 'zip'}
             className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              tab === 'zip' ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-50'
+              tab === 'zip' ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-700' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
             ZIP Upload
@@ -196,8 +199,9 @@ export default function ImportForm() {
           <button
             type="button"
             onClick={() => setTab('csv')}
+            aria-pressed={tab === 'csv'}
             className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              tab === 'csv' ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-gray-600 hover:bg-gray-50'
+              tab === 'csv' ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-700' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
             CSV + Images Upload
@@ -212,6 +216,7 @@ export default function ImportForm() {
               className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-400 focus-within:border-blue-500 transition-colors"
             >
               <input
+                ref={zipInputRef}
                 type="file"
                 accept=".zip"
                 className="sr-only"
@@ -288,7 +293,7 @@ export default function ImportForm() {
             </label>
           </div>
 
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 flex flex-wrap gap-3">
             <a
               href="/api/admin/products/import-template"
               download="products-import-template.csv"
@@ -302,7 +307,7 @@ export default function ImportForm() {
                 type="button"
                 onClick={() => setConfirmOpen(true)}
                 disabled={!canSubmit || loading}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Processing...' : 'Upload & Process'}
               </button>
@@ -313,9 +318,12 @@ export default function ImportForm() {
 
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+          <div role="dialog" aria-modal="true" aria-labelledby="import-confirm-title" className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+            <h2 id="import-confirm-title" className="text-lg font-semibold text-gray-900 mb-2">Start the import?</h2>
             <p className="text-gray-700">
-              You are about to import products. This action cannot be undone. Continue?
+              {updateExisting
+                ? 'New products will be created and products with a matching name will be overwritten. This cannot be undone.'
+                : 'Every row will be created as a new product. This cannot be undone.'}
             </p>
             <div className="mt-6 flex gap-3 justify-end">
               <button
@@ -331,7 +339,7 @@ export default function ImportForm() {
                   setConfirmOpen(false);
                   startImport();
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800"
               >
                 Continue
               </button>

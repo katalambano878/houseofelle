@@ -41,10 +41,10 @@ function isMailable(email: string | null | undefined): email is string {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-    delivered: 'bg-emerald-100 text-emerald-800',
-    shipped: 'bg-blue-100 text-blue-800',
-    processing: 'bg-indigo-100 text-indigo-800',
-    pending: 'bg-yellow-100 text-yellow-800',
+    delivered: 'bg-green-100 text-green-800',
+    shipped: 'bg-yellow-100 text-yellow-800',
+    processing: 'bg-blue-100 text-blue-800',
+    pending: 'bg-amber-100 text-amber-800',
     awaiting_payment: 'bg-amber-100 text-amber-800',
     cancelled: 'bg-red-100 text-red-800',
     refunded: 'bg-gray-100 text-gray-800',
@@ -192,7 +192,8 @@ export default function CustomerDetailsPage() {
         );
     }
 
-    const paidOrders = orders.filter((o) => o.payment_status === 'paid');
+    // Paid orders that were later cancelled or refunded are not money the customer spent.
+    const paidOrders = orders.filter((o) => o.payment_status === 'paid' && o.status !== 'cancelled' && o.status !== 'refunded');
     const totalSpent = paidOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
     const displayName =
         customer.full_name ||
@@ -214,7 +215,7 @@ export default function CustomerDetailsPage() {
                     </div>
                     <div className="min-w-0">
                         <h1 className="text-3xl font-bold text-gray-900 truncate">{displayName}</h1>
-                        <p className="text-gray-500 truncate">{customer.email}</p>
+                        <p className="text-gray-500 truncate">{isMailable(customer.email) ? customer.email : 'No email on file'}</p>
                         {customer.tags && customer.tags.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">
                                 {customer.tags.map((t) => (
@@ -224,7 +225,7 @@ export default function CustomerDetailsPage() {
                         )}
                     </div>
                 </div>
-                <div className="flex space-x-3">
+                <div className="flex flex-wrap gap-3">
                     {mailable ? (
                         <a
                             href={`mailto:${encodeURIComponent(mailable)}`}
@@ -246,7 +247,7 @@ export default function CustomerDetailsPage() {
                     {!editing && (
                         <button
                             onClick={startEdit}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                            className="px-4 py-2 bg-blue-700 text-white rounded-lg font-bold hover:bg-blue-800"
                         >
                             Edit Customer
                         </button>
@@ -306,7 +307,7 @@ export default function CustomerDetailsPage() {
                         <button
                             onClick={saveEdit}
                             disabled={saving}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
+                            className="px-4 py-2 bg-blue-700 text-white rounded-lg font-bold hover:bg-blue-800 disabled:opacity-50"
                         >
                             {saving ? 'Saving...' : 'Save changes'}
                         </button>
@@ -315,16 +316,16 @@ export default function CustomerDetailsPage() {
             )}
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-sm font-medium text-gray-500 mb-1">Total Spent (paid)</p>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Total Spent</p>
                     <p className="text-2xl font-bold text-gray-900">GH₵{money(totalSpent)}</p>
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <p className="text-sm font-medium text-gray-500 mb-1">Total Orders</p>
                     <p className="text-2xl font-bold text-gray-900">{orders.length}</p>
                     {orders.length !== paidOrders.length && (
-                        <p className="text-xs text-gray-500 mt-1">{paidOrders.length} paid</p>
+                        <p className="text-xs text-gray-500 mt-1">{paidOrders.length} paid and kept</p>
                     )}
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -335,7 +336,7 @@ export default function CustomerDetailsPage() {
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <p className="text-sm font-medium text-gray-500 mb-1">Phone</p>
-                    <p className="text-lg font-bold text-gray-900">{customer.phone || 'N/A'}</p>
+                    <p className="text-lg font-bold text-gray-900 break-all">{customer.phone || 'N/A'}</p>
                     {customer.secondary_phone && <p className="text-sm text-gray-500">{customer.secondary_phone}</p>}
                 </div>
             </div>
@@ -375,7 +376,7 @@ export default function CustomerDetailsPage() {
                                     const status = order.status || 'pending';
                                     return (
                                         <tr key={order.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 text-sm font-medium text-blue-600">
+                                            <td className="px-6 py-4 text-sm font-medium text-blue-700 whitespace-nowrap">
                                                 <Link href={`/admin/orders/${order.id}`}>#{order.order_number || order.id.slice(0, 8)}</Link>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-600">
@@ -383,7 +384,7 @@ export default function CustomerDetailsPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[status] || 'bg-gray-100 text-gray-800'}`}>
-                                                    {status.replace(/_/g, ' ')}
+                                                    {status === 'shipped' ? 'Packaged' : status.replace(/_/g, ' ')}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-600 capitalize">
@@ -393,7 +394,7 @@ export default function CustomerDetailsPage() {
                                                 GH₵{money(Number(order.total) || 0)}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <Link href={`/admin/orders/${order.id}`} aria-label="View order" className="text-gray-400 hover:text-blue-600">
+                                                <Link href={`/admin/orders/${order.id}`} aria-label={`View order ${order.order_number || order.id.slice(0, 8)}`} className="text-gray-500 hover:text-blue-700">
                                                     <i className="ri-eye-line text-lg"></i>
                                                 </Link>
                                             </td>

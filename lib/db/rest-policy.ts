@@ -208,14 +208,28 @@ export function authorize(caller: Caller, table: string, op: Op, select?: string
 }
 
 /** Restricts a non-staff write payload to its allowed columns and ownership. */
-export function shapeWrite(caller: Caller, decision: Decision, row: Row, op: "insert" | "update"): Row {
+export function shapeWrite(
+  caller: Caller,
+  decision: Decision,
+  row: Row,
+  op: "insert" | "update",
+  table?: string
+): Row {
   if (isStaff(caller)) {
+    let out = row;
     // Only an admin can hand out or remove admin/staff roles.
-    if (caller.role !== "admin" && "role" in row) {
-      const { role: _ignored, ...rest } = row;
-      return rest;
+    if (caller.role !== "admin" && "role" in out) {
+      const { role: _ignored, ...rest } = out;
+      out = rest;
     }
-    return row;
+    // Staff log their own actions and sales only, never under someone else's name.
+    if (table === "audit_logs" && op === "insert") {
+      out = { ...out, user_id: caller.userId };
+    }
+    if (table === "orders" && out.metadata && typeof out.metadata === "object" && "sold_by_id" in out.metadata) {
+      out = { ...out, metadata: { ...out.metadata, sold_by_id: caller.userId } };
+    }
+    return out;
   }
   const rule = decision.rule || {};
   let out: Row = {};

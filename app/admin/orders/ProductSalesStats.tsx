@@ -53,18 +53,19 @@ export default function ProductSalesStats({ isOpen, onClose }: { isOpen: boolean
 
         setLoadError('');
         try {
-            // 1. Paid, non-cancelled orders in the period.
+            // 1. Paid orders in the period that were not cancelled or refunded.
             let ordersQuery = supabase
                 .from('orders')
-                .select('id')
-                .eq('payment_status', 'paid')
-                .neq('status', 'cancelled');
+                .select('id, status')
+                .eq('payment_status', 'paid');
             if (startDate) ordersQuery = ordersQuery.gte('created_at', startDate);
             const { data: orderRows, error: ordersError } = await ordersQuery;
             if (ordersError) throw ordersError;
 
             // 2. Their items, in chunks so request URLs stay short.
-            const orderIds = (orderRows || []).map((o: any) => o.id as string);
+            const orderIds = (orderRows || [])
+                .filter((o: any) => o.status !== 'cancelled' && o.status !== 'refunded')
+                .map((o: any) => o.id as string);
             const items: any[] = [];
             for (let k = 0; k < orderIds.length; k += ID_CHUNK) {
                 const { data: chunk, error: itemsError } = await supabase
@@ -154,7 +155,7 @@ export default function ProductSalesStats({ isOpen, onClose }: { isOpen: boolean
                 aria-modal="true"
                 aria-label="Product sales breakdown"
                 onClick={(e) => e.stopPropagation()}
-                className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
 
                 {/* Header */}
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
@@ -229,20 +230,28 @@ export default function ProductSalesStats({ isOpen, onClose }: { isOpen: boolean
                                         const hasVariants = s.variants.length > 1 || (s.variants.length === 1 && s.variants[0].name !== 'Default');
                                         return (
                                     <>
-                                    <tr 
+                                    <tr
                                         className={`hover:bg-blue-50/30 transition-colors ${hasVariants ? 'cursor-pointer' : ''}`}
                                         onClick={() => hasVariants && setExpandedProduct(expandedProduct === s.productId ? null : s.productId)}
                                     >
                                         <td className="p-4 pl-6 font-medium text-gray-900">
                                             <div className="flex items-center space-x-2">
                                                 {hasVariants ? (
-                                                    <i className={`ri-arrow-${expandedProduct === s.productId ? 'down' : 'right'}-s-line text-gray-400`}></i>
+                                                    <button
+                                                        type="button"
+                                                        aria-expanded={expandedProduct === s.productId}
+                                                        aria-label={`${expandedProduct === s.productId ? 'Hide' : 'Show'} variants of ${s.productName}`}
+                                                        onClick={(e) => { e.stopPropagation(); setExpandedProduct(expandedProduct === s.productId ? null : s.productId); }}
+                                                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-100"
+                                                    >
+                                                        <i className={`ri-arrow-${expandedProduct === s.productId ? 'down' : 'right'}-s-line text-gray-400`}></i>
+                                                    </button>
                                                 ) : (
-                                                    <span className="w-4"></span>
+                                                    <span className="w-5"></span>
                                                 )}
                                                 <span>{s.productName}</span>
                                                 {hasVariants && (
-                                                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold">
+                                                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full font-semibold">
                                                         {s.variants.length} variants
                                                     </span>
                                                 )}
@@ -262,10 +271,10 @@ export default function ProductSalesStats({ isOpen, onClose }: { isOpen: boolean
                                     </tr>
                                     {expandedProduct === s.productId && hasVariants && (
                                         s.variants.map((v) => (
-                                            <tr key={`${s.productId}-${v.name}`} className="bg-gray-50/80 border-l-2 border-purple-200">
+                                            <tr key={`${s.productId}-${v.name}`} className="bg-gray-50/80 border-l-2 border-blue-200">
                                                 <td className="p-3 pl-14 text-gray-600 text-xs">
                                                     <span className="inline-flex items-center space-x-1.5">
-                                                        <i className="ri-price-tag-3-line text-purple-400"></i>
+                                                        <i className="ri-price-tag-3-line text-blue-400"></i>
                                                         <span className="font-medium">{v.name}</span>
                                                     </span>
                                                 </td>
@@ -284,11 +293,21 @@ export default function ProductSalesStats({ isOpen, onClose }: { isOpen: boolean
                                 ))
                             )}
                         </tbody>
+                        {!loading && !loadError && stats.length > 0 && (
+                            <tfoot className="bg-gray-50 border-t border-gray-200 font-semibold text-gray-900">
+                                <tr>
+                                    <td className="p-4 pl-6">Total</td>
+                                    <td className="p-4 text-center text-gray-400">—</td>
+                                    <td className="p-4 text-center">{stats.reduce((sum, s) => sum + s.itemsSold, 0)}</td>
+                                    <td className="p-4 text-right pr-6 font-mono">{money(stats.reduce((sum, s) => sum + s.totalRevenue, 0))}</td>
+                                </tr>
+                            </tfoot>
+                        )}
                     </table>
                 </div>
 
                 <div className="p-4 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 flex justify-between">
-                    <span>* Only paid/confirmed orders · Click a row to see variant breakdown</span>
+                    <span>* Paid orders only, excluding cancelled and refunded · Click a row to see variant breakdown</span>
                     <span>{stats.length} product{stats.length === 1 ? '' : 's'}</span>
                 </div>
             </div>

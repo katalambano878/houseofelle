@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { currentStaffActor, recordStaffAction } from '@/lib/staff-audit';
 import { generateProductCatalogPdf } from '@/lib/admin/product-catalog-pdf';
 
 const lowStockThreshold = (p: any) => {
@@ -49,7 +50,7 @@ export default function ProductsPage() {
 
 function ProductsPageContent() {
   const searchParams = useSearchParams();
-  const [stockFilter, setStockFilter] = useState<'' | 'low-stock'>(
+  const [stockFilter, setStockFilter] = useState<'' | 'low-stock' | 'out'>(
     searchParams.get('filter') === 'low-stock' ? 'low-stock' : ''
   );
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -64,6 +65,13 @@ function ProductsPageContent() {
   const [categories, setCategories] = useState<any[]>([]);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ current: number; total: number } | null>(null);
+  const [loadError, setLoadError] = useState('');
+  // Deleting removes reviews and images for good, so only the owner may do it. Staff can archive instead.
+  const [canDelete, setCanDelete] = useState(false);
+
+  useEffect(() => {
+    currentStaffActor().then((actor) => setCanDelete(actor?.role === 'admin')).catch(() => setCanDelete(false));
+  }, []);
 
   // Statistics
   const [stats, setStats] = useState({
@@ -74,7 +82,7 @@ function ProductsPageContent() {
   });
 
   const statusColors: any = {
-    'active': 'bg-blue-100 text-blue-700',
+    'active': 'bg-green-100 text-green-700',
     'draft': 'bg-gray-100 text-gray-700',
     'archived': 'bg-amber-100 text-amber-700',
   };
@@ -87,12 +95,13 @@ function ProductsPageContent() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError('');
       let query = supabase
         .from('products')
         .select(`
           *,
           categories(name),
-          product_variants(id),
+          product_variants(id, quantity),
           product_images(url, position)
         `);
 
@@ -101,7 +110,6 @@ function ProductsPageContent() {
       if (sortBy === 'price_asc') query = query.order('price', { ascending: true });
       if (sortBy === 'price_desc') query = query.order('price', { ascending: false });
       if (sortBy === 'name') query = query.order('name', { ascending: true });
-      if (sortBy === 'stock') query = query.order('quantity', { ascending: true });
 
       const { data, error } = await query;
 
@@ -109,30 +117,40 @@ function ProductsPageContent() {
 
       if (data) {
         // Transform data for UI
-        const transformedProducts = data.map((p: any) => ({
-          ...p,
-          category: p.categories?.name || 'Uncategorized',
-          image: p.product_images?.find((img: any) => img.position === 0)?.url
-            || p.product_images?.[0]?.url
-            || '/house-of-elle-logo.png',
-          variantsCount: p.product_variants?.length || 0,
-          stock: p.quantity,
-          sales: 0, // Placeholder for now
-          rating: p.rating_avg || 0
-        }));
+        let transformedProducts = data.map((p: any) => {
+          const variants = Array.isArray(p.product_variants) ? p.product_variants : [];
+          return {
+            ...p,
+            category: p.categories?.name || 'Uncategorized',
+            image: p.product_images?.find((img: any) => img.position === 0)?.url
+              || p.product_images?.[0]?.url
+              || '/house-of-elle-logo.png',
+            variantsCount: variants.length,
+            // Products with options are stocked per option.
+            stock: variants.length > 0
+              ? variants.reduce((sum: number, v: any) => sum + (Number(v.quantity) || 0), 0)
+              : Number(p.quantity) || 0,
+            tracked: p.track_quantity !== false,
+            rating: p.rating_avg || 0
+          };
+        });
+        if (sortBy === 'stock') {
+          transformedProducts = [...transformedProducts].sort((a, b) => a.stock - b.stock);
+        }
 
         setProducts(transformedProducts);
 
-        // Calculate stats locally for now (better to do count queries in production)
+        const tracked = transformedProducts.filter(p => p.tracked);
         setStats({
           total: transformedProducts.length,
-          lowStock: transformedProducts.filter(p => p.quantity <= lowStockThreshold(p) && p.quantity > 0).length,
-          outOfStock: transformedProducts.filter(p => p.quantity === 0).length,
+          lowStock: tracked.filter(p => p.stock <= lowStockThreshold(p) && p.stock > 0).length,
+          outOfStock: tracked.filter(p => p.stock <= 0).length,
           active: transformedProducts.filter(p => p.status === 'active').length
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching products:', error);
+      setLoadError(error?.message || 'Could not load products.');
     } finally {
       setLoading(false);
     }
@@ -168,6 +186,12 @@ function ProductsPageContent() {
       alert(`Could not delete this product (${err}). If it has been ordered before, set its status to Archived instead.`);
       return;
     }
+    recordStaffAction({
+      action: 'delete',
+      entityType: 'products',
+      entityId: productId,
+      details: { label: products.find((p) => p.id === productId)?.name || null },
+    });
     setProducts((prev) => prev.filter((p) => p.id !== productId));
     setSelectedProducts((prev) => prev.filter((id) => id !== productId));
     alert('Product deleted successfully');
@@ -184,6 +208,12 @@ function ProductsPageContent() {
         failed.push(products.find((p) => p.id === productId)?.name || productId.slice(0, 8));
       } else {
         deleted.push(productId);
+        recordStaffAction({
+          action: 'delete',
+          entityType: 'products',
+          entityId: productId,
+          details: { label: products.find((p) => p.id === productId)?.name || null, bulk: true },
+        });
       }
     }
     setProducts((prev) => prev.filter((p) => !deleted.includes(p.id)));
@@ -201,7 +231,8 @@ function ProductsPageContent() {
   const filteredProducts = products.filter(product => {
     if (categoryFilter && product.category !== categoryFilter) return false;
     if (statusFilter && String(product.status || '').toLowerCase() !== statusFilter) return false;
-    if (stockFilter === 'low-stock' && !(Number(product.quantity ?? 0) <= lowStockThreshold(product))) return false;
+    if (stockFilter === 'low-stock' && !(product.tracked && product.stock > 0 && product.stock <= lowStockThreshold(product))) return false;
+    if (stockFilter === 'out' && !(product.tracked && product.stock <= 0)) return false;
     const term = searchQuery.toLowerCase();
     return (product.name || '').toLowerCase().includes(term) ||
       (product.sku && product.sku.toLowerCase().includes(term)) ||
@@ -228,7 +259,7 @@ function ProductsPageContent() {
           id: p.id,
           name: p.name,
           price: Number(p.price) || 0,
-          stock: Number(p.stock ?? p.quantity) || 0,
+          stock: Number(p.stock) || 0,
           sku: p.sku,
           category: p.category,
           status: p.status,
@@ -300,19 +331,19 @@ function ProductsPageContent() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Total Products</p>
           <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Active</p>
           <p className="text-2xl font-bold text-blue-700">{stats.active}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Low Stock</p>
           <p className="text-2xl font-bold text-amber-700">{stats.lowStock}</p>
         </div>
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p className="text-sm text-gray-600 mb-1">Out of Stock</p>
           <p className="text-2xl font-bold text-red-700">{stats.outOfStock}</p>
         </div>
@@ -325,7 +356,8 @@ function ProductsPageContent() {
               <div className="relative">
                 <i className="ri-search-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg w-5 h-5 flex items-center justify-center"></i>
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search products"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search products by name, SKU, or category..."
@@ -334,15 +366,17 @@ function ProductsPageContent() {
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
+                aria-expanded={showFilters}
                 className="px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:border-gray-400 transition-colors font-medium whitespace-nowrap cursor-pointer"
               >
                 <i className="ri-filter-line mr-2"></i>
-                Filters
+                Filters{[categoryFilter, statusFilter, stockFilter].filter(Boolean).length > 0 ? ` (${[categoryFilter, statusFilter, stockFilter].filter(Boolean).length})` : ''}
               </button>
               <select
+                aria-label="Sort products"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium cursor-pointer"
@@ -356,6 +390,8 @@ function ProductsPageContent() {
               <div className="flex border-2 border-gray-300 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setViewMode('list')}
+                  aria-label="List view"
+                  aria-pressed={viewMode === 'list'}
                   className={`w-10 h-10 flex items-center justify-center transition-colors cursor-pointer ${viewMode === 'list' ? 'bg-blue-700 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
                     }`}
                 >
@@ -363,6 +399,8 @@ function ProductsPageContent() {
                 </button>
                 <button
                   onClick={() => setViewMode('grid')}
+                  aria-label="Grid view"
+                  aria-pressed={viewMode === 'grid'}
                   className={`w-10 h-10 flex items-center justify-center border-l-2 border-gray-300 transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-blue-700 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
                     }`}
                 >
@@ -375,6 +413,7 @@ function ProductsPageContent() {
           {showFilters && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg grid md:grid-cols-4 gap-4">
               <select
+                aria-label="Filter by category"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer"
@@ -383,6 +422,7 @@ function ProductsPageContent() {
                 {categories.map((cat: any) => <option key={cat.name} value={cat.name}>{cat.name}</option>)}
               </select>
               <select
+                aria-label="Filter by status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer"
@@ -393,23 +433,34 @@ function ProductsPageContent() {
                 <option value="archived">Archived</option>
               </select>
               <select
+                aria-label="Filter by stock level"
                 value={stockFilter}
-                onChange={(e) => setStockFilter(e.target.value as '' | 'low-stock')}
+                onChange={(e) => setStockFilter(e.target.value as '' | 'low-stock' | 'out')}
                 className="px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer"
               >
                 <option value="">All Stock Levels</option>
                 <option value="low-stock">Low Stock</option>
+                <option value="out">Out of Stock</option>
               </select>
+              {[categoryFilter, statusFilter, stockFilter].some(Boolean) && (
+                <button
+                  type="button"
+                  onClick={() => { setCategoryFilter(''); setStatusFilter(''); setStockFilter(''); }}
+                  className="text-sm font-medium text-blue-700 hover:text-blue-800 text-left md:text-center"
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           )}
         </div>
 
         {selectedProducts.length > 0 && (
-          <div className="p-4 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+          <div className="p-4 bg-blue-50 border-b border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-blue-800 font-semibold">
               {selectedProducts.length} product{selectedProducts.length > 1 ? 's' : ''} selected
             </p>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleDownloadCatalogPdf}
                 disabled={pdfGenerating}
@@ -418,11 +469,19 @@ function ProductsPageContent() {
                 <i className="ri-file-pdf-line mr-1"></i>
                 Download PDF
               </button>
+              {canDelete && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
+                >
+                  Delete
+                </button>
+              )}
               <button
-                onClick={handleBulkDelete}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
+                onClick={() => setSelectedProducts([])}
+                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
               >
-                Delete
+                Clear selection
               </button>
             </div>
           </div>
@@ -433,11 +492,20 @@ function ProductsPageContent() {
             <i className="ri-loader-4-line animate-spin text-3xl mb-2 inline-block"></i>
             <p>Loading products...</p>
           </div>
+        ) : loadError ? (
+          <div className="p-12 text-center text-red-600">
+            <p className="mb-3">{loadError}</p>
+            <button onClick={fetchProducts} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">
+              Try again
+            </button>
+          </div>
         ) : filteredProducts.length === 0 ? (
           <div className="p-12 text-center text-gray-500">
             <i className="ri-inbox-line text-4xl mb-4 text-gray-300 inline-block"></i>
             <p className="text-lg">No products found</p>
-            <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filters</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {products.length === 0 ? 'Add your first product to get started.' : 'Try adjusting your search or filters'}
+            </p>
           </div>
         ) : viewMode === 'list' ? (
           <div className="overflow-x-auto">
@@ -447,6 +515,7 @@ function ProductsPageContent() {
                   <th className="py-4 px-6">
                     <input
                       type="checkbox"
+                      aria-label="Select all products shown"
                       checked={filteredProducts.length > 0 && filteredProducts.every((p) => selectedProducts.includes(p.id))}
                       onChange={handleSelectAll}
                       className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
@@ -467,6 +536,7 @@ function ProductsPageContent() {
                     <td className="py-4 px-6">
                       <input
                         type="checkbox"
+                        aria-label={`Select ${product.name}`}
                         checked={selectedProducts.includes(product.id)}
                         onChange={() => handleSelectProduct(product.id)}
                         className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
@@ -474,27 +544,40 @@ function ProductsPageContent() {
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex items-center space-x-3">
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                        <div className="w-16 h-16 shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                           <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                         </div>
                         <div>
                           <p className="font-semibold text-gray-900">{product.name}</p>
                           <div className="flex items-center mt-1">
-                            <span className="text-xs text-gray-400">ID: {product.id.substring(0, 8)}...</span>
+                            <span className="text-xs text-gray-500">
+                              {product.variantsCount > 0 ? `${product.variantsCount} option${product.variantsCount === 1 ? '' : 's'}` : 'No options'}
+                            </span>
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="py-4 px-4 text-gray-700 text-sm font-mono">{product.sku || '-'}</td>
                     <td className="py-4 px-4 text-gray-700 text-sm">{product.category}</td>
-                    <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">GH₵ {money(product.price)}</td>
-                    <td className="py-4 px-4 text-gray-700">
-                      {product.stock}
-                      {product.stock <= lowStockThreshold(product) && product.stock > 0 && (
-                        <span className="ml-2 w-2 h-2 rounded-full bg-amber-500 inline-block" title="Low Stock"></span>
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <span className="font-semibold text-gray-900">GH₵ {money(product.price)}</span>
+                      {Number(product.compare_at_price) > Number(product.price) && (
+                        <span className="block text-xs text-gray-500 line-through">GH₵ {money(product.compare_at_price)}</span>
                       )}
-                      {product.stock === 0 && (
-                        <span className="ml-2 w-2 h-2 rounded-full bg-red-500 inline-block" title="Out of Stock"></span>
+                    </td>
+                    <td className="py-4 px-4 text-gray-700 whitespace-nowrap">
+                      {!product.tracked ? (
+                        <span className="text-sm text-gray-500">Not tracked</span>
+                      ) : (
+                        <>
+                          {product.stock}
+                          {product.stock <= lowStockThreshold(product) && product.stock > 0 && (
+                            <span className="ml-2 text-xs font-semibold text-amber-700">Low</span>
+                          )}
+                          {product.stock <= 0 && (
+                            <span className="ml-2 text-xs font-semibold text-red-700">Out</span>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="py-4 px-4">
@@ -506,16 +589,22 @@ function ProductsPageContent() {
                       <div className="flex items-center space-x-2">
                         <Link
                           href={`/admin/products/${product.id}`}
+                          aria-label={`Edit ${product.name}`}
+                          title="Edit"
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                         >
                           <i className="ri-edit-line text-lg"></i>
                         </Link>
-                        <button
-                          onClick={() => handleDeleteProduct(product.id)}
-                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <i className="ri-delete-bin-line text-lg"></i>
-                        </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDeleteProduct(product.id)}
+                            aria-label={`Delete ${product.name}`}
+                            title="Delete"
+                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <i className="ri-delete-bin-line text-lg"></i>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -524,12 +613,13 @@ function ProductsPageContent() {
             </table>
           </div>
         ) : (
-          <div className="p-6 grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="p-4 sm:p-6 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {filteredProducts.map((product) => (
               <div key={product.id} className="border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
                 <div className="relative">
                   <input
                     type="checkbox"
+                    aria-label={`Select ${product.name}`}
                     checked={selectedProducts.includes(product.id)}
                     onChange={() => handleSelectProduct(product.id)}
                     className="absolute top-2 left-2 w-5 h-5 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer z-10"
@@ -544,10 +634,15 @@ function ProductsPageContent() {
                 <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">{product.name}</h3>
                 <p className="text-sm text-gray-600 mb-2">{product.category}</p>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-lg font-bold text-gray-900">GH₵ {product.price}</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    GH₵ {money(product.price)}
+                    {Number(product.compare_at_price) > Number(product.price) && (
+                      <span className="ml-2 text-sm font-normal text-gray-500 line-through">GH₵ {money(product.compare_at_price)}</span>
+                    )}
+                  </p>
                 </div>
                 <div className="flex items-center justify-between text-sm text-gray-600 mb-3 pb-3 border-b border-gray-200">
-                  <span>Stock: {product.stock}</span>
+                  <span>{product.tracked ? `Stock: ${product.stock}` : 'Stock not tracked'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Link
@@ -556,12 +651,15 @@ function ProductsPageContent() {
                   >
                     Edit
                   </Link>
-                  <button
-                    onClick={() => handleDeleteProduct(product.id)}
-                    className="w-9 h-9 flex items-center justify-center border-2 border-gray-300 text-gray-700 hover:border-red-600 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <i className="ri-delete-bin-line"></i>
-                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDeleteProduct(product.id)}
+                      aria-label={`Delete ${product.name}`}
+                      className="w-9 h-9 flex items-center justify-center border-2 border-gray-300 text-gray-700 hover:border-red-600 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <i className="ri-delete-bin-line"></i>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

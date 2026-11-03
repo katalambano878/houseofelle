@@ -4,6 +4,7 @@ import { money } from '@/lib/format-money';
 import Link from 'next/link';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { recordStaffAction } from '@/lib/staff-audit';
 import FraudDetectionAlert from '@/components/FraudDetectionAlert';
 import { deliveryLabel, orderSource } from '@/lib/delivery';
 
@@ -215,7 +216,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
     const addr = o?.shipping_address || {};
     return (addr.firstName && addr.lastName)
       ? `${String(addr.firstName).trim()} ${String(addr.lastName).trim()}`
-      : addr.full_name || addr.firstName || o?.email?.split('@')[0] || 'Customer';
+      : addr.full_name || addr.firstName || (o?.email && !String(o.email).toLowerCase().endsWith('.local') ? o.email.split('@')[0] : '') || 'Walk-in customer';
   };
 
   const handleUpdateStatus = async (newStatus?: string) => {
@@ -262,6 +263,22 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
       else if (inserted) setHistory((h) => [...h, inserted as StatusHistoryEntry]);
     }
 
+    if (statusChanged || trackingChanged) {
+      recordStaffAction({
+        action: statusChanged ? 'status_change' : 'update',
+        entityType: 'orders',
+        entityId: order.id,
+        details: {
+          label: order.order_number || order.id,
+          ...(statusChanged ? { from: order.status } : {}),
+          changes: {
+            ...(statusChanged ? { status: statusToUpdate } : {}),
+            ...(trackingChanged ? { tracking_number: trackingNumber || 'removed' } : {}),
+          },
+        },
+      });
+    }
+
     setOrder({ ...order, status: statusToUpdate, notes: adminNotes, metadata: nextMetadata });
 
     // Email + SMS when the status changed or a tracking number was added/changed.
@@ -300,6 +317,31 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
   };
 
   const [resendingNotification, setResendingNotification] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
+
+  /** Asks Moolre whether an unpaid Mobile Money order has been paid, and marks it paid if so. */
+  const handleCheckPayment = async () => {
+    if (!order?.order_number) return;
+    setCheckingPayment(true);
+    try {
+      const res = await fetch('/api/payment/moolre/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderNumber: order.order_number }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (result?.success) {
+        await fetchOrderDetails();
+        alert(result.message === 'Order already paid' ? 'This order is already paid.' : 'Payment confirmed by Moolre. The order is now marked paid.');
+      } else {
+        alert(result?.message || 'Moolre has not confirmed a payment for this order yet.');
+      }
+    } catch (err: any) {
+      alert(`Could not check the payment: ${err?.message || 'network error'}`);
+    } finally {
+      setCheckingPayment(false);
+    }
+  };
 
   const handleResendNotification = async () => {
     if (!order) return;
@@ -353,22 +395,31 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
   const statusColors: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-700 border-amber-200',
     'processing': 'bg-blue-100 text-blue-700 border-blue-200',
-    'shipped': 'bg-purple-100 text-purple-700 border-purple-200',
-    'delivered': 'bg-blue-100 text-blue-700 border-blue-200',
+    'shipped': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    'delivered': 'bg-green-100 text-green-700 border-green-200',
     'cancelled': 'bg-red-100 text-red-700 border-red-200',
     'awaiting_payment': 'bg-gray-100 text-gray-700 border-gray-200',
     'refunded': 'bg-gray-100 text-gray-700 border-gray-200'
   };
   const paymentColors: Record<string, string> = {
-    paid: 'bg-emerald-100 text-emerald-700',
+    paid: 'bg-green-100 text-green-700',
     pending: 'bg-amber-100 text-amber-700',
     failed: 'bg-red-100 text-red-700',
     refunded: 'bg-gray-100 text-gray-700',
     partially_refunded: 'bg-gray-100 text-gray-700',
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
-  if (error || !order) return <div className="p-8 text-center text-red-500">{error || 'Order not found'}</div>;
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading order...</div>;
+  if (error || !order) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-600 mb-4">{error || 'Order not found'}</p>
+        <Link href="/admin/orders" className="text-blue-700 hover:text-blue-800 font-medium">
+          <i className="ri-arrow-left-line mr-1"></i>Back to orders
+        </Link>
+      </div>
+    );
+  }
 
   const currentStatus = order.status || 'pending';
   const shippingAddress = order.shipping_address || {};
@@ -462,7 +513,8 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
             </div>
             <div className="text-right">
               <p>Subtotal: GH₵ {money(order?.subtotal)}</p>
-              <p>Shipping: GH₵ {money(order?.shipping_total)}</p>
+              {Number(order?.discount_total) > 0 && <p>Discount: -GH₵ {money(order?.discount_total)}</p>}
+              <p>Delivery: GH₵ {money(order?.shipping_total)}</p>
               <p className="font-bold text-lg border-t border-gray-400 pt-1 mt-1">Total: GH₵ {money(order?.total)}</p>
             </div>
           </div>
@@ -477,13 +529,13 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
 
       <div className="max-w-7xl mx-auto p-6 no-print">
         {/* Page Header with Print Button */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <Link href="/admin/orders" className="text-gray-600 hover:text-gray-900">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center space-x-4 min-w-0">
+            <Link href="/admin/orders" aria-label="Back to orders" className="text-gray-600 hover:text-gray-900">
               <i className="ri-arrow-left-line text-2xl"></i>
             </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{order?.order_number}</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-all">{order?.order_number}</h1>
               <p className="text-sm text-gray-600">Order placed on {order ? new Date(order.created_at).toLocaleDateString() : ''}</p>
             </div>
           </div>
@@ -549,16 +601,16 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                   <span>GH₵ {money(order.subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-700">
-                  <span>Shipping</span>
+                  <span>Delivery</span>
                   <span>GH₵ {money(order.shipping_total)}</span>
                 </div>
                 <div className="flex justify-between text-gray-700">
                   <span>Tax</span>
                   <span>GH₵ {money(order.tax_total)}</span>
                 </div>
-                {Number(order.discount_total) > 0 && (
+                {(Number(order.discount_total) > 0 || order.metadata?.coupon_code) && (
                   <div className="flex justify-between text-blue-700 font-semibold">
-                    <span>Discount</span>
+                    <span>Discount{order.metadata?.coupon_code ? ` (code ${order.metadata.coupon_code})` : ''}</span>
                     <span>-GH₵ {money(order.discount_total)}</span>
                   </div>
                 )}
@@ -602,6 +654,10 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
               <div className="relative">
                 <button
                   onClick={() => setShowStatusMenu(!showStatusMenu)}
+                  disabled={statusUpdating}
+                  aria-haspopup="listbox"
+                  aria-expanded={showStatusMenu}
+                  aria-label={`Order status: ${statusLabel(currentStatus)}. Change status`}
                   className={`w-full px-4 py-3 rounded-lg border-2 font-semibold text-left flex items-center justify-between ${statusColors[currentStatus] || 'bg-gray-100'}`}
                 >
                   <span>{statusLabel(currentStatus)}</span>
@@ -613,6 +669,11 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                       <button
                         key={status}
                         onClick={() => {
+                          if (status === currentStatus) {
+                            setShowStatusMenu(false);
+                            return;
+                          }
+                          if (!confirm(`Change this order to ${statusLabel(status)}? The customer will get an email and SMS.`)) return;
                           handleUpdateStatus(status);
                         }}
                         className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${status === currentStatus ? 'bg-blue-50 font-semibold' : ''
@@ -626,10 +687,11 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label htmlFor="order-tracking-number" className="block text-sm font-semibold text-gray-900 mb-2">
                   Tracking Number
                 </label>
                 <input
+                  id="order-tracking-number"
                   type="text"
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
@@ -642,7 +704,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                 disabled={statusUpdating}
                 className="w-full mt-4 bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-lg font-semibold transition-colors whitespace-nowrap disabled:opacity-50"
               >
-                {statusUpdating ? 'Updating...' : 'Update Status'}
+                {statusUpdating ? 'Saving...' : 'Save Tracking Number'}
               </button>
             </div>
 
@@ -654,15 +716,27 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">{customerName}</p>
-                  <p className="text-sm text-gray-600">{order.email}</p>
+                  <p className="text-sm text-gray-600 break-all">{order.email && !String(order.email).toLowerCase().endsWith('.local') ? order.email : 'No email'}</p>
                   <p className="text-sm text-gray-600">{shippingAddress.phone || order.phone}</p>
                 </div>
               </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Shipping Address</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery</h2>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold border bg-blue-50 text-blue-800 border-blue-200">
+                  {orderSource(order) === 'pos' ? 'POS (in store)' : 'Website'}
+                </span>
+                <span className="text-sm font-semibold text-gray-900">{deliveryLabel(order.shipping_method)}</span>
+              </div>
+              {order.metadata?.sold_by_name && (
+                <p className="text-sm text-gray-600 mb-3">Sold by {order.metadata.sold_by_name}</p>
+              )}
               <div className="text-gray-700 space-y-1">
+                {!(shippingAddress.address || shippingAddress.address_line1 || shippingAddress.city) && (
+                  <p className="text-sm text-gray-500">No delivery address on this order.</p>
+                )}
                 {/* Support both old field names (address_line1) and new (address) */}
                 <p>{shippingAddress.address || shippingAddress.address_line1}</p>
                 {(shippingAddress.address_line2) && <p>{shippingAddress.address_line2}</p>}
@@ -691,11 +765,21 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                 <div className="flex justify-between">
                   {/* Transaction ID might be in metadata depending on callback */}
                   <span className="text-gray-600">Transaction</span>
-                  <span className="text-sm text-gray-900 font-mono truncate max-w-[150px]">
+                  <span className="text-sm text-gray-900 font-mono truncate max-w-[150px]" title={order.metadata?.moolre_reference || order.payment_transaction_id || ''}>
                     {order.metadata?.moolre_reference || order.payment_transaction_id || 'N/A'}
                   </span>
                 </div>
               </div>
+              {order.payment_status !== 'paid' && order.payment_method === 'moolre' && order.status !== 'cancelled' && /^ORD-\d+-\d+$/.test(order.order_number || '') && (
+                <button
+                  onClick={handleCheckPayment}
+                  disabled={checkingPayment}
+                  className="w-full mt-4 border-2 border-blue-700 text-blue-700 hover:bg-blue-50 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50 flex items-center justify-center"
+                >
+                  <i className={`${checkingPayment ? 'ri-loader-4-line animate-spin' : 'ri-refresh-line'} mr-2`}></i>
+                  {checkingPayment ? 'Checking with Moolre...' : 'Check Mobile Money payment'}
+                </button>
+              )}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -706,7 +790,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
               <button
                 onClick={handleResendNotification}
                 disabled={resendingNotification}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors whitespace-nowrap disabled:opacity-50 flex items-center justify-center"
+                className="w-full bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-lg font-semibold transition-colors whitespace-nowrap disabled:opacity-50 flex items-center justify-center"
               >
                 {resendingNotification ? (
                   <>
@@ -726,8 +810,9 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Admin Notes</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4"><label htmlFor="order-admin-notes">Admin Notes</label></h2>
               <textarea
+                id="order-admin-notes"
                 value={adminNotes}
                 onChange={(e) => setAdminNotes(e.target.value)}
                 placeholder="Add internal notes about this order..."
