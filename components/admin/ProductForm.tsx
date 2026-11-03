@@ -1121,7 +1121,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                                 <p className="text-sm text-gray-700">
                                     <strong>Image Guidelines:</strong> Use high-quality images (min 1000x1000px), white or neutral backgrounds work best.
-                                    Supported formats: JPG, PNG, WebP (max 5MB each).
+                                    Supported formats: JPG, PNG, WebP, GIF, AVIF (max 10MB each).
                                 </p>
                             </div>
                         </div>
