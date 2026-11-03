@@ -8,8 +8,8 @@ const CACHE_TTL = 15 * 60 * 1000; // 15 minutes — products don't change freque
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const featured = searchParams.get('featured') === 'true';
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const category = searchParams.get('category');
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 200);
+    const category = (searchParams.get('category') || '').trim().slice(0, 100);
 
     // Build a cache key from params
     const cacheKey = `${featured}-${limit}-${category || 'all'}`;
@@ -41,8 +41,16 @@ export async function GET(request: Request) {
         if (featured) {
             query = query.eq('featured', true).limit(limit);
         } else if (category) {
-            // Filter by category slug or name
-            query = query.limit(limit);
+            // Filter by category slug (or id)
+            const { data: cat } = await supabase
+                .from('categories')
+                .select('id')
+                .or(`slug.eq.${category.replace(/[^a-z0-9-]/gi, '')},id.eq.${category.replace(/[^a-f0-9-]/gi, '')}`)
+                .maybeSingle();
+            if (!cat) {
+                return NextResponse.json([], { headers: { 'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=1800' } });
+            }
+            query = query.eq('category_id', cat.id).limit(limit);
         } else {
             query = query.limit(limit);
         }
@@ -67,6 +75,6 @@ export async function GET(request: Request) {
         });
     } catch (err: any) {
         console.error('[Storefront API] Error:', err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
     }
 }

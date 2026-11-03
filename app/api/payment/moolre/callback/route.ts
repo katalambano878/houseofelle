@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendOrderConfirmation } from '@/lib/notifications';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
+import { confirmMoolrePayment, secretsMatch } from '@/lib/moolre';
 
 /**
  * Moolre Callback Payload Structure (from their actual API):
@@ -73,16 +74,15 @@ export async function POST(req: Request) {
         // ============================================================
         // SECURITY: Verify callback secret FIRST (mandatory)
         // ============================================================
-        const expectedSecret = process.env.MOOLRE_CALLBACK_SECRET;
-        if (expectedSecret) {
-            // If we have a configured secret, the callback MUST match it
-            if (!body.secret || body.secret !== expectedSecret) {
-                console.error('[Callback] Secret mismatch or missing! Rejecting callback.');
-                return NextResponse.json({ success: false, message: 'Invalid callback signature' }, { status: 403 });
-            }
-        } else {
-            // Log a warning if no secret is configured — this should be fixed
-            console.warn('[Callback] WARNING: MOOLRE_CALLBACK_SECRET not configured. Callback origin cannot be verified.');
+        const expectedSecret = process.env.MOOLRE_CALLBACK_SECRET || '';
+        const secretVerified = !!expectedSecret && secretsMatch(body.secret, expectedSecret);
+        if (expectedSecret && !secretVerified) {
+            console.error('[Callback] Secret mismatch or missing! Rejecting callback.');
+            return NextResponse.json({ success: false, message: 'Invalid callback signature' }, { status: 403 });
+        }
+        if (!expectedSecret) {
+            // Without a shared secret the body proves nothing; success is confirmed with Moolre below.
+            console.warn('[Callback] MOOLRE_CALLBACK_SECRET not configured; confirming with the Moolre API instead.');
         }
 
         // ============================================================
@@ -124,7 +124,7 @@ export async function POST(req: Request) {
             '| Moolre ref:', moolreReference);
 
         if (!merchantOrderRef) {
-            console.error('[Callback] Missing order reference. Body:', JSON.stringify(body).substring(0, 500));
+            console.error('[Callback] Missing order reference. Keys:', Object.keys(body).join(', '));
             return NextResponse.json({ success: false, message: 'Missing order reference' }, { status: 400 });
         }
 
@@ -166,16 +166,19 @@ export async function POST(req: Request) {
             // ============================================================
             // SECURITY: Verify amount matches — REJECT if mismatch
             // ============================================================
-            const callbackAmount = data.amount ? parseFloat(data.amount) : (body.amount ? parseFloat(body.amount) : null);
-            if (callbackAmount !== null) {
-                const expectedAmount = Number(existingOrder.total);
-                if (Math.abs(callbackAmount - expectedAmount) > 0.01) {
-                    console.error('[Callback] AMOUNT MISMATCH — REJECTING! Expected:', expectedAmount, 'Got:', callbackAmount, 'Order:', merchantOrderRef);
-                    return NextResponse.json({
-                        success: false,
-                        message: 'Payment amount does not match order total'
-                    }, { status: 400 });
-                }
+            const callbackAmount = parseFloat(data.amount ?? body.amount);
+            const expectedAmount = Number(existingOrder.total);
+            if (!Number.isFinite(callbackAmount) || Math.abs(callbackAmount - expectedAmount) > 0.01) {
+                console.error('[Callback] AMOUNT MISSING OR MISMATCHED — REJECTING! Expected:', expectedAmount, 'Got:', callbackAmount, 'Order:', merchantOrderRef);
+                return NextResponse.json({
+                    success: false,
+                    message: 'Payment amount does not match order total'
+                }, { status: 400 });
+            }
+
+            if (!secretVerified && !(await confirmMoolrePayment(String(rawExternalRef || ''), expectedAmount))) {
+                console.error('[Callback] Moolre did not confirm payment for', merchantOrderRef);
+                return NextResponse.json({ success: false, message: 'Payment could not be confirmed' }, { status: 202 });
             }
 
             // Mark order as paid via RPC
@@ -224,16 +227,27 @@ export async function POST(req: Request) {
             // Payment failed
             console.log(`[Callback] Payment FAILED for ${merchantOrderRef} | Status: ${apiStatus} | TX: ${txStatus}`);
 
-            await supabaseAdmin
-                .from('orders')
-                .update({
-                    payment_status: 'failed',
-                    metadata: {
-                        moolre_reference: moolreReference,
-                        failure_reason: body.message || 'Payment failed'
-                    }
-                })
-                .eq('order_number', merchantOrderRef);
+            // Only unverified failures are ignored; never downgrade a paid order or wipe its metadata.
+            if (secretVerified) {
+                const { data: current } = await supabaseAdmin
+                    .from('orders')
+                    .select('id, payment_status, metadata')
+                    .eq('order_number', merchantOrderRef)
+                    .maybeSingle();
+                if (current && current.payment_status !== 'paid') {
+                    await supabaseAdmin
+                        .from('orders')
+                        .update({
+                            payment_status: 'failed',
+                            metadata: {
+                                ...(current.metadata || {}),
+                                moolre_reference: moolreReference,
+                                failure_reason: String(body.message || 'Payment failed').slice(0, 200)
+                            }
+                        })
+                        .eq('id', current.id);
+                }
+            }
 
             return NextResponse.json({ success: false, message: 'Payment not successful' });
         }

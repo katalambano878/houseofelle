@@ -21,7 +21,6 @@ export default function AdminReviewsPage() {
         .from('reviews')
         .select(`
           *,
-          profiles:user_id (full_name, email),
           products:product_id (name, product_images (url))
         `)
         .order('created_at', { ascending: false });
@@ -31,12 +30,25 @@ export default function AdminReviewsPage() {
         console.warn('Error fetching reviews:', error);
         // setReviews([]); // Keep empty
       } else if (data) {
-        const formatted = data.map((r: any) => ({
+        // Reviewer names come from profiles (no FK edge from reviews, so a second query)
+        const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
+        const profilesById = new Map<string, any>();
+        if (userIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .in('id', userIds);
+          if (profilesError) console.warn('Error fetching reviewer profiles:', profilesError);
+          (profiles || []).forEach((p: any) => profilesById.set(p.id, p));
+        }
+        const formatted = data.map((r: any) => {
+          const profile = profilesById.get(r.user_id);
+          return {
           id: r.id,
           customer: {
-            name: r.profiles?.full_name || 'Anonymous',
-            email: r.profiles?.email || 'N/A',
-            avatar: getInitials(r.profiles?.full_name || r.profiles?.email)
+            name: profile?.full_name || 'Anonymous',
+            email: profile?.email || 'N/A',
+            avatar: getInitials(profile?.full_name || profile?.email)
           },
           product: {
             name: r.products?.name || 'Unknown Product',
@@ -46,9 +58,10 @@ export default function AdminReviewsPage() {
           title: r.title,
           comment: r.content,
           date: new Date(r.created_at).toLocaleDateString(),
-          status: r.status || 'Pending',
-          helpful: r.helpful || 0
-        }));
+          status: String(r.status || 'pending').toLowerCase(),
+          helpful: r.helpful_votes || 0
+          };
+        });
         setReviews(formatted);
       }
     } catch (error) {
@@ -81,9 +94,9 @@ export default function AdminReviewsPage() {
   };
 
   const statusColors: any = {
-    'Pending': 'bg-amber-100 text-amber-700',
-    'Approved': 'bg-blue-100 text-blue-700',
-    'Rejected': 'bg-red-100 text-red-700'
+    'pending': 'bg-amber-100 text-amber-700',
+    'approved': 'bg-blue-100 text-blue-700',
+    'rejected': 'bg-red-100 text-red-700'
   };
 
   const handleSelectAll = () => {
@@ -106,8 +119,8 @@ export default function AdminReviewsPage() {
     if (selectedReviews.length === 0) return;
     try {
       let newStatus = '';
-      if (action === 'Approve') newStatus = 'Approved';
-      if (action === 'Reject') newStatus = 'Rejected';
+      if (action === 'Approve') newStatus = 'approved';
+      if (action === 'Reject') newStatus = 'rejected';
 
       if (newStatus) {
         const { error } = await supabase
@@ -285,7 +298,7 @@ export default function AdminReviewsPage() {
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-600 whitespace-nowrap">{review.date}</td>
                     <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${statusColors[review.status] || 'bg-gray-100'}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap capitalize ${statusColors[review.status] || 'bg-gray-100'}`}>
                         {review.status}
                       </span>
                     </td>

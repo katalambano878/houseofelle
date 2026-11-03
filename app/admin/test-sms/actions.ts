@@ -1,9 +1,21 @@
 'use server';
 
 import { verifyAdminToken } from '@/lib/auth';
+import { sendSMS } from '@/lib/notifications';
 
+/** Same Ghana formatting the shared sender uses, so the page can show what was dialled. */
+function formatGhanaPhone(phone: string): string {
+    let cleaned = phone.replace(/\D/g, '');
+    if (cleaned.startsWith('0')) cleaned = '233' + cleaned.slice(1);
+    if (cleaned.length === 9) cleaned = '233' + cleaned;
+    return '+' + cleaned;
+}
+
+/**
+ * Sends one test SMS through the store's real sender (Taysend first, Moolre fallback),
+ * so a passing test means order and campaign messages will go out too.
+ */
 export async function testSmsAction(phone: string, message: string, authToken: string) {
-    // SECURITY: Verify admin authentication before allowing SMS sending
     const auth = await verifyAdminToken(authToken);
     if (!auth.authenticated) {
         return {
@@ -12,78 +24,38 @@ export async function testSmsAction(phone: string, message: string, authToken: s
         };
     }
 
+    if (!phone || typeof phone !== 'string') {
+        return { success: false, error: 'Enter a phone number.' };
+    }
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 9 || digits.length > 15) {
+        return { success: false, error: 'That does not look like a valid phone number.' };
+    }
+    if (!message || typeof message !== 'string' || !message.trim()) {
+        return { success: false, error: 'Enter a message.' };
+    }
+    if (message.length > 1000) {
+        return { success: false, error: 'Message is too long (1000 characters max).' };
+    }
+
+    const formattedPhone = formatGhanaPhone(phone);
     try {
-        console.log('Testing SMS to:', phone, '| by user:', auth.user?.email);
-
-        // Moolre SMS API only requires X-API-VASKEY for authentication
-        const smsVasKey = process.env.MOOLRE_SMS_API_KEY;
-
-        if (!smsVasKey) {
+        const result: any = await sendSMS({ to: phone, message });
+        if (!result) {
             return {
                 success: false,
-                error: 'Missing MOOLRE_SMS_API_KEY environment variable'
+                formattedPhone,
+                error: 'No SMS provider is configured, or every provider failed. Check TAYSEND_API_KEY / TAYSEND_SENDER_ID or MOOLRE_SMS_API_KEY, and the server log.'
             };
         }
-
-        // Validate phone input
-        if (!phone || typeof phone !== 'string') {
-            return { success: false, error: 'Invalid phone number' };
-        }
-
-        // Validate message input
-        if (!message || typeof message !== 'string' || message.length > 1000) {
-            return { success: false, error: 'Invalid or too long message' };
-        }
-
-        // Format phone number for Ghana
-        let cleaned = phone.replace(/\D/g, '');
-        if (cleaned.startsWith('0')) {
-            cleaned = '233' + cleaned.slice(1);
-        }
-        if (!cleaned.startsWith('233') && cleaned.length === 9) {
-            cleaned = '233' + cleaned;
-        }
-        const recipient = '+' + cleaned;
-
-        // Make API call per Moolre documentation
-        const response = await fetch('https://api.moolre.com/open/sms/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-VASKEY': smsVasKey
-            },
-            body: JSON.stringify({
-                type: 1,
-                senderid: process.env.SMS_SENDER_ID || 'STORE',
-                messages: [
-                    {
-                        recipient: recipient,
-                        message: message
-                    }
-                ]
-            })
-        });
-
-        const responseText = await response.text();
-        let result;
-        try {
-            result = JSON.parse(responseText);
-        } catch {
-            result = { rawResponse: responseText };
-        }
-
         return {
-            success: result?.status === 1,
-            result,
-            formattedPhone: recipient,
-            httpStatus: response.status
+            success: result.status === 1,
+            provider: result.provider || 'moolre',
+            formattedPhone,
+            result
         };
     } catch (error: any) {
-        // SECURITY: Don't expose stack traces
-        console.error('[Test SMS] Error:', error.message, error.stack);
-        return {
-            success: false,
-            error: error.message || 'SMS sending failed'
-        };
+        console.error('[Test SMS] Error:', error?.message);
+        return { success: false, formattedPhone, error: error?.message || 'SMS sending failed' };
     }
 }

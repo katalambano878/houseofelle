@@ -92,53 +92,67 @@ export default function ImportForm() {
         return;
       }
 
+      const handleMessage = (event: string, dataStr: string) => {
+        try {
+          const data = JSON.parse(dataStr);
+          if (event === 'progress') {
+            setProgress({
+              phase: data.phase ?? 'validating',
+              current: data.current ?? 0,
+              total: data.total ?? 1,
+              message: data.message ?? '',
+            });
+          } else if (event === 'product') {
+            setProductLog((prev) => [
+              ...prev,
+              {
+                row: data.row ?? 0,
+                name: data.name ?? '',
+                status: data.status ?? 'error',
+                error: data.error,
+                skipped: data.skipped,
+              },
+            ]);
+          } else if (event === 'complete') {
+            setSummary(data.summary ?? {});
+            setErrors(data.errors ?? []);
+            setWarnings(data.warnings ?? []);
+            setProgress((p) => (p ? { ...p, phase: 'complete', message: 'Complete' } : null));
+          } else if (event === 'error') {
+            setStreamError(data.message ?? 'Unknown error');
+          }
+        } catch (_) {}
+      };
+
+      // SSE parser state lives outside the read loop: a message (or a single line)
+      // can be split across network chunks.
       let buffer = '';
+      let event = '';
+      let dataLines: string[] = [];
+      const processLine = (rawLine: string) => {
+        const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+        if (line === '') {
+          if (event && dataLines.length) handleMessage(event, dataLines.join('\n'));
+          event = '';
+          dataLines = [];
+        } else if (line.startsWith('event:')) {
+          event = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).replace(/^ /, ''));
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
-        let event = '';
-        let dataStr = '';
-        for (const line of lines) {
-          if (line.startsWith('event: ')) event = line.slice(7).trim();
-          else if (line.startsWith('data: ')) dataStr = line.slice(6);
-          else if (line === '' && event && dataStr) {
-            try {
-              const data = JSON.parse(dataStr);
-              if (event === 'progress') {
-                setProgress({
-                  phase: data.phase ?? 'validating',
-                  current: data.current ?? 0,
-                  total: data.total ?? 1,
-                  message: data.message ?? '',
-                });
-              } else if (event === 'product') {
-                setProductLog((prev) => [
-                  ...prev,
-                  {
-                    row: data.row ?? 0,
-                    name: data.name ?? '',
-                    status: data.status ?? 'error',
-                    error: data.error,
-                    skipped: data.skipped,
-                  },
-                ]);
-              } else if (event === 'complete') {
-                setSummary(data.summary ?? {});
-                setErrors(data.errors ?? []);
-                setWarnings(data.warnings ?? []);
-                setProgress((p) => (p ? { ...p, phase: 'complete', message: 'Complete' } : null));
-              } else if (event === 'error') {
-                setStreamError(data.message ?? 'Unknown error');
-              }
-            } catch (_) {}
-            event = '';
-            dataStr = '';
-          }
-        }
+        for (const line of lines) processLine(line);
       }
+      buffer += decoder.decode();
+      if (buffer) processLine(buffer);
+      processLine(''); // flush a final message that had no trailing blank line
     } catch (e: any) {
       setStreamError(e?.message ?? 'Network error');
     } finally {

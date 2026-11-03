@@ -2,96 +2,62 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 
+// Each id must match an article in app/(store)/help/article/[id]/page.tsx.
 const categories = [
   {
     id: 'orders',
     title: 'Orders & Delivery',
-    icon: 'ri-shopping-bag-line',
-    count: 12,
+    icon: 'ri-truck-line',
     articles: [
-      { id: 1, title: 'How do I track my order?', views: 1247 },
-      { id: 2, title: 'What are the delivery times?', views: 892 },
-      { id: 3, title: 'Can I change my delivery address?', views: 654 },
-      { id: 4, title: 'What if my order is delayed?', views: 543 },
-      { id: 5, title: 'Do you offer express delivery?', views: 421 }
-    ]
+      { id: 1, title: 'How do I track my order?' },
+      { id: 2, title: 'How much is delivery and how long does it take?' },
+      { id: 3, title: 'Can I change my delivery address?' },
+    ],
   },
   {
     id: 'returns',
-    title: 'Returns & Refunds',
+    title: 'Returns & Problems',
     icon: 'ri-arrow-left-right-line',
-    count: 10,
     articles: [
-      { id: 6, title: 'How do I return an item?', views: 2341 },
-      { id: 7, title: 'What is your return policy?', views: 1876 },
-      { id: 8, title: 'When will I get my refund?', views: 1432 },
-      { id: 9, title: 'Can I exchange instead of return?', views: 987 },
-      { id: 10, title: 'How do I print a return label?', views: 765 }
-    ]
+      { id: 6, title: 'My item arrived damaged, leaking or wrong. What do I do?' },
+    ],
   },
   {
     id: 'payment',
-    title: 'Payment & Pricing',
-    icon: 'ri-bank-card-line',
-    count: 8,
+    title: 'Payment',
+    icon: 'ri-smartphone-line',
     articles: [
-      { id: 11, title: 'What payment methods do you accept?', views: 1654 },
-      { id: 12, title: 'Is my payment information secure?', views: 1234 },
-      { id: 13, title: 'Can I pay in installments?', views: 987 },
-      { id: 14, title: 'Do you accept gift cards?', views: 543 },
-      { id: 15, title: 'Why was my payment declined?', views: 432 }
-    ]
+      { id: 11, title: 'How do I pay?' },
+    ],
   },
   {
     id: 'account',
-    title: 'Account & Profile',
+    title: 'Account',
     icon: 'ri-user-line',
-    count: 9,
     articles: [
-      { id: 16, title: 'How do I create an account?', views: 876 },
-      { id: 17, title: 'I forgot my password', views: 1543 },
-      { id: 18, title: 'How do I update my email?', views: 654 },
-      { id: 19, title: 'Can I delete my account?', views: 432 },
-      { id: 20, title: 'How do I manage my addresses?', views: 543 }
-    ]
+      { id: 16, title: 'Creating an account and resetting your password' },
+      { id: 19, title: 'Can I download my data or delete my account?' },
+      { id: 20, title: 'How do I manage my saved addresses?' },
+    ],
   },
   {
     id: 'products',
-    title: 'Products & Stock',
+    title: 'Products & Wholesale',
     icon: 'ri-gift-line',
-    count: 7,
     articles: [
-      { id: 21, title: 'When will items be back in stock?', views: 1987 },
-      { id: 22, title: 'How do I use the size guide?', views: 876 },
-      { id: 23, title: 'Are your products authentic?', views: 765 },
-      { id: 24, title: 'Do you offer gift wrapping?', views: 543 },
-      { id: 25, title: 'How do I care for my product?', views: 432 }
-    ]
+      { id: 21, title: 'Do you sell wholesale?' },
+      { id: 25, title: 'How should I store my perfume?' },
+    ],
   },
-  {
-    id: 'loyalty',
-    title: 'Loyalty & Rewards',
-    icon: 'ri-medal-line',
-    count: 6,
-    articles: [
-      { id: 26, title: 'How do I earn loyalty points?', views: 2134 },
-      { id: 27, title: 'How do I redeem my points?', views: 1765 },
-      { id: 28, title: 'Do my points expire?', views: 987 },
-      { id: 29, title: 'What are the loyalty tiers?', views: 654 },
-      { id: 30, title: 'How does the referral program work?', views: 543 }
-    ]
-  }
 ];
 
 const popularArticles = [
-  { id: 1, title: 'How do I track my order?', category: 'Orders', views: 1247 },
-  { id: 6, title: 'How do I return an item?', category: 'Returns', views: 2341 },
-  { id: 26, title: 'How do I earn loyalty points?', category: 'Loyalty', views: 2134 },
-  { id: 21, title: 'When will items be back in stock?', category: 'Products', views: 1987 },
-  { id: 7, title: 'What is your return policy?', category: 'Returns', views: 1876 }
+  { id: 1, title: 'How do I track my order?', category: 'Orders & Delivery' },
+  { id: 11, title: 'How do I pay?', category: 'Payment' },
+  { id: 2, title: 'How much is delivery and how long does it take?', category: 'Orders & Delivery' },
+  { id: 6, title: 'My item arrived damaged, leaking or wrong. What do I do?', category: 'Returns & Problems' },
+  { id: 21, title: 'Do you sell wholesale?', category: 'Products & Wholesale' },
 ];
 
 export default function HelpCenterPage() {
@@ -111,8 +77,6 @@ export default function HelpCenterPage() {
     : [];
 
   return (
-    <>
-      <Header />
       <main className="min-h-screen bg-gray-50">
         <div className="bg-gradient-to-br from-blue-700 to-blue-900 text-white py-16">
           <div className="max-w-4xl mx-auto px-4 text-center">
@@ -148,7 +112,7 @@ export default function HelpCenterPage() {
                   >
                     <p className="font-semibold text-gray-900">{article.title}</p>
                     <p className="text-sm text-gray-600 mt-1">
-                      {article.category} • {article.views.toLocaleString()} views
+                      {article.category}
                     </p>
                   </Link>
                 ))}
@@ -181,17 +145,25 @@ export default function HelpCenterPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {filteredCategories.map((category) => (
-              <button
+              <div
                 key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
-                className="bg-white rounded-xl shadow-sm p-6 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-blue-700"
+                className={`bg-white rounded-xl shadow-sm p-6 text-left hover:shadow-lg transition-all border-2 ${selectedCategory === category.id ? 'border-blue-700' : 'border-transparent hover:border-blue-700'}`}
               >
-                <div className="w-14 h-14 flex items-center justify-center bg-blue-100 rounded-xl mb-4">
-                  <i className={`${category.icon} text-3xl text-blue-700`}></i>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{category.title}</h3>
-                <p className="text-gray-600">{category.count} articles</p>
-                
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
+                  aria-expanded={selectedCategory === category.id}
+                  className="w-full text-left"
+                >
+                  <div className="w-14 h-14 flex items-center justify-center bg-blue-100 rounded-xl mb-4">
+                    <i className={`${category.icon} text-3xl text-blue-700`}></i>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{category.title}</h3>
+                  <p className="text-gray-600">
+                    {category.articles.length} {category.articles.length === 1 ? 'article' : 'articles'}
+                  </p>
+                </button>
+
                 {selectedCategory === category.id && (
                   <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
                     {category.articles.map((article) => (
@@ -205,7 +177,7 @@ export default function HelpCenterPage() {
                     ))}
                   </div>
                 )}
-              </button>
+              </div>
             ))}
           </div>
 
@@ -228,7 +200,6 @@ export default function HelpCenterPage() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
-                    <span className="text-sm text-gray-500">{article.views.toLocaleString()} views</span>
                     <i className="ri-arrow-right-s-line text-2xl text-gray-400"></i>
                   </div>
                 </Link>
@@ -257,8 +228,8 @@ export default function HelpCenterPage() {
                 <i className="ri-arrow-left-right-line text-3xl text-purple-700"></i>
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Start a Return</h3>
-              <p className="text-gray-600 text-sm mb-4">Return or exchange your item</p>
-              <span className="text-purple-700 font-semibold whitespace-nowrap">Initiate Return →</span>
+              <p className="text-gray-600 text-sm mb-4">Report a damaged, leaking or wrong item</p>
+              <span className="text-purple-700 font-semibold whitespace-nowrap">Start a Return →</span>
             </Link>
 
             <Link
@@ -275,7 +246,5 @@ export default function HelpCenterPage() {
           </div>
         </div>
       </main>
-      <Footer />
-    </>
   );
 }

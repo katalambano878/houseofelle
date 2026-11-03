@@ -27,6 +27,12 @@ function getFriendlyError(message: string): string {
   return message;
 }
 
+/** Only same-site paths ("/account", not "//evil.com" or "https://…") are allowed. */
+function safeRedirect(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return '/account';
+  return value;
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const errorRef = useRef<HTMLDivElement>(null);
@@ -46,7 +52,13 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [redirectTo, setRedirectTo] = useState('/account');
   const { getToken, verifying } = useRecaptcha();
+
+  useEffect(() => {
+    // Read on the client to avoid a Suspense boundary for useSearchParams.
+    setRedirectTo(safeRedirect(new URLSearchParams(window.location.search).get('redirect')));
+  }, []);
 
   // Auto-scroll to error when it appears
   useEffect(() => {
@@ -118,12 +130,16 @@ export default function SignupPage() {
         // Send Welcome Notification
         fetch('/api/notifications', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(data.session?.access_token && { 'Authorization': `Bearer ${data.session.access_token}` })
+          },
           body: JSON.stringify({
             type: 'welcome',
             payload: {
               email: formData.email,
-              firstName: formData.firstName
+              firstName: formData.firstName,
+              phone: formData.phone
             }
           })
         }).catch(err => console.error('Welcome notification error:', err));
@@ -132,7 +148,7 @@ export default function SignupPage() {
           setSuccess(true);
         } else {
           // Auto-login success (if email confirming is off)
-          router.push('/account');
+          router.push(redirectTo);
           router.refresh();
         }
       }
@@ -156,7 +172,7 @@ export default function SignupPage() {
             We've sent a confirmation link to <strong>{formData.email}</strong>.<br />
             Please check your inbox to activate your account.
           </p>
-          <Link href="/auth/login" className="inline-block bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors">
+          <Link href={redirectTo === '/account' ? '/auth/login' : `/auth/login?redirect=${encodeURIComponent(redirectTo)}`} className="inline-block bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors">
             Back to Login
           </Link>
         </div>
@@ -370,7 +386,7 @@ export default function SignupPage() {
 
           <p className="mt-8 text-center text-gray-600">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
+            <Link href={redirectTo === '/account' ? '/auth/login' : `/auth/login?redirect=${encodeURIComponent(redirectTo)}`} className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
               Sign in
             </Link>
           </p>

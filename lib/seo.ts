@@ -3,11 +3,11 @@ import type { Metadata } from 'next';
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com';
 
 export const SEO_KEYWORDS = [
-  'women’s fashion Ghana',
-  'boutique Accra',
-  'stylish outfits Ghana',
-  'ladies wear Accra',
-  'premium fashion Ghana',
+  'perfume shop Accra',
+  'perfumes Ghana',
+  'body mist Ghana',
+  'scented candles Accra',
+  'wholesale perfume Ghana',
   'House of Elle',
 ];
 
@@ -51,37 +51,37 @@ export function buildPageMetadata({ title, description, path = '', image = '/ope
 export const pageSeoTemplates = {
   home: () =>
     buildPageMetadata({
-      title: 'House of Elle | Premium Women’s Fashion in Accra',
+      title: 'House of Elle | Perfumes, Body Mists & Candles in Accra',
       description:
-        'Shop premium women’s fashion at House of Elle. Discover stylish, modern outfits designed for confidence and elegance. Located in Accra, Ghana.',
+        'Shop curated perfumes, body mists, scented candles and body care at House of Elle in Accra, Ghana. Wholesale options available.',
       path: '/',
     }),
   shop: () =>
     buildPageMetadata({
-      title: 'Shop Women’s Fashion in Accra | House of Elle',
+      title: 'Shop Perfumes & Body Care in Accra | House of Elle',
       description:
-        'Browse premium women’s fashion at House of Elle. Discover confidence-boosting outfits curated for modern women in Accra and beyond.',
+        'Browse curated perfumes, body mists, scented candles and body care at House of Elle, with delivery in Accra and across Ghana.',
       path: '/shop',
     }),
   categories: () =>
     buildPageMetadata({
-      title: 'Fashion Categories | House of Elle',
+      title: 'Shop by Category | House of Elle',
       description:
-        'Explore fashion categories at House of Elle and find premium styles for work, events, and everyday elegance in Accra, Ghana.',
+        'Explore perfumes, body mists, candles, body care and wholesale collections at House of Elle in Accra, Ghana.',
       path: '/categories',
     }),
   about: () =>
     buildPageMetadata({
-      title: 'About House of Elle | Premium Fashion Brand',
+      title: 'About House of Elle | Fragrance & Body Care in Accra',
       description:
-        'Learn about House of Elle, a premium fashion and lifestyle brand in Accra serving modern women with elegant, confidence-led style.',
+        'Learn about House of Elle, a fragrance and body care destination in Accra offering curated perfumes, body mists, candles and wholesale options.',
       path: '/about',
     }),
   contact: () =>
     buildPageMetadata({
-      title: 'Contact House of Elle | Accra Boutique',
+      title: 'Contact House of Elle | Accra',
       description:
-        'Contact House of Elle in Spintex Lashibi, Accra. Reach us for personal styling support, orders, and premium fashion enquiries.',
+        'Contact House of Elle in Spintex Lashibi, Accra, for orders, scent recommendations and wholesale enquiries.',
       path: '/contact',
     }),
 };

@@ -17,16 +17,16 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "House of Elle | Premium Women’s Fashion in Accra",
+    default: "House of Elle | Perfumes, Body Mists & Candles in Accra",
     template: "%s | House of Elle"
   },
-  description: "Shop premium women’s fashion at House of Elle. Discover stylish, modern outfits designed for confidence and elegance. Located in Accra, Ghana.",
+  description: "Shop curated perfumes, body mists, scented candles and body care at House of Elle in Accra, Ghana. Wholesale options available.",
   keywords: [
-    "women’s fashion Ghana",
-    "boutique Accra",
-    "stylish outfits Ghana",
-    "ladies wear Accra",
-    "premium fashion Ghana",
+    "perfume shop Accra",
+    "perfumes Ghana",
+    "body mist Ghana",
+    "scented candles Accra",
+    "wholesale perfume Ghana",
     "House of Elle"
   ],
   authors: [{ name: "House of Elle" }],
@@ -73,15 +73,15 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_GH",
     url: siteUrl,
-    title: "House of Elle | Premium Women’s Fashion",
-    description: "Elevate your style with House of Elle.",
+    title: "House of Elle | Perfumes, Body Mists & Candles",
+    description: "Curated fragrance and body care from Accra.",
     siteName: "House of Elle",
     images: [
       {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "House of Elle - Elevate Your Style",
+        alt: "House of Elle - Fragrance and body care in Accra",
         type: "image/png",
       },
     ],
@@ -89,11 +89,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "House of Elle",
-    description: "Modern fashion for confident women.",
+    description: "Curated perfumes, body mists and candles from Accra.",
     images: ["/opengraph-image"],
-  },
-  alternates: {
-    canonical: siteUrl,
   },
   category: "shopping",
 };
@@ -129,16 +126,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicon/apple-touch-icon.png" />
         <link rel="apple-touch-startup-image" href="/favicon/apple-touch-icon.png" />
 
-        <link rel="canonical" href={siteUrl} />
         <meta name="robots" content="index,follow" />
-        <meta property="og:title" content="House of Elle | Premium Women’s Fashion" />
-        <meta property="og:description" content="Elevate your style with House of Elle." />
-        <meta property="og:image" content={`${siteUrl}/opengraph-image`} />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="House of Elle" />
-        <meta name="twitter:description" content="Modern fashion for confident women." />
-        <meta name="twitter:image" content={`${siteUrl}/opengraph-image`} />
         <link
           href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css"
           rel="stylesheet"
@@ -162,7 +150,7 @@ export default function RootLayout({
                   "url": siteUrl,
                   "logo": `${siteUrl}/house-of-elle-logo.png`,
                   "image": `${siteUrl}/house-of-elle-logo.png`,
-                  "description": "Premium women’s fashion and lifestyle boutique in Accra, Ghana.",
+                  "description": "Fragrance and body care house in Accra, Ghana: perfumes, body mists, scented candles and wholesale.",
                   "sameAs": [
                     "https://www.instagram.com/houseof_elle",
                     "https://www.tiktok.com/@houseof_elle"
@@ -176,13 +164,13 @@ export default function RootLayout({
                   }
                 },
                 {
-                  "@type": "ClothingStore",
+                  "@type": "Store",
                   "@id": `${siteUrl}#store`,
                   "name": "House of Elle",
                   "image": `${siteUrl}/house-of-elle-logo.png`,
                   "url": siteUrl,
                   "telephone": "+233553347531",
-                  "priceRange": "$$",
+                  "priceRange": "GH₵",
                   "address": {
                     "@type": "PostalAddress",
                     "streetAddress": "Spintex Lashibi, Shalom Spot Junction",
@@ -207,6 +195,15 @@ export default function RootLayout({
             {`
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
+              // Consent mode: nothing is stored until the visitor accepts in the cookie banner.
+              var c = {};
+              try { c = JSON.parse(localStorage.getItem('cookieConsent') || '{}'); } catch (e) {}
+              gtag('consent', 'default', {
+                analytics_storage: c.analytics ? 'granted' : 'denied',
+                ad_storage: c.marketing ? 'granted' : 'denied',
+                ad_user_data: c.marketing ? 'granted' : 'denied',
+                ad_personalization: c.marketing ? 'granted' : 'denied'
+              });
               gtag('js', new Date());
               gtag('config', '${GA_MEASUREMENT_ID}', {
                 page_path: window.location.pathname,

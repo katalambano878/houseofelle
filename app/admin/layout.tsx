@@ -5,6 +5,21 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+/** Fired by the Modules page after a toggle, so the sidebar refreshes without a reload. */
+const MODULES_CHANGED_EVENT = 'store-modules-changed';
+
+type MenuItem = {
+  title: string;
+  icon: string;
+  path: string;
+  exact?: boolean;
+  badge?: string;
+  /** Hidden unless this store module is enabled. */
+  moduleId?: string;
+  /** Hidden from staff. */
+  adminOnly?: boolean;
+};
+
 export default function AdminLayout({
   children,
 }: {
@@ -21,6 +36,8 @@ export default function AdminLayout({
 
   // Module Filtering State
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
+  // Paid orders still waiting to be packed or delivered.
+  const [openOrders, setOpenOrders] = useState(0);
 
   useEffect(() => {
     async function checkAuth() {
@@ -95,7 +112,7 @@ export default function AdminLayout({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showUserMenu]);
 
-  // Fetch Modules Effect
+  // Fetch Modules Effect (and again whenever the Modules page changes one)
   useEffect(() => {
     async function fetchModules() {
       try {
@@ -112,23 +129,32 @@ export default function AdminLayout({
       }
     }
     fetchModules();
+    window.addEventListener(MODULES_CHANGED_EVENT, fetchModules);
+    return () => window.removeEventListener(MODULES_CHANGED_EVENT, fetchModules);
   }, []);
 
-  // Screen size check for initial state
+  // Open-order count for the header bell, refreshed on navigation.
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        // Only set to false if it's currently true? 
-        // Actually, let's just default to open on desktop, closed on mobile on mount only
-      }
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('payment_status', 'paid')
+      .in('status', ['pending', 'processing'])
+      .then(({ count, error }) => {
+        if (!cancelled && !error) setOpenOrders(count ?? 0);
+      });
+    return () => {
+      cancelled = true;
     };
+  }, [isAuthenticated, pathname]);
 
-    // Set initial state based on width
+  // Start with the sidebar closed on small screens.
+  useEffect(() => {
     if (window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
-
-    // Optional: Auto-close on resize to mobile? For now, leave as is.
   }, []);
 
   const handleLogout = async () => {
@@ -143,7 +169,7 @@ export default function AdminLayout({
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Loading Admin...</div>;
   }
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       title: 'Dashboard',
       icon: 'ri-dashboard-line',
@@ -154,17 +180,18 @@ export default function AdminLayout({
       title: 'Orders',
       icon: 'ri-shopping-bag-line',
       path: '/admin/orders',
-      badge: ''
+      badge: openOrders > 0 ? String(openOrders) : ''
     },
     {
       title: 'POS System',
       icon: 'ri-store-3-line',
       path: '/admin/pos'
     },
-        {
+    {
       title: 'Buy SMS',
       icon: 'ri-message-2-line',
-      path: '/admin/sms-credit'
+      path: '/admin/sms-credit',
+      adminOnly: true
     },
     {
       title: 'Products',
@@ -215,17 +242,17 @@ export default function AdminLayout({
     },
     {
       title: 'SMS Debugger',
-      icon: 'ri-message-2-line',
-      path: '/admin/test-sms'
+      icon: 'ri-bug-line',
+      path: '/admin/test-sms',
+      adminOnly: true
     },
-
     {
       title: 'Blog',
       icon: 'ri-article-line',
       path: '/admin/blog',
       moduleId: 'blog'
     },
-{
+    {
       title: 'Modules',
       icon: 'ri-puzzle-line',
       path: '/admin/modules'
@@ -233,9 +260,8 @@ export default function AdminLayout({
   ];
 
   const visibleMenuItems = menuItems.filter(item => {
-    // @ts-ignore
+    if (item.adminOnly && userRole !== 'admin') return false;
     if (!item.moduleId) return true;
-    // @ts-ignore
     return enabledModules.includes(item.moduleId);
   });
 
@@ -317,16 +343,26 @@ export default function AdminLayout({
           <div className="px-4 py-4 lg:px-6 flex items-center justify-between">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              aria-label={isSidebarOpen ? 'Collapse menu' : 'Expand menu'}
               className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
             >
               <i className={`${isSidebarOpen ? 'ri-menu-fold-line' : 'ri-menu-unfold-line'} text-xl`}></i>
             </button>
 
             <div className="flex items-center space-x-2 lg:space-x-4">
-              <button className="relative w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+              <Link
+                href="/admin/orders"
+                aria-label={openOrders > 0 ? `${openOrders} paid orders to fulfil` : 'No paid orders waiting'}
+                title={openOrders > 0 ? `${openOrders} paid order${openOrders === 1 ? '' : 's'} to fulfil` : 'No paid orders waiting'}
+                className="relative w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
                 <i className="ri-notification-3-line text-xl"></i>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+                {openOrders > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {openOrders > 99 ? '99+' : openOrders}
+                  </span>
+                )}
+              </Link>
 
               <div className="relative user-menu-container">
                 <button

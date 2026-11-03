@@ -4,164 +4,167 @@ import { money } from '@/lib/format-money';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, AreaChart, Area, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+/** CSV cell: always quoted, inner quotes doubled, formula-looking values defused. */
+function csvCell(value: unknown): string {
+  let v = value == null ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+  return `"${v.replace(/"/g, '""')}"`;
+}
+
+type SalesPoint = { date: string; day: string; sales: number; orders: number };
+type NameValue = { name: string; value: number };
+type TopProduct = { name: string; revenue: number; units: number };
+
+const ID_CHUNK = 100;
+
 
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState('30days');
-  const [reportType, setReportType] = useState('overview');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [itemsWarning, setItemsWarning] = useState('');
 
-  const [salesData, setSalesData] = useState<any[]>([]);
-  const [categoryRevenue, setCategoryRevenue] = useState<any[]>([]);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [salesData, setSalesData] = useState<SalesPoint[]>([]);
+  const [categoryRevenue, setCategoryRevenue] = useState<NameValue[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
 
-  const [metrics, setMetrics] = useState({
-    revenue: 0,
-    revenueGrowth: 0,
-    orders: 0,
-    ordersGrowth: 0,
-    aov: 0,
-    aovGrowth: 0,
-    conversion: 0,
-    conversionGrowth: 0
-  });
+  const [metrics, setMetrics] = useState({ revenue: 0, orders: 0, aov: 0 });
 
   const fetchAnalytics = useCallback(async () => {
-    try {
-      setLoading(true);
+    setLoading(true);
+    setLoadError('');
+    setItemsWarning('');
 
-      // Calculate start date based on timeRange
-      const now = new Date();
-      let startDate = new Date();
-      if (timeRange === '7days') startDate.setDate(now.getDate() - 7);
-      if (timeRange === '30days') startDate.setDate(now.getDate() - 30);
-      if (timeRange === '90days') startDate.setDate(now.getDate() - 90);
-      if (timeRange === 'year') startDate.setFullYear(now.getFullYear(), 0, 1);
+    // Start of the selected range, at local midnight.
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (timeRange === '7days') startDate.setDate(startDate.getDate() - 6);
+    if (timeRange === '30days') startDate.setDate(startDate.getDate() - 29);
+    if (timeRange === '90days') startDate.setDate(startDate.getDate() - 89);
+    if (timeRange === 'year') startDate.setMonth(0, 1);
 
-      const isoStart = startDate.toISOString();
+    // Only paid, non-cancelled orders count as revenue.
+    const { data: orders, error: orderError } = await supabase
+      .from('orders')
+      .select('id, created_at, total')
+      .gte('created_at', startDate.toISOString())
+      .eq('payment_status', 'paid')
+      .neq('status', 'cancelled')
+      .order('created_at');
 
-      // Fetch Orders for Revenue & Count - only PAID orders count as revenue
-      const { data: orders, error: orderError } = await supabase
-        .from('orders')
-        .select('id, created_at, total, payment_status')
-        .gte('created_at', isoStart)
-        .eq('payment_status', 'paid') // Only count paid orders as revenue
-        .neq('status', 'cancelled')
-        .order('created_at');
-
-      if (orderError) throw orderError;
-
-      // Fetch Order Items for Products & Categories
-      // This might be heavy for large DBs, but fine for typical small shop admin
-      const { data: items, error: itemError } = await supabase
-        .from('order_items')
-        .select(`
-            *,
-            products (name, categories(name))
-         `)
-        .gte('created_at', isoStart); // Assuming order_items has created_at or join orders.. 
-      // Actually order_items usually doesn't have created_at directly in some schemas, 
-      // so we should join orders to filter by date.
-      // Simpler: fetch order_items for the fetched orders IDs.
-
-      let validItems: any[] = [];
-      if (orders && orders.length > 0) {
-        const orderIds = orders.map(o => o.id);
-        const { data: fetchedItems, error: itemFetchError } = await supabase
-          .from('order_items')
-          .select(`
-            quantity, 
-            unit_price, 
-            total_price,
-            product_id,
-            products!inner(name, category_id, categories(name))
-          `)
-          .in('order_id', orderIds);
-
-        if (itemFetchError) {
-          console.error('Error fetching order items:', itemFetchError);
-        }
-        if (fetchedItems) validItems = fetchedItems;
-      }
-
-      // Process Metrics
-      const totalRevenue = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
-      const totalOrders = orders?.length || 0;
-      const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-      setMetrics({
-        revenue: totalRevenue,
-        revenueGrowth: 0, // Needs comparison with previous period (skipped for simplicity/speed)
-        orders: totalOrders,
-        ordersGrowth: 0,
-        aov: aov,
-        aovGrowth: 0,
-        conversion: 0, // No visitor data
-        conversionGrowth: 0
-      });
-
-      // Process Sales Chart Data (Group by Date with Zero-Filling)
-      const salesMap: Record<string, any> = {};
-
-      // Initialize map with all dates in range
-      const d = new Date(startDate);
-      const today = new Date();
-      while (d <= today) {
-        const dateKey = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        salesMap[dateKey] = {
-          date: dateKey,
-          sales: 0,
-          orders: 0,
-          fullDate: d.getTime() // Helper for sorting
-        };
-        d.setDate(d.getDate() + 1);
-      }
-
-      orders?.forEach(o => {
-        const dateKey = new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        if (salesMap[dateKey]) {
-          salesMap[dateKey].sales += o.total || 0;
-          salesMap[dateKey].orders += 1;
-        }
-      });
-
-      setSalesData(Object.values(salesMap));
-
-      // Process Category Revenue
-      const catMap: Record<string, any> = {};
-      validItems.forEach(item => {
-        const catName = item.products?.categories?.name || 'Uncategorized';
-        if (!catMap[catName]) catMap[catName] = { name: catName, value: 0 };
-        // Use total_price if available, otherwise calculate from unit_price * quantity
-        const itemRevenue = item.total_price || (item.unit_price * item.quantity) || 0;
-        catMap[catName].value += itemRevenue;
-      });
-      // Convert to array for Recharts Pie
-      const catArray = Object.values(catMap).map((c: any) => ({ name: c.name, value: c.value }));
-      setCategoryRevenue(catArray);
-
-      // Process Top Products
-      const prodMap: Record<string, any> = {};
-      validItems.forEach(item => {
-        const pName = item.products?.name || 'Unknown';
-        if (!prodMap[pName]) prodMap[pName] = { name: pName, revenue: 0, units: 0 };
-        const itemRevenue = item.total_price || (item.unit_price * item.quantity) || 0;
-        prodMap[pName].revenue += itemRevenue;
-        prodMap[pName].units += item.quantity;
-      });
-      const topProdArray = Object.values(prodMap).sort((a: any, b: any) => b.revenue - a.revenue).slice(0, 5);
-      setTopProducts(topProdArray);
-
-    } catch (err) {
-      console.error('Error fetching analytics:', err);
-    } finally {
+    if (orderError) {
+      setLoadError(orderError.message || 'Could not load orders.');
       setLoading(false);
+      return;
     }
+
+    const paid = orders || [];
+    const totalRevenue = paid.reduce((sum, o: any) => sum + (Number(o.total) || 0), 0);
+    const totalOrders = paid.length;
+    setMetrics({
+      revenue: totalRevenue,
+      orders: totalOrders,
+      aov: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+    });
+
+    // Daily series, zero-filled. Keyed by local YYYY-MM-DD so years never collide.
+    const keyOf = (dt: Date) =>
+      `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    const salesMap = new Map<string, SalesPoint>();
+    for (const d = new Date(startDate); d <= now; d.setDate(d.getDate() + 1)) {
+      salesMap.set(keyOf(d), {
+        day: keyOf(d),
+        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        sales: 0,
+        orders: 0,
+      });
+    }
+    paid.forEach((o: any) => {
+      const point = salesMap.get(keyOf(new Date(o.created_at)));
+      if (point) {
+        point.sales += Number(o.total) || 0;
+        point.orders += 1;
+      }
+    });
+    setSalesData(Array.from(salesMap.values()));
+
+    // Items for those orders, fetched in chunks to keep request URLs short.
+    const items: any[] = [];
+    const orderIds = paid.map((o: any) => o.id);
+    for (let k = 0; k < orderIds.length; k += ID_CHUNK) {
+      const { data: chunk, error: itemError } = await supabase
+        .from('order_items')
+        .select('quantity, unit_price, total_price, product_id, product_name, products(name, categories(name))')
+        .in('order_id', orderIds.slice(k, k + ID_CHUNK));
+      if (itemError) {
+        setItemsWarning(itemError.message || 'Some order items could not be loaded.');
+        break;
+      }
+      if (chunk) items.push(...chunk);
+    }
+
+    const itemRevenue = (item: any) =>
+      Number(item.total_price) || (Number(item.unit_price) || 0) * (Number(item.quantity) || 0);
+
+    const catMap = new Map<string, number>();
+    const prodMap = new Map<string, TopProduct>();
+    items.forEach((item) => {
+      const product = Array.isArray(item.products) ? item.products[0] : item.products;
+      const category = Array.isArray(product?.categories) ? product.categories[0] : product?.categories;
+      const catName = category?.name || 'Uncategorized';
+      const rev = itemRevenue(item);
+      catMap.set(catName, (catMap.get(catName) || 0) + rev);
+
+      // Keep sales of deleted products, which still carry product_name.
+      const pName = product?.name || item.product_name || 'Unknown';
+      const key = item.product_id || `name:${pName}`;
+      const entry = prodMap.get(key) || { name: pName, revenue: 0, units: 0 };
+      entry.revenue += rev;
+      entry.units += Number(item.quantity) || 0;
+      prodMap.set(key, entry);
+    });
+    setCategoryRevenue(
+      Array.from(catMap, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+    );
+    setTopProducts(Array.from(prodMap.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
+
+    setLoading(false);
   }, [timeRange]);
 
   useEffect(() => {
     fetchAnalytics();
   }, [fetchAnalytics]);
+
+  const exportCsv = () => {
+    const lines: unknown[][] = [
+      ['Summary'],
+      ['Range', timeRange],
+      ['Revenue (GHS)', metrics.revenue.toFixed(2)],
+      ['Paid orders', metrics.orders],
+      ['Avg order value (GHS)', metrics.aov.toFixed(2)],
+      [],
+      ['Date', 'Sales (GHS)', 'Orders'],
+      ...salesData.map((p) => [p.day, p.sales.toFixed(2), p.orders]),
+      [],
+      ['Category', 'Revenue (GHS)'],
+      ...categoryRevenue.map((c) => [c.name, c.value.toFixed(2)]),
+      [],
+      ['Top product', 'Units', 'Revenue (GHS)'],
+      ...topProducts.map((p) => [p.name, p.units, p.revenue.toFixed(2)]),
+    ];
+    const csv = lines.map((r) => r.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${timeRange}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -184,7 +187,11 @@ export default function AnalyticsPage() {
               <option value="90days">Last 90 Days</option>
               <option value="year">This Year</option>
             </select>
-            <button className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer flex items-center justify-center">
+            <button
+              onClick={exportCsv}
+              disabled={loading || !!loadError}
+              className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <i className="ri-download-line mr-2"></i>
               Export
             </button>
@@ -197,17 +204,29 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {loadError && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center justify-between gap-4">
+            <span>{loadError}</span>
+            <button onClick={fetchAnalytics} className="font-semibold underline">Try again</button>
+          </div>
+        )}
+        {itemsWarning && !loadError && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Category and product breakdowns may be incomplete: {itemsWarning}
+          </div>
+        )}
+        {loading && <p className="mb-4 text-sm text-gray-500">Loading analytics...</p>}
+
         {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg">
                 <i className="ri-money-dollar-circle-line text-2xl text-blue-700"></i>
               </div>
-              <span className="text-blue-700 font-semibold text-sm">Live</span>
             </div>
             <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-            <p className="text-3xl font-bold text-gray-900">GH₵{metrics.revenue.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-900">GH₵{metrics.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-6">
@@ -216,7 +235,7 @@ export default function AnalyticsPage() {
                 <i className="ri-shopping-cart-line text-2xl text-blue-700"></i>
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-1">Total Orders</p>
+            <p className="text-sm text-gray-600 mb-1">Paid Orders</p>
             <p className="text-3xl font-bold text-gray-900">{metrics.orders}</p>
           </div>
 
@@ -230,23 +249,12 @@ export default function AnalyticsPage() {
             <p className="text-3xl font-bold text-gray-900">GH₵{money(metrics.aov)}</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 flex items-center justify-center bg-amber-100 rounded-lg">
-                <i className="ri-percent-line text-2xl text-amber-700"></i>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mb-1">Conversion Rate</p>
-            <p className="text-3xl font-bold text-gray-900">--</p>
-            <p className="text-xs text-gray-400 mt-1">Setup Tracking</p>
-          </div>
         </div>
 
         {/* Charts */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900">Revenue & Performance Trends</h2>
-            {/* Report Type Toggles omitted for brevity, hardcoded to Sales for now */}
           </div>
           <div style={{ width: '100%', height: 350 }}>
             <ResponsiveContainer>
@@ -311,10 +319,10 @@ export default function AnalyticsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {topProducts.map((product, index) => (
-                    <tr key={index}>
+                    <tr key={`${product.name}-${index}`}>
                       <td className="py-3 text-sm font-medium text-gray-900">{product.name}</td>
                       <td className="py-3 text-right text-sm text-gray-600">{product.units}</td>
-                      <td className="py-3 text-right text-sm font-semibold text-blue-600">GH₵{product.revenue.toLocaleString()}</td>
+                      <td className="py-3 text-right text-sm font-semibold text-blue-600">GH₵{money(product.revenue)}</td>
                     </tr>
                   ))}
                   {topProducts.length === 0 && <tr><td colSpan={3} className="text-center py-4 text-gray-500">No sales data yet.</td></tr>}

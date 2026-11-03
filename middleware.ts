@@ -98,7 +98,19 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
-    if (supabaseServiceKey) {
+    // Fail closed: if the session can't be checked, send the visitor to log in.
+    const denyAdmin = (reason: string) => {
+      const loginUrl = new URL('/admin/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      loginUrl.searchParams.set('error', reason);
+      return NextResponse.redirect(loginUrl);
+    };
+
+    if (!supabaseServiceKey) {
+      return denyAdmin('auth_unavailable');
+    }
+
+    {
       try {
         const supabase = createClient(supabaseUrl, supabaseServiceKey, {
           auth: { autoRefreshToken: false, persistSession: false },
@@ -132,6 +144,7 @@ export async function middleware(request: NextRequest) {
         response.headers.set('x-user-role', profile.role);
       } catch (err) {
         console.error('[Middleware] Auth check error:', err);
+        return denyAdmin('session_expired');
       }
     }
   }

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import CheckoutSteps from '@/components/CheckoutSteps';
 import OrderSummary from '@/components/OrderSummary';
+import { checkCoupon, type AppliedCoupon } from '@/components/AdvancedCouponSystem';
 import { useCart } from '@/context/CartContext';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -21,7 +22,7 @@ export default function CheckoutPage() {
   const [saveAddress, setSaveAddress] = useState(false);
   const [savePayment, setSavePayment] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const { getToken, verifying } = useRecaptcha();
+  const { getRawToken, verifying } = useRecaptcha();
 
   const [shippingData, setShippingData] = useState({
     firstName: '',
@@ -69,6 +70,24 @@ export default function CheckoutPage() {
         setCheckoutType('account'); // Auto-select account checkout if logged in
         // Pre-fill email if available
         setShippingData(prev => ({ ...prev, email: session.user.email || '' }));
+        const { data: saved } = await supabase
+          .from('addresses')
+          .select('full_name, phone, address_line1, city, state, is_default')
+          .order('is_default', { ascending: false })
+          .limit(1);
+        const addr = saved?.[0];
+        if (addr) {
+          const [firstName, ...rest] = String(addr.full_name || '').split(' ');
+          setShippingData(prev => ({
+            ...prev,
+            firstName: prev.firstName || firstName || '',
+            lastName: prev.lastName || rest.join(' '),
+            phone: prev.phone || addr.phone || '',
+            address: prev.address || addr.address_line1 || '',
+            city: prev.city || addr.city || '',
+            region: prev.region || addr.state || '',
+          }));
+        }
       }
     }
     checkUser();
@@ -91,7 +110,24 @@ export default function CheckoutPage() {
   const subtotal = cartSubtotal;
   const shippingCost = 0; // Delivery options temporarily disabled
   const tax = 0; // No Tax
-  const total = subtotal + shippingCost + tax;
+  // Coupon applied in the cart; re-checked here and again by the order API.
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+  useEffect(() => {
+    let code = '';
+    try { code = localStorage.getItem('appliedCoupon') || ''; } catch {}
+    if (!code || subtotal <= 0) { setCoupon(null); return; }
+    let cancelled = false;
+    checkCoupon(code, subtotal)
+      .then((c) => { if (!cancelled) setCoupon(c); })
+      .catch(() => {
+        if (cancelled) return;
+        setCoupon(null);
+        try { localStorage.removeItem('appliedCoupon'); } catch {}
+      });
+    return () => { cancelled = true; };
+  }, [subtotal]);
+  const discount = coupon ? Math.min(coupon.discount, subtotal) : 0;
+  const total = subtotal - discount + shippingCost + tax;
 
   const validateShipping = () => {
     const newErrors: any = {};
@@ -129,173 +165,76 @@ export default function CheckoutPage() {
 
     setIsLoading(true);
 
-    // reCAPTCHA verification
-    const isHuman = await getToken('checkout');
-    if (!isHuman) {
+    // reCAPTCHA token is verified by the order API
+    const recaptchaToken = await getRawToken('checkout');
+    if (recaptchaToken === null) {
       alert('Security verification failed. Please try again.');
       setIsLoading(false);
       return;
     }
 
     try {
-      const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      // Generate tracking number: SLI-XXXXXX (6-char alphanumeric)
-      const trackingId = Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
-      const trackingNumber = `SLI-${trackingId}`;
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
-      // 1. Create Order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([{
-          order_number: orderNumber,
-          user_id: user?.id || null, // Capture user_id if logged in
-          email: shippingData.email,
+      // 1. Create the order. The server prices it from the catalogue, not from the cart.
+      const orderRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          recaptchaToken,
+          shipping: shippingData,
+          shippingMethod: deliveryMethod,
+          paymentMethod,
+          couponCode: coupon?.code,
+          items: cart.map(item => ({
+            id: item.id,
+            variantId: item.variantId,
+            variant: item.variant,
+            quantity: item.quantity,
+          })),
+        }),
+      });
+      const created = await orderRes.json().catch(() => ({}));
+      if (!orderRes.ok) {
+        throw new Error(created.error || 'Could not place your order');
+      }
+
+      // Save the address to the shopper's address book if they asked to (best effort).
+      if (user && saveAddress) {
+        await supabase.from('addresses').insert({
+          full_name: `${shippingData.firstName} ${shippingData.lastName}`.trim(),
           phone: shippingData.phone,
-          status: 'pending',
-          payment_status: 'pending',
-          currency: 'GHS',
-          subtotal: subtotal,
-          tax_total: tax,
-          shipping_total: shippingCost,
-          discount_total: 0,
-          total: total,
-          shipping_method: deliveryMethod,
-          payment_method: paymentMethod,
-          shipping_address: shippingData,
-          billing_address: shippingData, // Using same for now
-          metadata: {
-            guest_checkout: !user,
-            first_name: shippingData.firstName,
-            last_name: shippingData.lastName,
-            tracking_number: trackingNumber
-          }
-        }])
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // 2. Create Order Items (with UUID validation)
-      // Helper to check if string is a valid UUID
-      const isValidUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-      
-      // Build order items, resolving slugs to UUIDs if needed
-      const orderItems = [];
-      
-      // Batch-fetch product metadata (for preorder_shipping etc.)
-      const productIds = cart.map(item => item.id).filter(id => isValidUUID(id));
-      const { data: productsData } = productIds.length > 0
-        ? await supabase.from('products').select('id, metadata').in('id', productIds)
-        : { data: [] };
-      const productMetaMap = new Map((productsData || []).map((p: any) => [p.id, p.metadata]));
-      
-      for (const item of cart) {
-        let productId = item.id;
-        
-        // If id is not a valid UUID, it might be a slug - try to resolve it
-        if (!isValidUUID(productId)) {
-          const { data: product } = await supabase
-            .from('products')
-            .select('id, metadata')
-            .or(`slug.eq.${productId},id.eq.${productId}`)
-            .single();
-          
-          if (product) {
-            productId = product.id;
-            productMetaMap.set(product.id, product.metadata);
-          } else {
-            throw new Error(`Product not found: ${item.name}. Please remove it from your cart and try again.`);
-          }
-        }
-        
-        const prodMeta = productMetaMap.get(productId);
-        
-        orderItems.push({
-          order_id: order.id,
-          product_id: productId,
-          product_name: item.name,
-          variant_name: item.variant,
-          quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity,
-          metadata: {
-            image: item.image,
-            slug: item.slug,
-            preorder_shipping: prodMeta?.preorder_shipping || null
-          }
+          address_line1: shippingData.address,
+          city: shippingData.city,
+          state: shippingData.region,
+          postal_code: '',
+          country: 'Ghana',
+          type: 'shipping',
         });
       }
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Note: Stock reduction happens in mark_order_paid when payment is confirmed
-
-      // 3. Upsert Customer Record (for both guest and registered users)
-      const fullName = `${shippingData.firstName} ${shippingData.lastName}`.trim();
-      await supabase.rpc('upsert_customer_from_order', {
-        p_email: shippingData.email,
-        p_phone: shippingData.phone,
-        p_full_name: fullName,
-        p_first_name: shippingData.firstName,
-        p_last_name: shippingData.lastName,
-        p_user_id: user?.id || null,
-        p_address: shippingData
-      });
-
-      // 4. Handle Payment Redirects or Completion
-      if (paymentMethod === 'moolre') {
-        try {
-          // Payment link reminder will be sent automatically after 15 mins if unpaid (via cron)
-
-          const paymentRes = await fetch('/api/payment/moolre', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              orderId: orderNumber,
-              amount: total,
-              customerEmail: shippingData.email
-            })
-          });
-
-          const paymentResult = await paymentRes.json();
-
-          if (!paymentResult.success) {
-            throw new Error(paymentResult.message || 'Payment initialization failed');
-          }
-
-          // Clear cart before redirecting
-          clearCart();
-
-          // Redirect to Moolre
-          window.location.href = paymentResult.url;
-          return;
-
-        } catch (paymentErr: any) {
-          console.error('Payment Error:', paymentErr);
-          alert('Failed to initialize payment: ' + paymentErr.message);
-          setIsLoading(false);
-          return; // Stop execution
-        }
-      }
-
-      // 5. Send Notifications (For COD or others)
-      fetch('/api/notifications', {
+      // 2. Start Moolre payment (amount is read from the saved order)
+      const paymentRes = await fetch('/api/payment/moolre', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'order_created',
-          payload: order
-        })
-      }).catch(err => console.error('Notification trigger error:', err));
+        body: JSON.stringify({ orderId: created.id })
+      });
+      const paymentResult = await paymentRes.json().catch(() => ({}));
 
-      // 6. Clear Cart & Redirect (For COD)
+      if (!paymentResult.success) {
+        // The order exists, so send the shopper to its payment page to retry.
+        alert('We saved your order but could not open the payment page: ' + (paymentResult.message || 'please try again.'));
+        clearCart();
+        router.push(`/pay/${created.id}`);
+        return;
+      }
+
+      // Clear cart before redirecting to Moolre
       clearCart();
-      router.push(`/order-success?order=${orderNumber}`);
-
+      window.location.href = paymentResult.url;
+      return;
     } catch (err: any) {
       console.error('Checkout error:', err);
       alert('Failed to place order: ' + err.message);
@@ -358,7 +297,15 @@ export default function CheckoutPage() {
               </button>
 
               <button
-                onClick={() => setCheckoutType('account')}
+                type="button"
+                onClick={() => {
+                  // Guests sign up first; the cart is kept and they come straight back here.
+                  if (!user) {
+                    router.push('/auth/signup?redirect=/checkout');
+                    return;
+                  }
+                  setCheckoutType('account');
+                }}
                 className={`p-6 rounded-xl border-2 transition-all text-left cursor-pointer ${checkoutType === 'account'
                   ? 'border-blue-700 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
@@ -373,7 +320,7 @@ export default function CheckoutPage() {
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">{user ? 'My Account' : 'Create Account'}</h3>
                 <p className="text-sm text-gray-600">
-                  {user ? `Logged in as ${user.email}` : 'Save info, track orders & earn loyalty points'}
+                  {user ? `Logged in as ${user.email}` : 'Save your details and see all your orders in one place'}
                 </p>
               </button>
             </div>
@@ -501,7 +448,7 @@ export default function CheckoutPage() {
                       </div>
                     </div>
 
-                    {checkoutType === 'account' && (
+                    {user && checkoutType === 'account' && (
                       <label className="flex items-center space-x-3 cursor-pointer">
                         <input
                           type="checkbox"
@@ -637,6 +584,8 @@ export default function CheckoutPage() {
               shipping={shippingCost}
               tax={tax}
               total={total}
+              discount={discount}
+              couponCode={coupon?.code}
             />
           </div>
         </div>

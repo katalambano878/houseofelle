@@ -190,7 +190,7 @@ export default function PrivacyPage() {
                 </div>
                 <h3 className="font-bold text-gray-900 mb-2">Payment Security</h3>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  We never store your full payment card details. All payments are processed by PCI-DSS compliant providers.
+                  Online payments are handled by Moolre, our Mobile Money provider. We never see or store your Mobile Money PIN.
                 </p>
               </div>
 

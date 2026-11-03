@@ -6,6 +6,28 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
+const ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'];
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/** Returns an error message when the file can't be uploaded, or null when it is fine. */
+function validateImageFile(file: File): string | null {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext) || (file.type && !ALLOWED_IMAGE_TYPES.includes(file.type))) {
+        return 'Please choose a JPG, PNG, WebP, GIF or AVIF image.';
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+        return `This image is ${(file.size / 1024 / 1024).toFixed(1)} MB. The maximum is 10 MB.`;
+    }
+    return null;
+}
+
+function randomId() {
+    return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 interface ProductFormProps {
     initialData?: any;
     isEditMode?: boolean;
@@ -25,50 +47,49 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
     const [moq, setMoq] = useState(initialData?.moq || '1');
     const [lowStockThreshold, setLowStockThreshold] = useState(initialData?.metadata?.low_stock_threshold || '5');
     const [description, setDescription] = useState(initialData?.description || '');
-    const [status, setStatus] = useState(initialData?.status || 'Active');
+    const [status, setStatus] = useState(String(initialData?.status || 'active').toLowerCase());
     const [featured, setFeatured] = useState(initialData?.featured || false);
     const [preorderShipping, setPreorderShipping] = useState(initialData?.metadata?.preorder_shipping || '');
     const [activeTab, setActiveTab] = useState('general');
 
     // Auto-generate SKU function
     const generateSku = () => {
-        const prefix = 'STORE'; // Storefront
+        const prefix = 'HOE'; // House of Elle
         const timestamp = Date.now().toString(36).toUpperCase().slice(-4);
         const random = Math.random().toString(36).substring(2, 6).toUpperCase();
         return `${prefix}-${timestamp}-${random}`;
     };
 
     // --- Variant System ---
-    // Preset color palette
+    // Preset scent / colour options (swatch colours are only a visual hint)
     const colorPresets = [
+        { name: 'Vanilla', hex: '#F3E5AB' },
+        { name: 'Rose', hex: '#E8A0B4' },
+        { name: 'Oud', hex: '#5C3A21' },
+        { name: 'Amber', hex: '#FFBF00' },
+        { name: 'Sandalwood', hex: '#C19A6B' },
+        { name: 'Jasmine', hex: '#F8F4E3' },
+        { name: 'Lavender', hex: '#B57EDC' },
+        { name: 'Citrus', hex: '#F7B32B' },
+        { name: 'Coconut', hex: '#FFFDF5' },
+        { name: 'Ocean', hex: '#4A90B8' },
+        { name: 'Musk', hex: '#D8C3A5' },
         { name: 'Black', hex: '#000000' },
         { name: 'White', hex: '#FFFFFF' },
-        { name: 'Red', hex: '#EF4444' },
-        { name: 'Blue', hex: '#3B82F6' },
-        { name: 'Navy', hex: '#1E3A5F' },
-        { name: 'Green', hex: '#22C55E' },
-        { name: 'Yellow', hex: '#EAB308' },
-        { name: 'Pink', hex: '#EC4899' },
-        { name: 'Purple', hex: '#A855F7' },
-        { name: 'Orange', hex: '#F97316' },
-        { name: 'Gray', hex: '#6B7280' },
-        { name: 'Brown', hex: '#92400E' },
-        { name: 'Beige', hex: '#D2B48C' },
-        { name: 'Maroon', hex: '#800000' },
-        { name: 'Teal', hex: '#14B8A6' },
-        { name: 'Cream', hex: '#FFFDD0' },
         { name: 'Gold', hex: '#D4AF37' },
-        { name: 'Silver', hex: '#C0C0C0' },
     ];
-    const sizePresets = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+    const sizePresets = ['10ml', '30ml', '50ml', '100ml', '150ml', '250ml', 'Gift Set', 'Wholesale Box'];
 
-    // Parse existing variants to extract unique colors and sizes
-    const existingVariants = (initialData?.product_variants || []).map((v: any) => ({
+    // Parse existing variants to extract unique colors and sizes.
+    // Archived variants (kept only because past orders reference them) are hidden from the editor.
+    const allExistingVariants = (initialData?.product_variants || []).map((v: any) => ({
         ...v,
         stock: v.stock ?? v.quantity ?? 0,
         color: v.color ?? v.option2 ?? '',
-        size: v.name || ''
+        size: v.option1 ?? ''
     }));
+    const existingVariants = allExistingVariants.filter((v: any) => !v.metadata?.archived);
+    const archivedVariants = allExistingVariants.filter((v: any) => v.metadata?.archived);
 
     const [selectedColors, setSelectedColors] = useState<{ name: string; hex: string }[]>(() => {
         const colors = new Map<string, string>();
@@ -97,14 +118,15 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
     const buildVariantKey = (color: string, size: string) => `${color}|||${size}`;
 
     // Store variant data (price, stock) in a map keyed by "color|||size"
-    const [variantData, setVariantData] = useState<Record<string, { price: string; stock: string; sku: string }>>(() => {
-        const data: Record<string, { price: string; stock: string; sku: string }> = {};
+    const [variantData, setVariantData] = useState<Record<string, { price: string; stock: string; sku: string; id?: string }>>(() => {
+        const data: Record<string, { price: string; stock: string; sku: string; id?: string }> = {};
         existingVariants.forEach((v: any) => {
             const key = buildVariantKey(v.color || '', v.size || '');
             data[key] = {
                 price: v.price?.toString() || '',
                 stock: v.stock?.toString() || '0',
-                sku: v.sku || ''
+                sku: v.sku || '',
+                id: v.id
             };
         });
         return data;
@@ -130,6 +152,8 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
     const variants = variantCombinations.map(combo => {
         const d = variantData[combo.key] || { price: price, stock: '0', sku: '' };
         return {
+            key: combo.key,
+            id: d.id as string | undefined,
             name: combo.size,
             color: combo.color,
             sku: d.sku,
@@ -236,14 +260,20 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
     }, [isEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.target;
         try {
-            if (!e.target.files || e.target.files.length === 0) return;
+            if (!input.files || input.files.length === 0) return;
+
+            const file = input.files[0];
+            const invalid = validateImageFile(file);
+            if (invalid) {
+                alert(invalid);
+                return;
+            }
 
             setUploading(true);
-            const file = e.target.files[0];
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random()}.${fileExt}`;
-            const filePath = `${fileName}`;
+            const fileExt = (file.name.split('.').pop() || '').toLowerCase();
+            const filePath = `${randomId()}.${fileExt}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('products')
@@ -258,9 +288,10 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
             setImages([...images, { url: publicUrl, position: images.length }]);
 
         } catch (error: any) {
-            alert('Error uploading image: ' + error.message);
+            alert('Error uploading image: ' + (error?.message || 'Please try again.'));
         } finally {
             setUploading(false);
+            input.value = '';
         }
     };
 
@@ -296,6 +327,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                 seo_description: metaDescription,
                 tags: (keywords as string).split(',').map((k: string) => k.trim()).filter(Boolean),
                 metadata: {
+                    ...(initialData?.metadata || {}),
                     low_stock_threshold: parseInt(lowStockThreshold) || 5,
                     preorder_shipping: preorderShipping.trim() || null
                 }
@@ -325,51 +357,131 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
 
             if (error) throw error;
 
-            // Update Images
-            if (productId) {
-                // Strategy: We will just delete all old images/variants and recreate them for simplicity in this MVP.
-                // In a clearer implementation, we would diff them.
+            if (!productId) throw new Error('The product was not saved. Please try again.');
 
-                // 1. Images
-                if (isEditMode) {
-                    await supabase.from('product_images').delete().eq('product_id', productId);
+            const problems: string[] = [];
+
+            // 1. Images: update kept rows, insert new ones, and only then remove the ones taken out.
+            const originalImages: any[] = isEditMode ? (initialData?.product_images || []) : [];
+            const keptImageIds = new Set(images.filter((img) => img.id).map((img) => img.id));
+            let imagesSaved = true;
+            for (let idx = 0; idx < images.length; idx++) {
+                const img = images[idx];
+                if (!img.id) continue;
+                const { error: imgUpdateError } = await supabase
+                    .from('product_images')
+                    .update({ position: idx, alt_text: productName })
+                    .eq('id', img.id);
+                if (imgUpdateError) {
+                    imagesSaved = false;
+                    problems.push(`Image ${idx + 1}: ${imgUpdateError.message}`);
                 }
-                if (images.length > 0) {
-                    const imageInserts = images.map((img, idx) => ({
-                        product_id: productId,
-                        url: img.url,
-                        position: idx,
-                        alt_text: productName
+            }
+            const newImages = images
+                .map((img, idx) => ({ img, idx }))
+                .filter(({ img }) => !img.id)
+                .map(({ img, idx }) => ({
+                    product_id: productId,
+                    url: img.url,
+                    position: idx,
+                    alt_text: productName
+                }));
+            if (newImages.length > 0) {
+                const { data: insertedImages, error: imgInsertError } = await supabase
+                    .from('product_images')
+                    .insert(newImages)
+                    .select('id, url, position');
+                if (imgInsertError) {
+                    imagesSaved = false;
+                    problems.push(`New images: ${imgInsertError.message}`);
+                } else if (insertedImages) {
+                    // Remember the new row ids so a retry updates them instead of inserting duplicates.
+                    setImages(prev => prev.map((img, idx) => {
+                        if (img.id) return img;
+                        const row = (insertedImages as any[]).find(r => r.position === idx && r.url === img.url);
+                        return row ? { ...img, id: row.id } : img;
                     }));
-                    await supabase.from('product_images').insert(imageInserts);
                 }
+            }
+            const removedImageIds = originalImages
+                .filter((img: any) => img.id && !keptImageIds.has(img.id))
+                .map((img: any) => img.id);
+            if (imagesSaved && removedImageIds.length > 0) {
+                const { error: imgDeleteError } = await supabase.from('product_images').delete().in('id', removedImageIds);
+                if (imgDeleteError) problems.push(`Removing images: ${imgDeleteError.message}`);
+            }
 
-                // 2. Variants
-                if (isEditMode) {
-                    // Be careful not to delete ALL variants if we want to preserve IDs etc, 
-                    // but for now, full replacement is safer to ensure sync.
-                    // Note: This might break order-item references if they rely on variant_id hard constraints without cascading.
-                    // Our Schema migration has ON DELETE SET NULL for order_items -> variant_id, so this is safe for now (but distinct from "archiving").
-                    await supabase.from('product_variants').delete().eq('product_id', productId);
-                }
+            // 2. Variants: update existing rows in place, insert new ones, delete (or archive) removed ones.
+            const variantRow = (v: (typeof variants)[number], existingMetadata?: any) => {
+                const colorHex = selectedColors.find(c => c.name === v.color)?.hex || null;
+                const metadata: Record<string, any> = { ...(existingMetadata || {}) };
+                delete metadata.archived;
+                if (colorHex) metadata.color_hex = colorHex;
+                else delete metadata.color_hex;
+                return {
+                    product_id: productId,
+                    name: v.name || v.color || 'Default',
+                    sku: v.sku?.trim() || null,
+                    price: parseFloat(v.price) || 0,
+                    quantity: parseInt(v.stock) || 0,
+                    option1: v.name || null,
+                    option2: v.color?.trim() || null,
+                    metadata
+                };
+            };
+            const variantLabel = (v: { name?: string; color?: string }) =>
+                [v.color, v.name].filter(Boolean).join(' / ') || 'Default';
 
-                if (variants.length > 0) {
-                    const variantInserts = variants.map(v => {
-                        const colorHex = selectedColors.find(c => c.name === v.color)?.hex || null;
-                        return {
-                            product_id: productId,
-                            name: v.name || v.color || 'Default',
-                            sku: v.sku || null,
-                            price: parseFloat(v.price) || 0,
-                            quantity: parseInt(v.stock) || 0,
-                            option1: v.name || null,
-                            option2: v.color?.trim() || null,
-                            metadata: colorHex ? { color_hex: colorHex } : {}
-                        };
-                    });
-                    const { error: varError } = await supabase.from('product_variants').insert(variantInserts);
-                    if (varError) throw varError;
+            const keptVariantIds = new Set<string>();
+            for (const v of variants) {
+                // Re-use a previously archived variant with the same scent/size instead of creating a duplicate.
+                const archived = !v.id
+                    ? archivedVariants.find((a: any) => buildVariantKey(a.color || '', a.size || '') === v.key)
+                    : undefined;
+                const targetId = v.id || archived?.id;
+                if (targetId) {
+                    keptVariantIds.add(targetId);
+                    const existing = allExistingVariants.find((ev: any) => ev.id === targetId);
+                    const { error: varUpdateError } = await supabase
+                        .from('product_variants')
+                        .update(variantRow(v, existing?.metadata))
+                        .eq('id', targetId);
+                    if (varUpdateError) problems.push(`Variant ${variantLabel(v)}: ${varUpdateError.message}`);
+                } else {
+                    const { data: inserted, error: varInsertError } = await supabase
+                        .from('product_variants')
+                        .insert([variantRow(v)])
+                        .select('id')
+                        .single();
+                    if (varInsertError) problems.push(`New variant ${variantLabel(v)}: ${varInsertError.message}`);
+                    else if (inserted?.id) {
+                        keptVariantIds.add(inserted.id);
+                        setVariantData(prev => ({ ...prev, [v.key]: { ...(prev[v.key] || { price: v.price, stock: v.stock, sku: v.sku }), id: inserted.id } }));
+                    }
                 }
+            }
+
+            const removedVariants = existingVariants.filter((v: any) => v.id && !keptVariantIds.has(v.id));
+            for (const v of removedVariants) {
+                const { error: varDeleteError } = await supabase.from('product_variants').delete().eq('id', v.id);
+                if (!varDeleteError) continue;
+                // Most likely referenced by an order or a cart: keep the row but take it off sale.
+                const { error: archiveError } = await supabase
+                    .from('product_variants')
+                    .update({ quantity: 0, metadata: { ...(v.metadata || {}), archived: true } })
+                    .eq('id', v.id);
+                if (archiveError) problems.push(`Removing variant ${variantLabel(v)}: ${archiveError.message}`);
+            }
+
+            if (problems.length > 0) {
+                if (!isEditMode) {
+                    // The product row exists now; switch to editing it so a retry doesn't create a duplicate.
+                    alert(`The product was created, but some parts were not saved:\n\n- ${problems.join('\n- ')}\n\nOpen the product again to fix them.`);
+                    router.push(`/admin/products/${productId}`);
+                } else {
+                    alert(`Some changes were not saved:\n\n- ${problems.join('\n- ')}\n\nReload the page to see what was saved, then try again.`);
+                }
+                return;
             }
 
             alert(isEditMode ? 'Product updated successfully!' : 'Product created successfully!');
@@ -511,9 +623,9 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         onChange={(e) => setStatus(e.target.value)}
                                         className="w-full px-4 py-3 pr-8 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
                                     >
-                                        <option>Active</option>
-                                        <option>Draft</option>
-                                        <option>Archived</option>
+                                        <option value="active">Active</option>
+                                        <option value="draft">Draft</option>
+                                        <option value="archived">Archived</option>
                                     </select>
                                 </div>
                             </div>
@@ -694,21 +806,21 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                         <div className="space-y-8">
                             <div>
                                 <h3 className="text-lg font-bold text-gray-900">Product Variants</h3>
-                                <p className="text-gray-600 mt-1">Select colors and sizes below — variants are generated automatically</p>
+                                <p className="text-gray-600 mt-1">Select scents / colours and sizes below — variants are generated automatically</p>
                             </div>
 
                             {/* STEP 1: Colors */}
                             <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                                 <h4 className="text-sm font-bold text-gray-900 mb-1 flex items-center">
                                     <i className="ri-palette-line mr-2 text-lg text-blue-700"></i>
-                                    Step 1: Select Colors
+                                    Step 1: Select Scents / Colours
                                     {selectedColors.length > 0 && (
                                         <span className="ml-2 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
                                             {selectedColors.length} selected
                                         </span>
                                     )}
                                 </h4>
-                                <p className="text-xs text-gray-500 mb-4">Click colors to add/remove. Skip if product has no color options.</p>
+                                <p className="text-xs text-gray-500 mb-4">Click to add/remove. Skip if the product has no scent or colour options.</p>
 
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     {colorPresets.map(color => {
@@ -741,13 +853,13 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         value={customColorHex}
                                         onChange={(e) => setCustomColorHex(e.target.value)}
                                         className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5"
-                                        title="Pick a custom color"
+                                        title="Pick a swatch colour"
                                     />
                                     <input
                                         type="text"
                                         value={customColorName}
                                         onChange={(e) => setCustomColorName(e.target.value)}
-                                        placeholder="Custom color name"
+                                        placeholder="Custom scent / colour"
                                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
                                         onKeyDown={(e) => e.key === 'Enter' && addCustomColor()}
                                     />
@@ -756,7 +868,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         disabled={!customColorName.trim()}
                                         className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                     >
-                                        Add Color
+                                        Add Scent / Colour
                                     </button>
                                 </div>
 
@@ -787,7 +899,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         </span>
                                     )}
                                 </h4>
-                                <p className="text-xs text-gray-500 mb-4">Click sizes to add/remove. Use custom for volumes (100ml), weights, etc.</p>
+                                <p className="text-xs text-gray-500 mb-4">Click sizes to add/remove. Use custom for other volumes or pack sizes.</p>
 
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     {sizePresets.map(size => {
@@ -814,7 +926,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                         type="text"
                                         value={customSize}
                                         onChange={(e) => setCustomSize(e.target.value)}
-                                        placeholder="Custom size (e.g. 100ml, One Size, 42)"
+                                        placeholder="Custom size (e.g. 75ml, Travel Size)"
                                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
                                         onKeyDown={(e) => e.key === 'Enter' && addCustomSize()}
                                     />
@@ -879,7 +991,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                             <thead className="bg-gray-50 border-b border-gray-200">
                                                 <tr>
                                                     {selectedColors.length > 0 && (
-                                                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Color</th>
+                                                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Scent / Colour</th>
                                                     )}
                                                     {selectedSizes.length > 0 && (
                                                         <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Size</th>
@@ -950,8 +1062,8 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                 <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
                                     <i className="ri-palette-line text-4xl text-gray-300 mb-2 block"></i>
                                     <p className="font-medium">No variants configured</p>
-                                    <p className="text-sm mt-1">Select colors and/or sizes above to create variant combinations.</p>
-                                    <p className="text-xs mt-2 text-gray-400">You can add just colors, just sizes, or both for a full grid.</p>
+                                    <p className="text-sm mt-1">Select scents / colours and/or sizes above to create variant combinations.</p>
+                                    <p className="text-xs mt-2 text-gray-400">You can add just scents / colours, just sizes, or both for a full grid.</p>
                                 </div>
                             )}
                         </div>
@@ -998,7 +1110,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                     <span className="text-sm font-semibold">{uploading ? 'Uploading...' : 'Upload Image'}</span>
                                     <input
                                         type="file"
-                                        accept="image/*"
+                                        accept=".jpg,.jpeg,.png,.webp,.gif,.avif,image/jpeg,image/png,image/webp,image/gif,image/avif"
                                         className="hidden"
                                         onChange={handleImageUpload}
                                         disabled={uploading}

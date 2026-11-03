@@ -44,10 +44,12 @@ export default function UpdatePrompt() {
   }, []);
 
   const handleUpdate = () => {
+    // The page reloads on controllerchange (PWAInstaller) once the new worker takes over.
     if (registration?.waiting) {
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+      window.location.reload();
     }
-    window.location.reload();
   };
 
   if (!showPrompt) return null;

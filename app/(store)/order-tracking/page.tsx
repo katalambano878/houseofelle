@@ -4,7 +4,6 @@ import { money } from '@/lib/format-money';
 import Link from 'next/link';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 function OrderTrackingContent() {
   const searchParams = useSearchParams();
@@ -33,43 +32,21 @@ function OrderTrackingContent() {
     setError('');
 
     try {
-      // Only select the fields we need — avoid exposing unnecessary data
-      const { data, error: fetchError } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          status,
-          payment_status,
-          total,
-          email,
-          created_at,
-          shipping_address,
-          metadata,
-          order_items (
-            id,
-            product_name,
-            variant_name,
-            quantity,
-            unit_price,
-            metadata,
-            products (
-              product_images (url)
-            )
-          )
-        `)
-        .eq('order_number', orderNum)
-        .single();
+      // The lookup API only returns the order when the email matches it
+      const res = await fetch('/api/orders/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: orderNum.trim(), email: emailToVerify.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      const data = json?.order;
 
-      if (fetchError || !data) {
-        setError('Order not found. Please check your order number and try again.');
-        setIsTracking(false);
-        return;
-      }
-
-      // SECURITY: Always verify email matches — this is mandatory
-      if (data.email?.toLowerCase() !== emailToVerify.toLowerCase()) {
-        setError('The email address does not match this order. Please use the email you placed the order with.');
+      if (!res.ok || !data) {
+        setError(
+          res.status === 429
+            ? 'Too many attempts. Please wait a few minutes and try again.'
+            : 'No order matches that order number and email. Check both and try again.'
+        );
         setIsTracking(false);
         return;
       }
@@ -203,7 +180,7 @@ function OrderTrackingContent() {
                   value={orderNumber}
                   onChange={(e) => setOrderNumber(e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g. ORD-1770328211911-915 or SLI-ABC123"
+                  placeholder="e.g. ORD-1770328211911-915 or HOE-ABC123"
                 />
               </div>
 

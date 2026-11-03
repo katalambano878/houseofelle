@@ -7,22 +7,11 @@ export default function MaintenancePage() {
             <i className="ri-tools-line text-6xl text-blue-700"></i>
           </div>
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            We'll Be Right Back
+            We&apos;ll Be Right Back
           </h1>
           <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            We're currently performing scheduled maintenance to improve your shopping experience. We'll be back online shortly.
+            We&apos;re currently carrying out maintenance to improve your shopping experience. We&apos;ll be back online as soon as possible.
           </p>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-2xl p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Expected Downtime</h2>
-          <div className="flex items-center justify-center gap-3 text-blue-700">
-            <i className="ri-time-line text-3xl"></i>
-            <div className="text-left">
-              <p className="text-sm text-gray-600">Estimated completion</p>
-              <p className="text-2xl font-bold">30 minutes</p>
-            </div>
-          </div>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-8">
@@ -74,7 +63,7 @@ export default function MaintenancePage() {
               WhatsApp
             </a>
             <a
-              href="tel:0553347531"
+              href="tel:+233553347531"
               className="inline-flex items-center gap-2 bg-white text-gray-900 px-6 py-3 rounded-full font-medium hover:bg-gray-50 transition-colors border border-gray-200 whitespace-nowrap"
             >
               <i className="ri-phone-line"></i>
@@ -87,8 +76,11 @@ export default function MaintenancePage() {
           <p className="mb-2">Thank you for your patience</p>
           <p>Follow us on social media for real-time updates</p>
           <div className="flex gap-4 justify-center mt-4">
-            <a href="/contact" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors">
+            <a href="https://www.instagram.com/houseof_elle" target="_blank" rel="noopener noreferrer" aria-label="House of Elle on Instagram" className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors">
               <i className="ri-instagram-line text-gray-600"></i>
+            </a>
+            <a href="https://www.tiktok.com/@houseof_elle" target="_blank" rel="noopener noreferrer" aria-label="House of Elle on TikTok" className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors">
+              <i className="ri-tiktok-line text-gray-600"></i>
             </a>
           </div>
         </div>

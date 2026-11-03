@@ -2,7 +2,7 @@
 import { money } from '@/lib/format-money';
 
 import Link from 'next/link';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import FraudDetectionAlert from '@/components/FraudDetectionAlert';
 
@@ -17,6 +17,108 @@ interface FraudAnalysis {
   reasons: string[];
 }
 
+interface StatusHistoryEntry {
+  id: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
+
+const ORDER_SELECT = `
+  *,
+  order_items (
+    id,
+    product_id,
+    variant_id,
+    product_name,
+    variant_name,
+    sku,
+    quantity,
+    unit_price,
+    total_price,
+    metadata,
+    products (
+      product_images (url, position)
+    )
+  )
+`;
+
+const HIGH_VALUE_TOTAL = 5000;
+
+/** Strip characters that would break a PostgREST or() filter list. */
+const orValue = (v: string) => v.replace(/[,()"'\\]/g, '').trim();
+
+const firstImage = (item: any): string | null => {
+  const images = Array.isArray(item?.products?.product_images) ? [...item.products.product_images] : [];
+  images.sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+  return images[0]?.url || null;
+};
+
+/**
+ * Simple, explainable risk checks from data the store already has.
+ * Each reason says exactly what was found, so staff can judge it.
+ */
+async function analyseOrder(order: any): Promise<FraudAnalysis> {
+  const reasons: string[] = [];
+  let score = 0;
+
+  const total = Number(order.total) || 0;
+  if (total >= HIGH_VALUE_TOTAL) {
+    reasons.push(`High order value (GH₵ ${money(total)})`);
+    score += 1;
+  }
+
+  const ship = order.shipping_address || {};
+  const bill = order.billing_address || {};
+  const shipPhone = String(ship.phone || '').replace(/\D/g, '').slice(-9);
+  const orderPhone = String(order.phone || '').replace(/\D/g, '').slice(-9);
+  if (shipPhone && orderPhone && shipPhone !== orderPhone) {
+    reasons.push('Shipping phone differs from the contact phone');
+    score += 1;
+  }
+  const shipName = `${ship.firstName || ''} ${ship.lastName || ''}`.trim().toLowerCase() || String(ship.full_name || '').toLowerCase();
+  const billName = `${bill.firstName || ''} ${bill.lastName || ''}`.trim().toLowerCase() || String(bill.full_name || '').toLowerCase();
+  if (shipName && billName && shipName !== billName) {
+    reasons.push('Billing name differs from shipping name');
+    score += 1;
+  }
+
+  // Other orders from the same email or phone.
+  const parts: string[] = [];
+  if (order.email) {
+    const v = orValue(order.email);
+    if (v) parts.push(`email.eq.${v}`);
+  }
+  if (order.phone) {
+    const v = orValue(order.phone);
+    if (v) parts.push(`phone.eq.${v}`);
+  }
+  if (parts.length > 0) {
+    const since = new Date(new Date(order.created_at).getTime() - 7 * 24 * 3600 * 1000).toISOString();
+    const { data: related } = await supabase
+      .from('orders')
+      .select('id, created_at, payment_status')
+      .or(parts.join(','))
+      .gte('created_at', since)
+      .neq('id', order.id);
+    const others = related || [];
+    const placed = new Date(order.created_at).getTime();
+    const sameDay = others.filter((o: any) => Math.abs(new Date(o.created_at).getTime() - placed) <= 24 * 3600 * 1000).length;
+    const failed = others.filter((o: any) => o.payment_status === 'failed').length;
+    if (sameDay >= 3) {
+      reasons.push(`${sameDay} other orders from this email or phone within 24 hours`);
+      score += sameDay >= 5 ? 3 : 1;
+    }
+    if (failed >= 2) {
+      reasons.push(`${failed} failed payments from this email or phone in the last 7 days`);
+      score += failed >= 4 ? 2 : 1;
+    }
+  }
+
+  const riskLevel: RiskLevel = score >= 3 ? 'high' : score >= 1 ? 'medium' : 'low';
+  return { riskLevel, reasons };
+}
+
 export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -25,6 +127,9 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [adminNotes, setAdminNotes] = useState('');
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [history, setHistory] = useState<StatusHistoryEntry[]>([]);
+  const [fraudAnalysis, setFraudAnalysis] = useState<FraudAnalysis>({ riskLevel: 'low', reasons: [] });
+  const autoPrinted = useRef(false);
 
   const handlePrint = () => {
     window.print();
@@ -46,147 +151,151 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
   }, []);
 
   const fetchOrderDetails = useCallback(async () => {
-    try {
-      setLoading(true);
-      // Try to fetch by ID or order_number
-      let query = supabase
+    setLoading(true);
+    setError(null);
+
+    // The route param may be the order id or its order number.
+    let { data, error: fetchError } = await supabase
+      .from('orders')
+      .select(ORDER_SELECT)
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (!fetchError && !data) {
+      const byNumber = await supabase
         .from('orders')
-        .select(`
-          *,
-          order_items (
-            id,
-            product_id,
-            product_name,
-            variant_name,
-            sku,
-            quantity,
-            unit_price,
-            total_price,
-            metadata,
-            products (
-              product_images (url)
-            )
-          )
-        `)
-        .eq('id', orderId);
-
-      let { data, error } = await query.single();
-
-      if (error && error.code === 'PGRST116') {
-        // Not found by ID, try order_number
-        const { data: dataByNum, error: errorByNum } = await supabase
-          .from('orders')
-          .select(`
-            *,
-            order_items (
-              id,
-              product_id,
-              product_name,
-              variant_name,
-              sku,
-              quantity,
-              unit_price,
-              total_price,
-              metadata,
-              products (
-                product_images (url)
-              )
-            )
-          `)
-          .eq('order_number', orderId)
-          .single();
-
-        if (dataByNum) {
-          data = dataByNum;
-          error = null;
-        } else {
-          error = errorByNum;
-        }
-      }
-
-      if (error) throw error;
-      setOrder(data);
-      setTrackingNumber(data.metadata?.tracking_number || '');
-      setAdminNotes(data.notes || '');
-
-    } catch (err: any) {
-      console.error('Error fetching order:', err);
-      setError('Failed to load order details');
-    } finally {
-      setLoading(false);
+        .select(ORDER_SELECT)
+        .eq('order_number', orderId)
+        .maybeSingle();
+      data = byNumber.data;
+      fetchError = byNumber.error;
     }
+
+    if (fetchError || !data) {
+      setError(fetchError ? `Failed to load order details: ${fetchError.message}` : 'Order not found');
+      setOrder(null);
+      setLoading(false);
+      return;
+    }
+
+    const loaded: any = data;
+    setOrder(loaded);
+    setTrackingNumber(loaded.metadata?.tracking_number || '');
+    setAdminNotes(loaded.notes || '');
+
+    const { data: historyRows } = await supabase
+      .from('order_status_history')
+      .select('id, status, notes, created_at')
+      .eq('order_id', loaded.id)
+      .order('created_at', { ascending: true });
+    setHistory((historyRows || []) as StatusHistoryEntry[]);
+
+    setLoading(false);
+
+    analyseOrder(loaded)
+      .then(setFraudAnalysis)
+      .catch(() => setFraudAnalysis({ riskLevel: 'low', reasons: [] }));
   }, [orderId]);
 
   useEffect(() => {
     fetchOrderDetails();
   }, [fetchOrderDetails]);
 
+  // "Print Invoice" on the orders list opens this page with ?print=true.
+  useEffect(() => {
+    if (loading || !order || autoPrinted.current) return;
+    if (new URLSearchParams(window.location.search).get('print') !== 'true') return;
+    autoPrinted.current = true;
+    const t = setTimeout(() => window.print(), 300);
+    return () => clearTimeout(t);
+  }, [loading, order]);
+
+  const customerNameOf = (o: any) => {
+    const addr = o?.shipping_address || {};
+    return (addr.firstName && addr.lastName)
+      ? `${String(addr.firstName).trim()} ${String(addr.lastName).trim()}`
+      : addr.full_name || addr.firstName || o?.email?.split('@')[0] || 'Customer';
+  };
+
   const handleUpdateStatus = async (newStatus?: string) => {
-    try {
-      setStatusUpdating(true);
-      const statusToUpdate = newStatus || order.status;
+    if (!order) return;
+    setStatusUpdating(true);
+    const statusToUpdate = newStatus || order.status;
+    const statusChanged = statusToUpdate !== order.status;
+    const previousTracking = order.metadata?.tracking_number || '';
+    const trackingChanged = trackingNumber !== previousTracking;
+    const nextMetadata = { ...(order.metadata || {}), tracking_number: trackingNumber };
 
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          status: statusToUpdate,
-          notes: adminNotes,
-          metadata: {
-            ...order.metadata,
-            tracking_number: trackingNumber
-          }
-        })
-        .eq('id', order.id);
-
-      if (error) throw error;
-
-      // Update local state
-      setOrder({
-        ...order,
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
         status: statusToUpdate,
         notes: adminNotes,
-        metadata: { ...order.metadata, tracking_number: trackingNumber }
-      });
+        metadata: nextMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id);
 
-      // Send Notification (Email + SMS)
-      // Only send if status changed OR tracking number was added/changed
-      const statusChanged = statusToUpdate !== order.status;
-      const trackingChanged = trackingNumber !== order.metadata?.tracking_number;
-
-      if (statusChanged || (trackingChanged && trackingNumber)) {
-        // Get auth token for notification API
-        const { data: { session } } = await supabase.auth.getSession();
-        const authToken = session?.access_token;
-
-        fetch('/api/notifications', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken && { 'Authorization': `Bearer ${authToken}` })
-          },
-          body: JSON.stringify({
-            type: 'order_status',
-            payload: {
-              email: order.email,
-              name: customerName,
-              orderId: orderId,
-              orderNumber: order.order_number || orderId,
-              status: statusToUpdate,
-              trackingNumber: trackingNumber,
-              phone: shippingAddress.phone || order.phone // Ensure phone is passed for SMS
-            }
-          })
-        }).catch(err => console.error('Notification error:', err));
-      }
-
-      alert('Order updated successfully');
-      setShowStatusMenu(false);
-    } catch (err) {
-      console.error('Error updating order:', err);
-      alert('Failed to update order');
-    } finally {
+    if (updateError) {
       setStatusUpdating(false);
+      alert(`Failed to update order: ${updateError.message}`);
+      return;
     }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token;
+
+    let historyWarning = '';
+    if (statusChanged) {
+      const { data: inserted, error: historyError } = await supabase
+        .from('order_status_history')
+        .insert({
+          order_id: order.id,
+          status: statusToUpdate,
+          notes: trackingChanged && trackingNumber ? `Tracking: ${trackingNumber}` : null,
+          created_by: session?.user?.id ?? null,
+        })
+        .select('id, status, notes, created_at')
+        .maybeSingle();
+      if (historyError) historyWarning = ` (status history not saved: ${historyError.message})`;
+      else if (inserted) setHistory((h) => [...h, inserted as StatusHistoryEntry]);
+    }
+
+    setOrder({ ...order, status: statusToUpdate, notes: adminNotes, metadata: nextMetadata });
+
+    // Email + SMS when the status changed or a tracking number was added/changed.
+    if (statusChanged || (trackingChanged && trackingNumber)) {
+      const addr = order.shipping_address || {};
+      fetch('/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+        },
+        body: JSON.stringify({
+          type: 'order_status',
+          payload: {
+            email: order.email,
+            name: customerNameOf(order),
+            orderId: order.id,
+            orderNumber: order.order_number || order.id,
+            status: statusToUpdate,
+            trackingNumber,
+            phone: addr.phone || order.phone
+          }
+        })
+      }).catch(err => console.error('Notification error:', err));
+    }
+
+    setStatusUpdating(false);
+    setShowStatusMenu(false);
+    alert(`Order updated successfully${historyWarning}`);
+  };
+
+  const handleCancelFromAlert = () => {
+    if (!order || order.status === 'cancelled') return;
+    if (!confirm(`Cancel order ${order.order_number || order.id}? The customer will be notified.`)) return;
+    handleUpdateStatus('cancelled');
   };
 
   const [resendingNotification, setResendingNotification] = useState(false);
@@ -202,9 +311,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
       const authToken = session?.access_token;
 
       const shippingAddress = order.shipping_address || {};
-      const customerName = (shippingAddress.firstName && shippingAddress.lastName)
-        ? `${shippingAddress.firstName.trim()} ${shippingAddress.lastName.trim()}`
-        : shippingAddress.full_name || shippingAddress.firstName || order.email?.split('@')[0] || 'Customer';
+      const customerName = customerNameOf(order);
 
       const response = await fetch('/api/notifications', {
         method: 'POST',
@@ -240,15 +347,23 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
     }
   };
 
-  const statusOptions = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-  const statusLabel = (s: string) => s === 'shipped' ? 'Packaged' : s.charAt(0).toUpperCase() + s.slice(1);
-  const statusColors: any = {
+  const statusOptions = ['pending', 'awaiting_payment', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
+  const statusLabel = (s: string) => s === 'shipped' ? 'Packaged' : (s.charAt(0).toUpperCase() + s.slice(1)).replace(/_/g, ' ');
+  const statusColors: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-700 border-amber-200',
     'processing': 'bg-blue-100 text-blue-700 border-blue-200',
     'shipped': 'bg-purple-100 text-purple-700 border-purple-200',
     'delivered': 'bg-blue-100 text-blue-700 border-blue-200',
     'cancelled': 'bg-red-100 text-red-700 border-red-200',
-    'awaiting_payment': 'bg-gray-100 text-gray-700 border-gray-200'
+    'awaiting_payment': 'bg-gray-100 text-gray-700 border-gray-200',
+    'refunded': 'bg-gray-100 text-gray-700 border-gray-200'
+  };
+  const paymentColors: Record<string, string> = {
+    paid: 'bg-emerald-100 text-emerald-700',
+    pending: 'bg-amber-100 text-amber-700',
+    failed: 'bg-red-100 text-red-700',
+    refunded: 'bg-gray-100 text-gray-700',
+    partially_refunded: 'bg-gray-100 text-gray-700',
   };
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
@@ -256,24 +371,30 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
 
   const currentStatus = order.status || 'pending';
   const shippingAddress = order.shipping_address || {};
-  const customerName = (shippingAddress.firstName && shippingAddress.lastName)
-    ? `${shippingAddress.firstName.trim()} ${shippingAddress.lastName.trim()}`
-    : shippingAddress.full_name || shippingAddress.firstName || order.email?.split('@')[0] || 'Customer';
+  const customerName = customerNameOf(order);
 
-  // Derive timeline from status (simplified logic as we don't have full history table joined here yet)
+  // Timeline: fixed milestones, dated from order_status_history when it has them.
+  const reachedAt = (s: string) => history.find((h) => h.status === s)?.created_at;
+  const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString() : '');
+  const paymentVerifiedAt = order.metadata?.payment_verified_at as string | undefined;
   const timeline = [
-    { status: 'Order Placed', date: new Date(order.created_at).toLocaleString(), completed: true },
-    { status: 'Payment', date: order.payment_status, completed: order.payment_status === 'paid' },
-    { status: 'Processing', date: '', completed: ['processing', 'shipped', 'delivered'].includes(order.status) },
-    { status: 'Packaged', date: '', completed: ['shipped', 'delivered'].includes(order.status) },
-    { status: 'Delivered', date: '', completed: order.status === 'delivered' }
+    { status: 'Order Placed', date: fmt(order.created_at), completed: true },
+    {
+      status: 'Payment',
+      date: order.payment_status === 'paid' ? fmt(paymentVerifiedAt) || 'Paid' : (order.payment_status || 'pending').replace(/_/g, ' '),
+      completed: order.payment_status === 'paid'
+    },
+    { status: 'Processing', date: fmt(reachedAt('processing')), completed: ['processing', 'shipped', 'delivered'].includes(order.status) },
+    { status: 'Packaged', date: fmt(reachedAt('shipped')), completed: ['shipped', 'delivered'].includes(order.status) },
+    { status: 'Delivered', date: fmt(reachedAt('delivered')), completed: order.status === 'delivered' }
   ];
-
-  // Mock fraud analysis for now (or implement real logic later)
-  const fraudAnalysis: FraudAnalysis = {
-    riskLevel: 'low',
-    reasons: []
-  };
+  if (order.status === 'cancelled' || order.status === 'refunded') {
+    timeline.push({
+      status: order.status === 'cancelled' ? 'Cancelled' : 'Refunded',
+      date: fmt(reachedAt(order.status)) || order.cancel_reason || '',
+      completed: true
+    });
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -379,7 +500,11 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
               <FraudDetectionAlert
                 riskLevel={fraudAnalysis.riskLevel}
                 reasons={fraudAnalysis.reasons}
-                orderId={orderId}
+                orderId={order.order_number || orderId}
+                contactEmail={order.email}
+                contactPhone={shippingAddress.phone || order.phone}
+                onCancelOrder={order.status !== 'cancelled' ? handleCancelFromAlert : undefined}
+                cancelling={statusUpdating}
               />
             )}
 
@@ -393,9 +518,9 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                 {order.order_items?.map((item: any) => (
                   <div key={item.id} className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
                     <div className="w-20 h-20 bg-white rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center relative">
-                      {item.products?.product_images?.[0]?.url ? (
+                      {firstImage(item) ? (
                         <img
-                          src={item.products.product_images[0].url}
+                          src={firstImage(item) as string}
                           alt={item.product_name}
                           className="w-full h-full object-cover"
                         />
@@ -405,8 +530,8 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900 mb-1">{item.product_name}</h3>
-                      <p className="text-sm text-gray-600 mb-1">{item.variant_name}</p>
-                      <p className="text-xs text-gray-500">SKU: {item.sku}</p>
+                      {item.variant_name && <p className="text-sm text-gray-600 mb-1">{item.variant_name}</p>}
+                      {item.sku && <p className="text-xs text-gray-500">SKU: {item.sku}</p>}
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-gray-900 mb-1">GH₵ {money(item.unit_price)}</p>
@@ -429,7 +554,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                   <span>Tax</span>
                   <span>GH₵ {money(order.tax_total)}</span>
                 </div>
-                {order.discount_total > 0 && (
+                {Number(order.discount_total) > 0 && (
                   <div className="flex justify-between text-blue-700 font-semibold">
                     <span>Discount</span>
                     <span>-GH₵ {money(order.discount_total)}</span>
@@ -445,8 +570,8 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Order Timeline</h2>
               <div className="space-y-4">
-                {timeline.map((event, index) => (
-                  <div key={index} className="flex items-start space-x-4">
+                {timeline.map((event) => (
+                  <div key={event.status} className="flex items-start space-x-4">
                     <div className={`w-10 h-10 flex items-center justify-center rounded-full border-2 ${event.completed ? 'bg-blue-700 border-blue-700' : 'bg-white border-gray-300'
                       }`}>
                       {event.completed ? (
@@ -557,8 +682,8 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status</span>
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold whitespace-nowrap capitalize">
-                    {order.payment_status}
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap capitalize ${paymentColors[order.payment_status] || 'bg-gray-100 text-gray-700'}`}>
+                    {(order.payment_status || 'pending').replace(/_/g, ' ')}
                   </span>
                 </div>
                 <div className="flex justify-between">

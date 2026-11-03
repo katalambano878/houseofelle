@@ -10,9 +10,10 @@ export default function FAQsPage() {
   const categories = [
     { id: 'all', name: 'All Questions', icon: 'ri-question-line' },
     { id: 'orders', name: 'Orders', icon: 'ri-shopping-bag-line' },
-    { id: 'shipping', name: 'Shipping', icon: 'ri-truck-line' },
+    { id: 'shipping', name: 'Delivery', icon: 'ri-truck-line' },
     { id: 'returns', name: 'Returns', icon: 'ri-arrow-go-back-line' },
-    { id: 'payment', name: 'Payment', icon: 'ri-bank-card-line' },
+    { id: 'payment', name: 'Payment', icon: 'ri-smartphone-line' },
+    { id: 'products', name: 'Products & Wholesale', icon: 'ri-gift-line' },
     { id: 'account', name: 'Account', icon: 'ri-user-line' }
   ];
 
@@ -20,112 +21,107 @@ export default function FAQsPage() {
     {
       category: 'orders',
       question: 'How do I place an order?',
-      answer: 'Browse our products, add items to your cart, proceed to checkout, provide your delivery address, select payment method, and confirm your order. You\'ll receive an email confirmation with your order details and tracking number.'
+      answer: 'Browse our perfumes, body mists, scented candles and body care, add items to your cart and go to checkout. Enter your delivery details, then pay with Mobile Money. You\'ll see an order confirmation with your order number once your payment is confirmed.'
     },
     {
       category: 'orders',
-      question: 'Can I modify or cancel my order?',
-      answer: 'You can modify or cancel your order within 1 hour of placing it. Contact our customer service immediately via WhatsApp 0553347531 or Call 0553347531 or email support@houseofelle.com. Once an order is processed, modifications may not be possible.'
+      question: 'Can I change or cancel my order?',
+      answer: 'Contact us as soon as possible with your order number via WhatsApp or call 0553347531, or use our contact form. We\'ll do our best to help, but once an order has been packed or sent out, changes may not be possible.'
     },
     {
       category: 'orders',
       question: 'How do I track my order?',
-      answer: 'After your order ships, you\'ll receive a tracking number via email and SMS. Visit our Order Tracking page and enter your order number and email address to see real-time updates on your delivery status.'
+      answer: 'Visit our Order Tracking page and enter your order number and the email you used at checkout. If you have an account, you can also see your orders and their status under Account → Order History.'
     },
     {
       category: 'orders',
       question: 'What if I receive the wrong item?',
-      answer: 'We sincerely apologise if you receive the wrong item. Contact us within 48 hours with photos of the item received. We\'ll arrange for the correct item to be sent immediately and collect the wrong item at no cost to you.'
+      answer: 'We\'re sorry! Contact us as soon as possible, ideally with photos of the item you received, or report it on our Returns page. Please keep the item and its packaging and we\'ll arrange the next steps with you.'
     },
     {
       category: 'shipping',
-      question: 'What are your delivery times?',
-      answer: 'Standard delivery takes 2-5 business days within Ghana. Express delivery (next-day) is available for Accra and Kumasi. Orders placed before 2pm are dispatched same day. Remote areas may take 5-7 business days.'
+      question: 'Where do you deliver?',
+      answer: 'We deliver within Ghana from our shop at Spintex Lashibi, Shalom Spot Junction, Accra.'
     },
     {
       category: 'shipping',
-      question: 'How much does shipping cost?',
-      answer: 'Standard shipping costs GHS 20. Express delivery costs GHS 40. Orders over GHS 300 qualify for FREE standard shipping. Store pickup is also available from our Spintex Lashibi, Shalom Spot Junction location.'
+      question: 'How much does delivery cost and how long does it take?',
+      answer: 'Delivery fees depend on your location and are confirmed after you order — checkout does not charge a delivery fee. We\'ll contact you to confirm the fee and the expected delivery time before your order goes out.'
     },
     {
       category: 'shipping',
       question: 'Do you ship outside Ghana?',
-      answer: 'We currently serve customers within Ghana from our Spintex Lashibi location. We\'re working on expanding to neighbouring West African countries. Sign up for our newsletter to be notified when international shipping becomes available.'
+      answer: 'We currently serve customers within Ghana. If you are outside Ghana, contact us and we\'ll let you know what\'s possible.'
     },
     {
-      category: 'shipping',
-      question: 'What if nobody is home for delivery?',
-      answer: 'Our delivery partner will attempt delivery twice. If unsuccessful, the package will be held at the nearest collection point for 5 days. You\'ll receive SMS and email notifications with collection instructions.'
+      category: 'returns',
+      question: 'My perfume arrived damaged or leaking. What do I do?',
+      answer: 'Contact us as soon as possible. Go to our Returns page, enter your order number and email, choose the affected items and tell us what happened. Keep the bottle and packaging, and send photos if you can — we\'ll get back to you to sort it out.'
     },
     {
       category: 'returns',
       question: 'What is your return policy?',
-      answer: 'We offer a 14-day return policy for unused items in original packaging. Simply initiate a return from your account, print the return label, and ship it back. Refunds are processed within 5-7 business days after we receive the item.'
-    },
-    {
-      category: 'returns',
-      question: 'Which items cannot be returned?',
-      answer: 'For hygiene reasons, we cannot accept returns on opened cosmetics, intimate apparel, earrings, or perishable goods. Custom or personalised items are also non-returnable unless defective.'
-    },
-    {
-      category: 'returns',
-      question: 'Who pays for return shipping?',
-      answer: 'If you\'re returning due to a defect or our error, we cover return shipping. For change-of-mind returns, customers pay return shipping costs (GHS 15 standard rate). Free shipping on returns for defective items.'
-    },
-    {
-      category: 'returns',
-      question: 'Can I exchange an item instead of returning it?',
-      answer: 'Yes! If you need a different size or colour, select "Exchange" when initiating your return. We\'ll send the replacement as soon as we receive your original item. Exchange shipping is FREE.'
+      answer: 'If something is wrong with your order — damaged, leaking, wrong or missing items — contact us as soon as possible or report it on our Returns page and we\'ll review it with you. For any other return question, please get in touch before sending anything back.'
     },
     {
       category: 'payment',
       question: 'What payment methods do you accept?',
-      answer: 'We accept MOMO (Mobile Money), Instant Bank Transfer, Cash (in store only), and Visa Card payment. Please note we do not accept payment on delivery.'
+      answer: 'We accept Mobile Money. At checkout you\'re taken to Moolre\'s secure payment page to approve the payment. Prices are in Ghana cedis (GH₵). Payment must be completed before your order is sent out.'
     },
     {
       category: 'payment',
-      question: 'Is it safe to use my credit card on your site?',
-      answer: 'Absolutely. We use industry-standard SSL encryption and partner with Moolre for secure payment processing. We never store your full card details on our servers. All transactions are PCI-DSS compliant.'
+      question: 'Is it safe to pay on your site?',
+      answer: 'Yes. Our site uses an encrypted (HTTPS) connection and payments are processed by Moolre on their secure payment page, so we never see or store your Mobile Money PIN.'
     },
     {
       category: 'payment',
-      question: 'Can I pay in instalments?',
-      answer: 'Yes! We offer payment plans through our partners for purchases over GHS 500. Select "Pay in Instalments" at checkout to see available options. Approval is instant and no interest is charged.'
-    },
-    {
-      category: 'payment',
-      question: 'When will my payment be charged?',
-      answer: 'For card and mobile money payments, you\'re charged immediately. We do not accept payment on delivery — payment must be completed before dispatch. If an item is out of stock, we\'ll refund you within 24 hours.'
+      question: 'My payment didn\'t go through. What should I do?',
+      answer: 'Check that you approved the prompt and have enough balance, then try again. If money left your wallet but your order still shows as awaiting payment, contact us with your order number and we\'ll check it for you.'
     },
     {
       category: 'payment',
       question: 'How do refunds work?',
-      answer: 'Refunds are processed to your original payment method within 5-7 business days after we receive and inspect your return. For mobile money refunds, ensure you provide correct details. You\'ll receive confirmation via email.'
+      answer: 'If we agree a refund with you — for example when an item is out of stock or arrived damaged — we\'ll confirm the amount and how you\'ll receive it. Contact us if you have a question about a refund.'
+    },
+    {
+      category: 'products',
+      question: 'What do you sell?',
+      answer: 'House of Elle is a fragrance and body care destination: curated perfumes, body mists, scented candles and body care products, available for retail and wholesale.'
+    },
+    {
+      category: 'products',
+      question: 'Do you sell wholesale?',
+      answer: 'Yes. Where a minimum order quantity applies, it\'s shown on the product page. For bulk orders or business enquiries, contact us and tell us what you need.'
+    },
+    {
+      category: 'products',
+      question: 'How should I store my perfume?',
+      answer: 'Keep bottles in a cool, dry place away from direct sunlight, avoid hot cars and steamy bathrooms, and close the cap tightly after use. This helps your fragrance last longer.'
+    },
+    {
+      category: 'products',
+      question: 'Can you help me choose a fragrance or a gift?',
+      answer: 'Of course. Message us on WhatsApp or use our contact form, tell us the scents you like or who the gift is for, and we\'ll suggest options.'
     },
     {
       category: 'account',
       question: 'Do I need an account to place an order?',
-      answer: 'No, you can checkout as a guest. However, creating an account lets you track orders, save addresses, view purchase history, manage your wishlist, and receive exclusive offers. It only takes 30 seconds to sign up.'
+      answer: 'No, you can check out as a guest. An account lets you see your order history, save delivery addresses, keep a wishlist and track your support requests.'
     },
     {
       category: 'account',
       question: 'How do I reset my password?',
-      answer: 'Click "Forgot Password" on the login page, enter your email address, and we\'ll send you a reset link. The link is valid for 1 hour. If you don\'t receive it, check your spam folder or contact support.'
+      answer: 'Select "Forgot Password" on the login page and enter your email address. We\'ll email you a link to choose a new password. If you don\'t receive it, check your spam folder or contact us.'
     },
     {
       category: 'account',
-      question: 'Can I have multiple delivery addresses?',
-      answer: 'Yes! You can save multiple delivery addresses in your account. During checkout, simply select the address you want to use or add a new one. This is perfect for sending gifts or alternating between work and home.'
+      question: 'Can I save more than one delivery address?',
+      answer: 'Yes. Go to Account → Addresses to add, edit or delete saved addresses and choose your default.'
     },
     {
       category: 'account',
       question: 'How do I update my account information?',
-      answer: 'Log in to your account and go to "Account Settings". You can update your name, email, phone number, password, and saved addresses. Changes are saved instantly and you\'ll receive a confirmation email.'
-    },
-    {
-      category: 'account',
-      question: 'What are loyalty points and how do they work?',
-      answer: 'Earn 1 point for every GHS 10 spent. 100 points = GHS 10 discount on your next purchase. Points are automatically added to your account after each order. Check your points balance in your account dashboard.'
+      answer: 'Sign in and open your Account. On the Profile tab you can update your name and phone number and change your password. Your sign-in email can\'t be changed there — contact us if you need help with it.'
     }
   ];
 
@@ -146,7 +142,7 @@ export default function FAQsPage() {
               Frequently Asked Questions
             </h1>
             <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-              Find quick answers to common questions about ordering, shipping, returns, payments, and more.
+              Find quick answers about ordering, delivery, payment, our fragrances and more.
             </p>
 
             <div className="relative">
@@ -254,7 +250,7 @@ export default function FAQsPage() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Shipping Policy</h3>
             <p className="text-gray-600 leading-relaxed">
-              Learn about delivery times, costs, and tracking your orders
+              How delivery works and how to track your orders
             </p>
           </Link>
 
@@ -262,9 +258,9 @@ export default function FAQsPage() {
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
               <i className="ri-arrow-go-back-line text-2xl text-blue-700"></i>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Returns Policy</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Returns</h3>
             <p className="text-gray-600 leading-relaxed">
-              Understand our return process, timeframes, and refund policy
+              Report a damaged, leaking or wrong item from your order
             </p>
           </Link>
 

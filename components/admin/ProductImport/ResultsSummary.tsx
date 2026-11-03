@@ -26,11 +26,18 @@ interface ResultsSummaryProps {
   onImportMore: () => void;
 }
 
+// Quote every field; neutralise values a spreadsheet would treat as a formula.
+function csvCell(value: unknown): string {
+  let text = value == null ? '' : String(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
 export default function ResultsSummary({ summary, errors, warnings, onImportMore }: ResultsSummaryProps) {
   const errorCsv =
     errors.length > 0
-      ? 'Row,Field,Message\n' +
-        errors.map((e) => `${e.row},${e.field},${(e.message ?? '').replace(/"/g, '""')}`).join('\n')
+      ? ['Row', 'Field', 'Message'].map(csvCell).join(',') + '\n' +
+        errors.map((e) => [e.row, e.field, e.message].map(csvCell).join(',')).join('\n')
       : '';
 
   return (

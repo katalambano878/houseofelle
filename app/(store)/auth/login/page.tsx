@@ -1,18 +1,29 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useRecaptcha } from '@/hooks/useRecaptcha';
+
+/** Only same-site paths ("/account", not "//evil.com" or "https://…") are allowed. */
+function safeRedirect(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return '/account';
+  return value;
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    rememberMe: false
+    password: ''
   });
+  const [redirectTo, setRedirectTo] = useState('/account');
+
+  useEffect(() => {
+    // Read on the client to avoid a Suspense boundary for useSearchParams.
+    setRedirectTo(safeRedirect(new URLSearchParams(window.location.search).get('redirect')));
+  }, []);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +72,7 @@ export default function LoginPage() {
       }
 
       if (data.session) {
-        router.push('/account');
+        router.push(redirectTo);
         router.refresh(); // Refresh to update auth state in other components
       }
     } catch (error: any) {
@@ -131,16 +142,7 @@ export default function LoginPage() {
               )}
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.rememberMe}
-                  onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">Remember me</span>
-              </label>
+            <div className="flex items-center justify-end">
               <Link href="/auth/forgot-password" className="text-sm text-blue-700 hover:text-blue-900 font-medium whitespace-nowrap">
                 Forgot password?
               </Link>
@@ -159,37 +161,9 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <button
-                disabled
-                className="flex items-center justify-center space-x-2 border-2 border-gray-200 bg-gray-50 py-3 rounded-lg cursor-not-allowed opacity-60"
-              >
-                <i className="ri-google-fill text-xl text-red-600 grayscale opacity-50"></i>
-                <span className="font-medium text-gray-400">Google</span>
-              </button>
-              <button
-                disabled
-                className="flex items-center justify-center space-x-2 border-2 border-gray-200 bg-gray-50 py-3 rounded-lg cursor-not-allowed opacity-60"
-              >
-                <i className="ri-facebook-fill text-xl text-blue-600 grayscale opacity-50"></i>
-                <span className="font-medium text-gray-400">Facebook</span>
-              </button>
-            </div>
-          </div>
-
           <p className="mt-8 text-center text-gray-600">
-            Don't have an account?{' '}
-            <Link href="/auth/signup" className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
+            Don&apos;t have an account?{' '}
+            <Link href={redirectTo === '/account' ? '/auth/signup' : `/auth/signup?redirect=${encodeURIComponent(redirectTo)}`} className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
               Create one now
             </Link>
           </p>

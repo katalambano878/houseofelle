@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/auth';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { extractFromZip } from '@/lib/import/zip-extractor';
-import { parseCSV, type ValidationWarning } from '@/lib/import/csv-parser';
+import { parseCSV, type ValidationError, type ValidationWarning } from '@/lib/import/csv-parser';
 import { uploadProductImages, collectReferencedImageNames } from '@/lib/import/image-processor';
 import {
   buildCategoryLookup,
@@ -155,12 +155,20 @@ export async function POST(request: Request) {
         message: 'Uploading images...',
       });
 
-      const imageUrlMap = await uploadProductImages(
-        images,
-        referencedNames,
-        prefix,
-        (p) => send('progress', { phase: 'uploading_images', ...p })
-      );
+      let imageUrlMap: Awaited<ReturnType<typeof uploadProductImages>>;
+      try {
+        imageUrlMap = await uploadProductImages(
+          images,
+          referencedNames,
+          prefix,
+          (p) => send('progress', { phase: 'uploading_images', ...p })
+        );
+      } catch (err: any) {
+        console.error('Product import: image upload failed', err);
+        send('error', { message: `Image upload failed: ${err?.message || 'unknown error'}. No products were created.` });
+        controller.close();
+        return;
+      }
 
       send('progress', {
         phase: 'creating_products',
@@ -170,24 +178,39 @@ export async function POST(request: Request) {
       });
 
       const results: CreateProductResult[] = [];
-      const { created, variants, errors: createErrors, skipped } = await createProductsFromRows(
-        validRows,
-        imageUrlMap,
-        categoryLookup,
-        existingNames,
-        existingIdsByName,
-        updateExisting,
-        (r) => {
-          results.push(r);
-          send('product', {
-            row: r.rowIndex,
-            name: r.name,
-            status: r.status,
-            error: r.error,
-            skipped: r.skipped,
-          });
-        }
-      );
+      let creation: Awaited<ReturnType<typeof createProductsFromRows>>;
+      try {
+        creation = await createProductsFromRows(
+          validRows,
+          imageUrlMap,
+          categoryLookup,
+          existingNames,
+          existingIdsByName,
+          updateExisting,
+          (r) => {
+            results.push(r);
+            send('product', {
+              row: r.rowIndex,
+              name: r.name,
+              status: r.status,
+              error: r.error,
+              skipped: r.skipped,
+            });
+          }
+        );
+      } catch (err: any) {
+        console.error('Product import: product creation failed', err);
+        const done = results.filter((r) => r.status === 'success').length;
+        send('error', {
+          message: `Creating products failed: ${err?.message || 'unknown error'}. ${done} product(s) were saved before the failure.`,
+        });
+        controller.close();
+        return;
+      }
+      const { created, variants, errors: createErrors, skipped } = creation;
+      const creationErrors: ValidationError[] = results
+        .filter((r) => r.status === 'error')
+        .map((r) => ({ row: r.rowIndex, field: 'product', message: `${r.name ? `${r.name}: ` : ''}${r.error || 'Could not be saved'}` }));
 
       const categoryWarnings: ValidationWarning[] = [];
       for (const row of validRows) {
@@ -214,7 +237,7 @@ export async function POST(request: Request) {
           skipped,
           duration,
         },
-        errors: validationErrors,
+        errors: [...validationErrors, ...creationErrors],
         warnings: allWarnings,
       });
 

@@ -62,13 +62,7 @@ export default function PWAPrompt() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-gray-900 text-lg truncate">House of Elle</h3>
-                <p className="text-sm text-gray-500">example.com</p>
-                <div className="flex items-center gap-1 mt-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <i key={star} className="ri-star-fill text-amber-400 text-xs" />
-                  ))}
-                  <span className="text-xs text-gray-400 ml-1">Shopping</span>
-                </div>
+                <p className="text-sm text-gray-500">Fragrance &amp; body care · Accra</p>
               </div>
             </div>
 

@@ -9,6 +9,7 @@ export type CartItem = {
     image: string;
     quantity: number;
     variant?: string;
+    variantId?: string; // product_variants.id, so checkout can price the exact option
     slug: string;
     maxStock: number;
     moq?: number; // Minimum Order Quantity
@@ -77,61 +78,63 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
     }, [cart, isInitialized]);
 
+    // A missing or zero maxStock means "no known cap" (e.g. products that keep selling when out of stock).
+    const stockCap = (item: CartItem) => (item.maxStock && item.maxStock > 0 ? item.maxStock : Infinity);
+    const sameLine = (item: CartItem, id: string, variant?: string) =>
+        item.id === id && (item.variant || '') === (variant || '');
+
+    // Write through immediately so a navigation right after adding (Buy Now) sees the item.
+    const persist = (next: CartItem[]) => {
+        try { localStorage.setItem('cart', JSON.stringify(next)); } catch {}
+        return next;
+    };
+
     const addToCart = (newItem: CartItem) => {
         setCart((prevCart) => {
-            const existingItemIndex = prevCart.findIndex(
-                (item) => item.id === newItem.id && item.variant === newItem.variant
-            );
+            const existingItemIndex = prevCart.findIndex((item) => sameLine(item, newItem.id, newItem.variant));
+            const minQty = newItem.moq || 1;
 
             if (existingItemIndex > -1) {
                 const newCart = [...prevCart];
                 const existingItem = newCart[existingItemIndex];
-                // Ensure we don't exceed max stock
-                const newQuantity = Math.min(
-                    existingItem.quantity + newItem.quantity,
-                    existingItem.maxStock
-                );
-                newCart[existingItemIndex] = { ...existingItem, quantity: newQuantity };
-                return newCart;
-            } else {
-                return [...prevCart, newItem];
+                const newQuantity = Math.min(existingItem.quantity + newItem.quantity, stockCap(existingItem));
+                newCart[existingItemIndex] = { ...existingItem, quantity: Math.max(newQuantity, minQty) };
+                return persist(newCart);
             }
+            const quantity = Math.min(Math.max(newItem.quantity || minQty, minQty), stockCap(newItem));
+            return persist([...prevCart, { ...newItem, quantity }]);
         });
 
         setIsCartOpen(true); // Open cart when item is added
     };
 
     const removeFromCart = (itemId: string, variant?: string) => {
-        setCart((prevCart) =>
-            prevCart.filter((item) => !(item.id === itemId && item.variant === variant))
-        );
+        setCart((prevCart) => persist(prevCart.filter((item) => !sameLine(item, itemId, variant))));
     };
 
     const updateQuantity = (itemId: string, quantity: number, variant?: string) => {
         setCart((prevCart) => {
-            const item = prevCart.find(i => i.id === itemId && i.variant === variant);
+            const item = prevCart.find(i => sameLine(i, itemId, variant));
             if (!item) return prevCart;
 
             const minQty = item.moq || 1;
-            
+
             // If trying to reduce below MOQ, remove the item
             if (quantity < minQty) {
-                return prevCart.filter(i => !(i.id === itemId && i.variant === variant));
+                return persist(prevCart.filter(i => !sameLine(i, itemId, variant)));
             }
 
             // Clamp quantity between MOQ and maxStock
-            const clampedQty = Math.min(Math.max(quantity, minQty), item.maxStock);
+            const clampedQty = Math.min(Math.max(quantity, minQty), stockCap(item));
 
-            return prevCart.map((i) =>
-                i.id === itemId && i.variant === variant
-                    ? { ...i, quantity: clampedQty }
-                    : i
-            );
+            return persist(prevCart.map((i) => (sameLine(i, itemId, variant) ? { ...i, quantity: clampedQty } : i)));
         });
     };
 
     const clearCart = () => {
-        setCart([]);
+        // Persist now: checkout clears the cart and immediately leaves for the payment page.
+        setCart(persist([]));
+        try { localStorage.removeItem('appliedCoupon'); } catch {}
     };
 
     const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);

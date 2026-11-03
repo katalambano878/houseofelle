@@ -1,11 +1,33 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useCMS } from '@/context/CMSContext';
 import { supabase } from '@/lib/supabase';
 import PageHero from '@/components/PageHero';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useRecaptcha } from '@/hooks/useRecaptcha';
+
+const MAP_QUERY = 'Spintex%20Lashibi%20Shalom%20Spot%20Junction%20Accra';
+
+/** Prefills subject/message from ?subject= and ?order= (e.g. "Get Help" on an order). */
+function ContactPrefill({ onPrefill }: { onPrefill: (subject: string, message: string) => void }) {
+  const searchParams = useSearchParams();
+  const subject = (searchParams.get('subject') || '').slice(0, 150);
+  const order = (searchParams.get('order') || '').slice(0, 40);
+
+  useEffect(() => {
+    if (!subject && !order) return;
+    onPrefill(
+      subject || (order ? `Order ${order}` : ''),
+      order ? `Order number: ${order}\n\n` : ''
+    );
+    // Run once per distinct query; onPrefill is a stable state updater wrapper.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, order]);
+
+  return null;
+}
 
 export default function ContactPage() {
   usePageTitle('Contact Us');
@@ -20,7 +42,15 @@ export default function ContactPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const { getToken, verifying } = useRecaptcha();
+  const { getRawToken, verifying } = useRecaptcha();
+
+  const applyPrefill = (subject: string, message: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      subject: prev.subject || subject,
+      message: prev.message || message,
+    }));
+  };
 
   useEffect(() => {
     async function fetchContactContent() {
@@ -44,8 +74,8 @@ export default function ContactPage() {
     setSubmitStatus('idle');
 
     // reCAPTCHA verification
-    const isHuman = await getToken('contact');
-    if (!isHuman) {
+    const recaptchaToken = await getRawToken('contact');
+    if (recaptchaToken === null) {
       setSubmitStatus('error');
       setIsSubmitting(false);
       return;
@@ -68,15 +98,17 @@ export default function ContactPage() {
         console.log('Note: contact_submissions table may not exist');
       }
 
-      // Send Contact Notification
-      fetch('/api/notifications', {
+      // Send Contact Notification (the server checks the reCAPTCHA token)
+      const res = await fetch('/api/notifications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'contact',
+          recaptchaToken,
           payload: formData
         })
-      }).catch(err => console.error('Contact notification error:', err));
+      });
+      if (!res.ok && error) throw new Error('Message not delivered');
 
       setSubmitStatus('success');
       setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
@@ -128,7 +160,7 @@ export default function ContactPage() {
       icon: 'ri-map-pin-line',
       title: 'Visit Us',
       value: contactAddress,
-      link: 'https://maps.google.com',
+      link: `https://www.google.com/maps?q=${MAP_QUERY}`,
       description: 'Spintex Lashibi, Shalom Spot Junction, Accra, Ghana'
     }
   ];
@@ -150,6 +182,9 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      <Suspense fallback={null}>
+        <ContactPrefill onPrefill={applyPrefill} />
+      </Suspense>
       <PageHero
         eyebrow="Get In Touch"
         title="Contact House of Elle"
@@ -214,7 +249,7 @@ export default function ContactPage() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="john@example.com"
+                  placeholder="you@example.com"
                 />
               </div>
 
@@ -337,7 +372,7 @@ export default function ContactPage() {
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Visit Our Store</h2>
             <p className="text-gray-600 mb-6 leading-relaxed">
-              Prefer to shop in person? Visit House of Elle at Spintex Lashibi, Shalom Spot Junction, Accra, Ghana. We help customers searching for premium fashion and lifestyle picks near me in Accra.
+              Prefer to shop in person? Visit House of Elle at Spintex Lashibi, Shalom Spot Junction, Accra, Ghana. Come and try our perfumes, body mists and candles in person, or ask us about wholesale.
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-gray-600">
               <div className="flex items-center gap-2">
@@ -352,7 +387,7 @@ export default function ContactPage() {
             <div className="mt-8 rounded-2xl overflow-hidden border border-brand-gold/20 shadow-md">
               <iframe
                 title="House of Elle Location - Spintex Lashibi, Accra"
-                src="https://www.google.com/maps?q=Spintex%20Lashibi%20Shalom%20Spot%20Junction%20Accra&output=embed"
+                src={`https://www.google.com/maps?q=${MAP_QUERY}&output=embed`}
                 width="100%"
                 height="320"
                 loading="lazy"

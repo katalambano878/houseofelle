@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import PageHero from '@/components/PageHero';
 
 export const revalidate = 0; // Ensure fresh data on every visit
@@ -22,7 +22,7 @@ export default async function CategoriesPage() {
   const palette = [
     { color: 'from-blue-500 to-blue-700', icon: 'ri-store-2-line' },
     { color: 'from-blue-500 to-blue-700', icon: 'ri-shopping-bag-3-line' },
-    { color: 'from-purple-500 to-purple-700', icon: 'ri-t-shirt-line' },
+    { color: 'from-purple-500 to-purple-700', icon: 'ri-drop-line' },
     { color: 'from-amber-500 to-amber-700', icon: 'ri-home-smile-line' },
     { color: 'from-rose-500 to-rose-700', icon: 'ri-heart-line' },
     { color: 'from-indigo-500 to-indigo-700', icon: 'ri-star-smile-line' },
@@ -32,7 +32,7 @@ export default async function CategoriesPage() {
     const style = palette[i % palette.length];
     return {
       ...c,
-      image: c.image_url || 'https://via.placeholder.com/600x400?text=Category',
+      image: c.image_url || '/placeholder-product.svg',
       color: style.color,
       icon: style.icon,
       // Optional: Fetch product count if needed, currently skipping for performance/simplicity

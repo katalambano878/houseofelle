@@ -371,7 +371,7 @@ export default function Home() {
           </AnimatedGrid>
           {homepageCategories.length === 0 && (
             <div className="mt-8 rounded-2xl border border-brand-gold/25 bg-white/60 p-8 text-center text-brand-brown">
-              No categories available yet. Add categories in admin and mark them as featured to show here.
+              New collections are on the way. <Link href="/shop" className="font-semibold underline underline-offset-4">Browse the shop</Link> in the meantime.
             </div>
           )}
         </div>
@@ -423,8 +423,8 @@ export default function Home() {
                     name={product.name}
                     price={product.price}
                     originalPrice={product.compare_at_price}
-                    image={product.product_images?.[0]?.url || 'https://via.placeholder.com/400x500'}
-                    rating={product.rating_avg || 5}
+                    image={[...(product.product_images || [])].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))[0]?.url || '/placeholder-product.svg'}
+                    rating={product.rating_avg || 0}
                     reviewCount={product.review_count || 0}
                     badge={product.featured ? 'Featured' : undefined}
                     inStock={effectiveStock > 0}

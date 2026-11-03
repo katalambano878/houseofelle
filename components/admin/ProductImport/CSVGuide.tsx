@@ -27,13 +27,14 @@ export default function CSVGuide() {
             low_stock_threshold, preorder_shipping, images (semicolon-separated filenames in images/ folder).
           </p>
           <p>
-            <strong>Variants (Color × Size):</strong> Repeat the product on multiple rows with the same name and set
-            variant_color, variant_color_hex (e.g. #000000), variant_size (e.g. S, M, L), variant_price, variant_stock.
-            Preset colors (Black, White, Red, Navy, etc.) get hex auto-filled if variant_color_hex is omitted.
+            <strong>Variants (Scent / Colour × Size):</strong> Repeat the product on multiple rows with the same name and set
+            variant_color (the scent or colour, e.g. Vanilla, Rose, Oud), variant_color_hex (optional swatch, e.g. #F3E5AB),
+            variant_size (e.g. 50ml, 100ml, Gift Set), variant_price, variant_stock.
+            Common colour names (e.g. Black, White, Red) get a swatch colour auto-filled if variant_color_hex is omitted.
           </p>
           <p>
             <strong>ZIP structure:</strong> Place products.csv at the root and put images in an images/ folder.
-            Reference filenames in the images column (e.g. front.jpg;side.jpg).
+            Reference filenames in the images column (e.g. bottle.jpg;box.jpg). Images can be JPG, PNG, WebP, GIF or AVIF.
           </p>
         </div>
       )}

@@ -4,6 +4,7 @@ import { verifyAuth } from '@/lib/auth';
 import { escapeHtml } from '@/lib/sanitize';
 import { sendOrderConfirmation, sendOrderStatusUpdate, sendWelcomeMessage, sendContactMessage, sendPaymentLink, sendEmail, sendSMS, emailLayout } from '@/lib/notifications';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
+import { verifyRecaptcha } from '@/lib/recaptcha';
 
 export async function POST(request: Request) {
     try {
@@ -37,13 +38,17 @@ export async function POST(request: Request) {
         // 'order_created' requires a valid order to exist (verified below)
         // 'contact' is public but rate-limited
         // ============================================================
-        const adminOnlyTypes = ['campaign', 'order_updated', 'order_status', 'payment_link', 'welcome'];
+        const adminOnlyTypes = ['campaign', 'order_updated', 'order_status', 'payment_link'];
         const requiresAdminAuth = adminOnlyTypes.includes(type);
 
         if (requiresAdminAuth) {
             const auth = await verifyAuth(request, { requireAdmin: true });
             if (!auth.authenticated) {
                 return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+            }
+            // Mass messages cost money and speak for the store, so only the owner may send them.
+            if (type === 'campaign' && auth.role !== 'admin') {
+                return NextResponse.json({ error: 'Only the store owner can send campaigns.' }, { status: 403 });
             }
         }
 
@@ -56,11 +61,15 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Missing order identifier' }, { status: 400 });
             }
 
-            const orderRef = payload.order_number || payload.id;
+            const orderRef = String(payload.order_number || payload.id);
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderRef);
+            if (!isUuid && !/^ORD-\d+-\d+$/.test(orderRef)) {
+                return NextResponse.json({ error: 'Invalid order identifier' }, { status: 400 });
+            }
             const { data: order, error: orderError } = await supabaseAdmin
                 .from('orders')
-                .select('id, order_number, created_at')
-                .or(`order_number.eq.${orderRef},id.eq.${orderRef}`)
+                .select('id, order_number, email, phone, total, shipping_address, metadata, created_at, payment_method')
+                .eq(isUuid ? 'id' : 'order_number', orderRef)
                 .single();
 
             if (orderError || !order) {
@@ -73,7 +82,15 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Order confirmation can only be sent for recent orders' }, { status: 400 });
             }
 
-            await sendOrderConfirmation(payload);
+            // Send once per order, using the saved order (never caller-supplied contact details or text).
+            if (order.metadata?.confirmation_sent_at) {
+                return NextResponse.json({ success: true, message: 'Order confirmation already sent' });
+            }
+            await supabaseAdmin
+                .from('orders')
+                .update({ metadata: { ...(order.metadata || {}), confirmation_sent_at: new Date().toISOString() } })
+                .eq('id', order.id);
+            await sendOrderConfirmation(order);
             return NextResponse.json({ success: true, message: 'Order confirmation sent' });
         }
 
@@ -121,7 +138,26 @@ export async function POST(request: Request) {
             if (!payload.email) {
                 return NextResponse.json({ error: 'Missing email' }, { status: 400 });
             }
-            await sendWelcomeMessage(payload);
+            // A new customer may trigger their own welcome; staff may send any.
+            const auth = await verifyAuth(request);
+            if (!auth.authenticated || !auth.user) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            }
+            const ownEmail = String(auth.user.email || '').toLowerCase();
+            const isOwnNewAccount =
+                ownEmail === String(payload.email).toLowerCase() &&
+                Date.now() - new Date(auth.user.created_at).getTime() < 15 * 60 * 1000;
+            if (!isOwnNewAccount) {
+                const staff = await verifyAuth(request, { requireAdmin: true });
+                if (!staff.authenticated) {
+                    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+                }
+            }
+            await sendWelcomeMessage({
+                email: String(payload.email),
+                firstName: String(payload.firstName || '').slice(0, 60),
+                phone: typeof payload.phone === 'string' ? payload.phone : undefined,
+            });
             return NextResponse.json({ success: true, message: 'Welcome message sent' });
         }
 
@@ -130,7 +166,7 @@ export async function POST(request: Request) {
         // ============================================================
         if (type === 'contact') {
             const { name, email, subject, message } = payload;
-            if (!name || !email || !subject || !message) {
+            if (![name, email, subject, message].every((v) => typeof v === 'string' && v.trim())) {
                 return NextResponse.json({ error: 'All contact fields required' }, { status: 400 });
             }
             // Basic email format check
@@ -141,15 +177,34 @@ export async function POST(request: Request) {
             if (name.length > 100 || subject.length > 200 || message.length > 5000) {
                 return NextResponse.json({ error: 'Input too long' }, { status: 400 });
             }
+            const captcha = await verifyRecaptcha(String(body.recaptchaToken || ''), 'contact');
+            if (!captcha.success) {
+                return NextResponse.json({ error: 'Security check failed' }, { status: 403 });
+            }
+            const perHour = checkRateLimit(`contact:${clientId}`, { maxRequests: 5, windowSeconds: 3600 });
+            if (!perHour.success) {
+                return NextResponse.json({ error: 'Too many messages. Please try again later.' }, { status: 429 });
+            }
             await sendContactMessage(payload);
             return NextResponse.json({ success: true, message: 'Contact message sent' });
         }
 
         if (type === 'payment_link') {
-            if (!payload.id || !payload.order_number) {
+            if (!payload.id || typeof payload.id !== 'string') {
                 return NextResponse.json({ error: 'Missing order details' }, { status: 400 });
             }
-            await sendPaymentLink(payload);
+            const { data: order } = await supabaseAdmin
+                .from('orders')
+                .select('id, order_number, email, phone, total, shipping_address, metadata, payment_status')
+                .eq('id', payload.id)
+                .maybeSingle();
+            if (!order) {
+                return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+            }
+            if (order.payment_status === 'paid') {
+                return NextResponse.json({ error: 'This order is already paid' }, { status: 400 });
+            }
+            await sendPaymentLink(order);
             return NextResponse.json({ success: true, message: 'Payment link sent' });
         }
 

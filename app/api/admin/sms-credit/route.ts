@@ -12,6 +12,10 @@ async function requireAdmin(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
+  // Buying credit spends the store's money, so it is owner (admin) only.
+  if (auth.role !== 'admin') {
+    return NextResponse.json({ error: 'Only the store owner can buy SMS credit.' }, { status: 403 });
+  }
   return null;
 }
 

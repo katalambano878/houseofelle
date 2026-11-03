@@ -59,5 +59,23 @@ export function useRecaptcha() {
         }
     }, []);
 
-    return { getToken, verifying, error, clearError: () => setError(null) };
+    /**
+     * Returns an unverified token for an API route that checks it itself
+     * (tokens can only be verified once). '' means reCAPTCHA is not set up;
+     * null means it is set up but failed.
+     */
+    const getRawToken = useCallback(async (action: string): Promise<string | null> => {
+        setError(null);
+        if (!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) return '';
+        setVerifying(true);
+        try {
+            const token = await executeRecaptcha(action);
+            if (!token) setError('Could not get reCAPTCHA token. Please try again.');
+            return token;
+        } finally {
+            setVerifying(false);
+        }
+    }, []);
+
+    return { getToken, getRawToken, verifying, error, clearError: () => setError(null) };
 }

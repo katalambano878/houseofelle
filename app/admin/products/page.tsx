@@ -2,16 +2,63 @@
 import { money } from '@/lib/format-money';
 
 import Link from 'next/link';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { generateProductCatalogPdf } from '@/lib/admin/product-catalog-pdf';
 
+const lowStockThreshold = (p: any) => {
+  const t = Number(p?.metadata?.low_stock_threshold);
+  return Number.isFinite(t) && p?.metadata?.low_stock_threshold != null ? t : 5;
+};
+
+/** Deletes a product and its dependent rows. Returns an error message, or null on success. */
+async function deleteProductCascade(productId: string): Promise<string | null> {
+  const check = (res: { error: any }, step: string) => {
+    if (res.error) throw new Error(`${step}: ${res.error.message || 'failed'}`);
+  };
+  try {
+    // Unlink from order_items so we can delete (order history keeps product_name/sku/price)
+    check(await supabase.from('order_items').update({ product_id: null, variant_id: null }).eq('product_id', productId), 'Unlinking orders');
+    // Delete in dependency order: review_images → reviews → cart_items → wishlist_items → product_images → product_variants → products
+    const reviewsRes = await supabase.from('reviews').select('id').eq('product_id', productId);
+    check(reviewsRes, 'Loading reviews');
+    const reviewIds = (reviewsRes.data || []).map((r: any) => r.id);
+    if (reviewIds.length) {
+      check(await supabase.from('review_images').delete().in('review_id', reviewIds), 'Deleting review images');
+      check(await supabase.from('reviews').delete().eq('product_id', productId), 'Deleting reviews');
+    }
+    check(await supabase.from('cart_items').delete().eq('product_id', productId), 'Removing from carts');
+    check(await supabase.from('wishlist_items').delete().eq('product_id', productId), 'Removing from wishlists');
+    check(await supabase.from('product_images').delete().eq('product_id', productId), 'Deleting images');
+    check(await supabase.from('product_variants').delete().eq('product_id', productId), 'Deleting variants');
+    check(await supabase.from('products').delete().eq('id', productId), 'Deleting product');
+    return null;
+  } catch (err: any) {
+    return err?.message || 'Unknown error';
+  }
+}
+
 export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center text-gray-500">Loading products...</div>}>
+      <ProductsPageContent />
+    </Suspense>
+  );
+}
+
+function ProductsPageContent() {
+  const searchParams = useSearchParams();
+  const [stockFilter, setStockFilter] = useState<'' | 'low-stock'>(
+    searchParams.get('filter') === 'low-stock' ? 'low-stock' : ''
+  );
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(searchParams.get('filter') === 'low-stock');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<any[]>([]);
@@ -45,7 +92,7 @@ export default function ProductsPage() {
         .select(`
           *,
           categories(name),
-          product_variants(count),
+          product_variants(id),
           product_images(url, position)
         `);
 
@@ -68,7 +115,7 @@ export default function ProductsPage() {
           image: p.product_images?.find((img: any) => img.position === 0)?.url
             || p.product_images?.[0]?.url
             || '/house-of-elle-logo.png',
-          variantsCount: p.product_variants?.[0]?.count || 0,
+          variantsCount: p.product_variants?.length || 0,
           stock: p.quantity,
           sales: 0, // Placeholder for now
           rating: p.rating_avg || 0
@@ -79,7 +126,7 @@ export default function ProductsPage() {
         // Calculate stats locally for now (better to do count queries in production)
         setStats({
           total: transformedProducts.length,
-          lowStock: transformedProducts.filter(p => p.quantity < (p.metadata?.low_stock_threshold || 5) && p.quantity > 0).length,
+          lowStock: transformedProducts.filter(p => p.quantity <= lowStockThreshold(p) && p.quantity > 0).length,
           outOfStock: transformedProducts.filter(p => p.quantity === 0).length,
           active: transformedProducts.filter(p => p.status === 'active').length
         });
@@ -97,10 +144,12 @@ export default function ProductsPage() {
   }, [fetchProducts, fetchCategories]);
 
   const handleSelectAll = () => {
-    if (selectedProducts.length === products.length) {
-      setSelectedProducts([]);
+    const visibleIds = filteredProducts.map((p) => p.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedProducts.includes(id));
+    if (allVisibleSelected) {
+      setSelectedProducts(selectedProducts.filter((id) => !visibleIds.includes(id)));
     } else {
-      setSelectedProducts(products.map(p => p.id));
+      setSelectedProducts(Array.from(new Set([...selectedProducts, ...visibleIds])));
     }
   };
 
@@ -114,63 +163,47 @@ export default function ProductsPage() {
 
   const handleDeleteProduct = async (productId: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
-    try {
-      // Unlink from order_items so we can delete (order history keeps product_name/sku/price)
-      await supabase.from('order_items').update({ product_id: null, variant_id: null }).eq('product_id', productId);
-      // Delete in dependency order: review_images → reviews → cart_items → wishlist_items → product_images → product_variants → products
-      const { data: reviewIds } = await supabase.from('reviews').select('id').eq('product_id', productId);
-      if (reviewIds?.length) {
-        const ids = reviewIds.map((r) => r.id);
-        await supabase.from('review_images').delete().in('review_id', ids);
-        await supabase.from('reviews').delete().eq('product_id', productId);
-      }
-      await supabase.from('cart_items').delete().eq('product_id', productId);
-      await supabase.from('wishlist_items').delete().eq('product_id', productId);
-      await supabase.from('product_images').delete().eq('product_id', productId);
-      await supabase.from('product_variants').delete().eq('product_id', productId);
-      const { error } = await supabase.from('products').delete().eq('id', productId);
-      if (error) throw error;
-      setProducts(products.filter((p) => p.id !== productId));
-      alert('Product deleted successfully');
-    } catch (err: any) {
-      alert('Error deleting product: ' + (err?.message || 'Please try again.'));
+    const err = await deleteProductCascade(productId);
+    if (err) {
+      alert(`Could not delete this product (${err}). If it has been ordered before, set its status to Archived instead.`);
+      return;
     }
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    setSelectedProducts((prev) => prev.filter((id) => id !== productId));
+    alert('Product deleted successfully');
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedProducts.length} product(s)?`)) return;
+    const ids = [...selectedProducts];
+    if (!confirm(`Are you sure you want to delete ${ids.length} product(s)?`)) return;
+    const deleted: string[] = [];
     const failed: string[] = [];
-    for (const productId of selectedProducts) {
-      try {
-        await supabase.from('order_items').update({ product_id: null, variant_id: null }).eq('product_id', productId);
-        const { data: reviewIds } = await supabase.from('reviews').select('id').eq('product_id', productId);
-        if (reviewIds?.length) {
-          const ids = reviewIds.map((r) => r.id);
-          await supabase.from('review_images').delete().in('review_id', ids);
-          await supabase.from('reviews').delete().eq('product_id', productId);
-        }
-        await supabase.from('cart_items').delete().eq('product_id', productId);
-        await supabase.from('wishlist_items').delete().eq('product_id', productId);
-        await supabase.from('product_images').delete().eq('product_id', productId);
-        await supabase.from('product_variants').delete().eq('product_id', productId);
-        const { error } = await supabase.from('products').delete().eq('id', productId);
-        if (error) throw error;
-      } catch {
+    for (const productId of ids) {
+      const err = await deleteProductCascade(productId);
+      if (err) {
         failed.push(products.find((p) => p.id === productId)?.name || productId.slice(0, 8));
+      } else {
+        deleted.push(productId);
       }
     }
-    setProducts(products.filter((p) => !selectedProducts.includes(p.id)));
-    setSelectedProducts([]);
+    setProducts((prev) => prev.filter((p) => !deleted.includes(p.id)));
+    setSelectedProducts(failed.length ? ids.filter((id) => !deleted.includes(id)) : []);
     if (failed.length) {
-      alert(`Deleted ${selectedProducts.length - failed.length}. Failed: ${failed.join(', ')}`);
+      alert(
+        `Deleted ${deleted.length} of ${ids.length}. Could not delete: ${failed.join(', ')}.\n\n` +
+        'Products that have been ordered may not be removable — set their status to Archived instead.'
+      );
     } else {
       alert('Products deleted successfully');
     }
   };
 
   const filteredProducts = products.filter(product => {
+    if (categoryFilter && product.category !== categoryFilter) return false;
+    if (statusFilter && String(product.status || '').toLowerCase() !== statusFilter) return false;
+    if (stockFilter === 'low-stock' && !(Number(product.quantity ?? 0) <= lowStockThreshold(product))) return false;
     const term = searchQuery.toLowerCase();
-    return product.name.toLowerCase().includes(term) ||
+    return (product.name || '').toLowerCase().includes(term) ||
       (product.sku && product.sku.toLowerCase().includes(term)) ||
       (product.category && product.category.toLowerCase().includes(term));
   });
@@ -341,15 +374,31 @@ export default function ProductsPage() {
 
           {showFilters && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg grid md:grid-cols-4 gap-4">
-              <select className="px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer">
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer"
+              >
                 <option value="">All Categories</option>
                 {categories.map((cat: any) => <option key={cat.name} value={cat.name}>{cat.name}</option>)}
               </select>
-              <select className="px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer">
-                <option>All Status</option>
-                <option>Active</option>
-                <option>Draft</option>
-                <option>Archived</option>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+                <option value="archived">Archived</option>
+              </select>
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value as '' | 'low-stock')}
+                className="px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer"
+              >
+                <option value="">All Stock Levels</option>
+                <option value="low-stock">Low Stock</option>
               </select>
             </div>
           )}
@@ -398,7 +447,7 @@ export default function ProductsPage() {
                   <th className="py-4 px-6">
                     <input
                       type="checkbox"
-                      checked={selectedProducts.length === products.length && products.length > 0}
+                      checked={filteredProducts.length > 0 && filteredProducts.every((p) => selectedProducts.includes(p.id))}
                       onChange={handleSelectAll}
                       className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                     />
@@ -441,7 +490,7 @@ export default function ProductsPage() {
                     <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">GH₵ {money(product.price)}</td>
                     <td className="py-4 px-4 text-gray-700">
                       {product.stock}
-                      {product.stock <= (product.metadata?.low_stock_threshold || 5) && product.stock > 0 && (
+                      {product.stock <= lowStockThreshold(product) && product.stock > 0 && (
                         <span className="ml-2 w-2 h-2 rounded-full bg-amber-500 inline-block" title="Low Stock"></span>
                       )}
                       {product.stock === 0 && (

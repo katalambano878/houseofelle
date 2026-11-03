@@ -8,8 +8,7 @@ import { supabase } from '@/lib/supabase';
 export default function InventoryManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
+  const [restocking, setRestocking] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,10 +25,14 @@ export default function InventoryManagementPage() {
         .select(`
           id,
           name,
+          slug,
           sku,
           price,
+          cost_per_item,
           quantity,
-          categories(name)
+          metadata,
+          categories(name),
+          product_variants(id)
         `)
         .order('name');
 
@@ -38,24 +41,25 @@ export default function InventoryManagementPage() {
       if (data) {
         const mapped = data.map((p: any) => {
           const stock = p.quantity || 0;
+          const threshold = p.metadata?.low_stock_threshold ?? 5;
           let status = 'good';
-          if (stock === 0) status = 'out';
-          else if (stock < 10) status = 'low';
+          if (stock <= 0) status = 'out';
+          else if (stock <= threshold) status = 'low';
 
-          // categories is an array from the join
-          const categoryData = p.categories as { name: string }[] | null;
+          // categories is a single object from the forward join
+          const categoryData = p.categories as { name: string } | null;
           return {
             id: p.id,
             name: p.name,
+            slug: p.slug,
             sku: p.sku || 'N/A',
-            category: categoryData?.[0]?.name || 'Uncategorized',
+            category: categoryData?.name || 'Uncategorized',
             currentStock: stock,
-            reorderLevel: 10, // Default
-            reorderQuantity: 50, // Default
-            price: p.price || 0,
-            cost: 0, // Not in DB
-            status,
-            supplier: 'Standard Supplier' // Default
+            reorderLevel: threshold,
+            price: Number(p.price) || 0,
+            cost: p.cost_per_item != null ? Number(p.cost_per_item) : null,
+            hasVariants: (p.product_variants?.length || 0) > 0,
+            status
           };
         });
         setProducts(mapped);
@@ -95,33 +99,74 @@ export default function InventoryManagementPage() {
     }
   };
 
-  const handleBulkRestock = () => {
-    // Placeholder for bulk restock logic
-    alert("Bulk restock feature coming soon (requires backend logic).");
+  const handleBulkRestock = async () => {
+    const selected = products.filter(p => selectedProducts.includes(p.id));
+    const withVariants = selected.filter(p => p.hasVariants);
+    const restockable = selected.filter(p => !p.hasVariants);
+    if (restockable.length === 0) {
+      alert('The selected products have variants. Restock each variant from the product editor.');
+      return;
+    }
+    const answer = prompt(
+      `How many units should be added to each of the ${restockable.length} selected product${restockable.length > 1 ? 's' : ''}?` +
+      (withVariants.length ? `\n\n${withVariants.length} product(s) with variants will be skipped — restock those in the product editor.` : '')
+    );
+    if (answer === null) return;
+    const amount = Number(answer.trim());
+    if (!Number.isInteger(amount) || amount <= 0) {
+      alert('Please enter a whole number greater than 0.');
+      return;
+    }
+
+    setRestocking(true);
+    const failed: string[] = [];
+    for (const p of restockable) {
+      const { error } = await supabase
+        .from('products')
+        .update({ quantity: p.currentStock + amount })
+        .eq('id', p.id);
+      if (error) failed.push(p.name);
+    }
+    setRestocking(false);
+    await fetchInventory();
     setSelectedProducts([]);
+    if (failed.length) {
+      alert(`Restocked ${restockable.length - failed.length} of ${restockable.length}. Failed: ${failed.join(', ')}`);
+    } else {
+      alert(`Added ${amount} units to ${restockable.length} product${restockable.length > 1 ? 's' : ''}.`);
+    }
+  };
+
+  // Quote every field; neutralise values a spreadsheet would treat as a formula.
+  const csvCell = (value: unknown) => {
+    let text = value == null ? '' : String(value);
+    if (/^[=+\-@]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
   };
 
   const handleExportCSV = () => {
     const csvData = [
-      ['SKU', 'Product Name', 'Category', 'Current Stock', 'Price', 'Status'],
-      ...products.map(p => [
+      ['SKU', 'Product Name', 'Category', 'Current Stock', 'Low Stock Threshold', 'Price', 'Cost per Item', 'Status'],
+      ...filteredProducts.map(p => [
         p.sku,
         p.name,
         p.category,
-        p.currentStock.toString(),
+        p.currentStock,
+        p.reorderLevel,
         money(p.price),
+        p.cost != null ? money(p.cost) : '',
         p.status
       ])
     ];
 
-    const csvContent = csvData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csvContent = csvData.map(row => row.map(csvCell).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `inventory-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-    setShowExportModal(false);
+    window.URL.revokeObjectURL(url);
   };
 
   return (
@@ -225,16 +270,9 @@ export default function InventoryManagementPage() {
               </div>
 
               <button
-                onClick={() => setShowImportModal(true)}
-                className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 whitespace-nowrap cursor-pointer"
-              >
-                <i className="ri-upload-line"></i>
-                <span>Import CSV</span>
-              </button>
-
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-4 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 whitespace-nowrap cursor-pointer"
+                onClick={handleExportCSV}
+                disabled={filteredProducts.length === 0}
+                className="border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-4 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <i className="ri-download-line"></i>
                 <span>Export</span>
@@ -250,9 +288,10 @@ export default function InventoryManagementPage() {
               <div className="flex items-center space-x-3">
                 <button
                   onClick={handleBulkRestock}
-                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer"
+                  disabled={restocking}
+                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Bulk Restock
+                  {restocking ? 'Restocking…' : 'Bulk Restock'}
                 </button>
                 <button
                   onClick={() => setSelectedProducts([])}
@@ -306,7 +345,9 @@ export default function InventoryManagementPage() {
                       <td className="px-6 py-4">
                         <div>
                           <p className="font-semibold text-gray-900">{product.name}</p>
-                          <p className="text-sm text-gray-500">{product.supplier}</p>
+                          <p className="text-sm text-gray-500">
+                            {product.cost != null ? `Cost: GH₵${money(product.cost)}` : 'Cost not set'}
+                          </p>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-gray-700">{product.sku}</td>
@@ -341,18 +382,23 @@ export default function InventoryManagementPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
-                          <button
+                          <Link
+                            href={`/admin/products/${product.id}`}
                             className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 transition-colors cursor-pointer"
                             title="Edit"
                           >
                             <i className="ri-edit-line text-lg"></i>
-                          </button>
-                          <button
-                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 transition-colors cursor-pointer"
-                            title="View Details"
-                          >
-                            <i className="ri-eye-line text-lg"></i>
-                          </button>
+                          </Link>
+                          {product.slug && (
+                            <Link
+                              href={`/product/${product.slug}`}
+                              target="_blank"
+                              className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 transition-colors cursor-pointer"
+                              title="View in store"
+                            >
+                              <i className="ri-eye-line text-lg"></i>
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -363,8 +409,6 @@ export default function InventoryManagementPage() {
           </div>
         </div>
       </div>
-      {showImportModal && <div className="hidden">Mock Modal</div>}
-      {showExportModal && <div className="hidden">Mock Export</div>}
     </div>
   );
 }

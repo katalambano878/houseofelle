@@ -1,17 +1,17 @@
 import { Resend } from 'resend';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { escapeHtml } from '@/lib/sanitize';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 'missing_api_key');
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'support@example.com';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Storefront <support@example.com>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'House of Elle <support@example.com>';
 const BRAND = {
-    name: 'Storefront',
-    color: '#2563eb',
-    colorLight: '#eff6ff',
-    colorDark: '#064e3b',
+    name: process.env.NEXT_PUBLIC_STORE_NAME || 'House of Elle',
+    color: '#6B4F3A',
+    colorLight: '#F5EDE4',
+    colorDark: '#2A2623',
     url: (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, ''),
-    phone: '+0000000000',
+    phone: process.env.STORE_PHONE || '',
 };
 
 // Reusable branded email layout
@@ -42,7 +42,7 @@ ${body}
 <tr><td style="background-color:#f9fafb;padding:24px 40px;border-top:1px solid #e5e7eb;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 <tr><td style="text-align:center;">
-<p style="margin:0 0 8px;color:#6b7280;font-size:13px;">Need help? Contact us at <a href="tel:${BRAND.phone}" style="color:${BRAND.color};text-decoration:none;">${BRAND.phone}</a></p>
+${BRAND.phone ? `<p style="margin:0 0 8px;color:#6b7280;font-size:13px;">Need help? Contact us at <a href="tel:${BRAND.phone}" style="color:${BRAND.color};text-decoration:none;">${BRAND.phone}</a></p>` : ''}
 <p style="margin:0 0 12px;color:#6b7280;font-size:13px;"><a href="${BRAND.url}" style="color:${BRAND.color};text-decoration:none;">Visit our store</a> &nbsp;·&nbsp; <a href="${BRAND.url}/order-tracking" style="color:${BRAND.color};text-decoration:none;">Track order</a></p>
 <p style="margin:0;color:#9ca3af;font-size:11px;">&copy; ${new Date().getFullYear()} ${BRAND.name}. All rights reserved.</p>
 </td></tr>
@@ -64,7 +64,9 @@ function emailButton(text: string, href: string, color?: string): string {
 }
 
 // Reusable info row
-function emailInfoRow(label: string, value: string): string {
+function emailInfoRow(label: string, value: string, { html = false }: { html?: boolean } = {}): string {
+    // Values are customer-supplied text unless the caller marks them as trusted markup.
+    if (!html) value = escapeHtml(String(value ?? ''));
     return `<tr>
 <td style="padding:10px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;width:40%;">${label}</td>
 <td style="padding:10px 16px;color:#111827;font-size:14px;font-weight:600;border-bottom:1px solid #f3f4f6;">${value}</td>
@@ -76,7 +78,7 @@ function emailShippingNotes(notes: string[]): string {
     if (notes.length === 0) return '';
     return `<div style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:14px 16px;margin:20px 0;">
 <p style="font-weight:600;color:#92400e;margin:0 0 6px;font-size:13px;">&#9200; Shipping Notes</p>
-${notes.map(n => `<p style="color:#78350f;margin:3px 0;font-size:13px;">${n}</p>`).join('')}
+${notes.map(n => `<p style="color:#78350f;margin:3px 0;font-size:13px;">${escapeHtml(n)}</p>`).join('')}
 </div>`;
 }
 
@@ -280,7 +282,7 @@ export async function sendOrderConfirmation(order: any) {
 <div style="text-align:center;margin-bottom:24px;">
   <div style="width:64px;height:64px;background-color:${BRAND.colorLight};border-radius:50%;margin:0 auto 16px;line-height:64px;font-size:28px;">&#10003;</div>
   <h2 style="margin:0 0 4px;color:#111827;font-size:24px;">Order Confirmed!</h2>
-  <p style="margin:0;color:#6b7280;font-size:15px;">Thank you for your purchase, ${name}.</p>
+  <p style="margin:0;color:#6b7280;font-size:15px;">Thank you for your purchase, ${escapeHtml(name)}.</p>
 </div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border-radius:12px;overflow:hidden;margin:20px 0;">
@@ -320,7 +322,7 @@ ${emailButton('Track Your Order', trackingUrl)}
 ${emailShippingNotes(shippingNotes)}
 
 ${emailButton('View Order in Admin', `${baseUrl}/admin/orders/${id}`)}
-`, `New order #${order_number} from ${name}`);
+`, `New order #${order_number} from ${escapeHtml(name)}`);
 
     await sendEmail({
         to: ADMIN_EMAIL,
@@ -332,7 +334,7 @@ ${emailButton('View Order in Admin', `${baseUrl}/admin/orders/${id}`)}
     if (phone) {
         const smsMessage = trackingNumber
             ? `Hi ${name}, your order #${order_number || id} is confirmed! Tracking: ${trackingNumber}. Track here: ${trackingUrl}${shippingNotesSms}`
-            : `Hi ${name}, your order #${order_number || id} at Storefront is confirmed! Track here: ${trackingUrl}${shippingNotesSms}`;
+            : `Hi ${name}, your order #${order_number || id} at ${BRAND.name} is confirmed! Track here: ${trackingUrl}${shippingNotesSms}`;
 
         await sendSMS({
             to: phone,
@@ -404,12 +406,12 @@ export async function sendOrderStatusUpdate(order: any, newStatus: string) {
 <div style="text-align:center;margin-bottom:24px;">
   <div style="width:64px;height:64px;background-color:${sc.bg};border-radius:50%;margin:0 auto 16px;line-height:64px;font-size:28px;">${sc.icon}</div>
   <h2 style="margin:0 0 4px;color:#111827;font-size:22px;">Order Update</h2>
-  <p style="margin:0;color:#6b7280;font-size:14px;">Hi ${name}, here's an update on your order.</p>
+  <p style="margin:0;color:#6b7280;font-size:14px;">Hi ${escapeHtml(name)}, here's an update on your order.</p>
 </div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border-radius:12px;overflow:hidden;margin:20px 0;">
   ${emailInfoRow('Order Number', `#${order_number || id}`)}
-  ${emailInfoRow('New Status', `<span style="display:inline-block;background-color:${sc.bg};color:${sc.color};padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;text-transform:uppercase;">${newStatus}</span>`)}
+  ${emailInfoRow('New Status', `<span style="display:inline-block;background-color:${sc.bg};color:${sc.color};padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;text-transform:uppercase;">${escapeHtml(newStatus)}</span>`, { html: true })}
   ${trackingNumber ? emailInfoRow('Tracking Number', trackingNumber) : ''}
 </table>
 
@@ -438,7 +440,7 @@ export async function sendWelcomeMessage(user: { email: string, firstName: strin
         html: emailLayout(`
 <div style="text-align:center;margin-bottom:24px;">
   <div style="width:64px;height:64px;background-color:${BRAND.colorLight};border-radius:50%;margin:0 auto 16px;line-height:64px;font-size:28px;">&#128075;</div>
-  <h2 style="margin:0 0 4px;color:#111827;font-size:24px;">Welcome, ${firstName}!</h2>
+  <h2 style="margin:0 0 4px;color:#111827;font-size:24px;">Welcome, ${escapeHtml(firstName)}!</h2>
   <p style="margin:0;color:#6b7280;font-size:15px;">We're so glad you're here.</p>
 </div>
 
@@ -467,14 +469,14 @@ export async function sendWelcomeMessage(user: { email: string, firstName: strin
 </div>
 
 ${emailButton('Start Shopping', `${BRAND.url}/shop`)}
-`, `Welcome to ${BRAND.name}, ${firstName}!`)
+`, `Welcome to ${BRAND.name}, ${escapeHtml(firstName)}!`)
     });
 
     // SMS
     if (phone) {
         await sendSMS({
             to: phone,
-            message: `Welcome ${firstName}! Thanks for joining Storefront.`
+            message: `Welcome ${firstName}! Thanks for joining ${BRAND.name}.`
         });
     }
 }
@@ -513,12 +515,12 @@ export async function sendPaymentLink(order: any) {
 <div style="text-align:center;margin-bottom:24px;">
   <div style="width:64px;height:64px;background-color:#fef3c7;border-radius:50%;margin:0 auto 16px;line-height:64px;font-size:28px;">&#128179;</div>
   <h2 style="margin:0 0 4px;color:#111827;font-size:22px;">Complete Your Order</h2>
-  <p style="margin:0;color:#6b7280;font-size:14px;">Hi ${name}, your order is waiting for payment.</p>
+  <p style="margin:0;color:#6b7280;font-size:14px;">Hi ${escapeHtml(name)}, your order is waiting for payment.</p>
 </div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border-radius:12px;overflow:hidden;margin:20px 0;">
   ${emailInfoRow('Order Number', `#${order_number}`)}
-  ${emailInfoRow('Amount Due', `<span style="color:${BRAND.color};font-size:18px;font-weight:700;">GH₵${Number(total).toFixed(2)}</span>`)}
+  ${emailInfoRow('Amount Due', `<span style="color:${BRAND.color};font-size:18px;font-weight:700;">GH₵${Number(total).toFixed(2)}</span>`, { html: true })}
 </table>
 
 <p style="color:#374151;font-size:14px;line-height:1.6;margin:16px 0;">Click the button below to securely complete your payment. This link will remain active until your order is completed or cancelled.</p>
@@ -549,27 +551,19 @@ export async function sendContactMessage(data: { name: string, email: string, su
     const safeMessage = escapeHtml(message);
     const safeEmail = escapeHtml(email);
 
-    // 1. Acknowledge to User
+    // 1. Acknowledge to User. Kept generic: the address is unverified, so the store
+    // must not echo the sender's own text to it (that would make the form a spam relay).
     await sendEmail({
         to: email,
-        subject: `We received your message: ${subject}`,
+        subject: `We received your message`,
         html: emailLayout(`
 <div style="text-align:center;margin-bottom:24px;">
-  <div style="width:64px;height:64px;background-color:${BRAND.colorLight};border-radius:50%;margin:0 auto 16px;line-height:64px;font-size:28px;">&#128172;</div>
   <h2 style="margin:0 0 4px;color:#111827;font-size:22px;">Message Received</h2>
   <p style="margin:0;color:#6b7280;font-size:14px;">We'll get back to you soon.</p>
 </div>
 
-<p style="color:#374151;font-size:14px;line-height:1.7;margin:16px 0;">Hi ${safeName},</p>
-<p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 16px;">Thank you for reaching out to ${BRAND.name}. We've received your message regarding <strong>"${safeSubject}"</strong> and our team will respond as soon as possible.</p>
-
-<div style="background-color:#f9fafb;border-left:4px solid ${BRAND.color};border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0;">
-  <p style="color:#6b7280;font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.5px;">Your message</p>
-  <p style="color:#374151;font-size:14px;margin:0;line-height:1.6;">${safeMessage}</p>
-</div>
-
-<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">We typically respond within 24 hours.</p>
-`, `Thanks for contacting us, ${safeName}`)
+<p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 16px;">Thank you for reaching out to ${BRAND.name}. Our team will reply to this address as soon as possible, usually within 24 hours.</p>
+`, `Thanks for contacting ${BRAND.name}`)
     });
 
     // 2. Alert Admin
@@ -580,9 +574,9 @@ export async function sendContactMessage(data: { name: string, email: string, su
 <h2 style="margin:0 0 16px;color:#111827;font-size:20px;">&#128233; New Contact Message</h2>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border-radius:12px;overflow:hidden;margin:16px 0;">
-  ${emailInfoRow('From', safeName)}
-  ${emailInfoRow('Email', `<a href="mailto:${safeEmail}" style="color:${BRAND.color};">${safeEmail}</a>`)}
-  ${emailInfoRow('Subject', safeSubject)}
+  ${emailInfoRow('From', name)}
+  ${emailInfoRow('Email', `<a href="mailto:${safeEmail}" style="color:${BRAND.color};">${safeEmail}</a>`, { html: true })}
+  ${emailInfoRow('Subject', subject)}
 </table>
 
 <div style="background-color:#f9fafb;border-left:4px solid ${BRAND.color};border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0;">

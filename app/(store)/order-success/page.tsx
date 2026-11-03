@@ -9,35 +9,52 @@ import { supabase } from '@/lib/supabase';
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get('order');
+  const orderId = searchParams.get('id');
   const paymentSuccess = searchParams.get('payment_success');
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showConfetti, setShowConfetti] = useState(true);
+  // Confetti layout is fixed once so re-renders don't reshuffle it.
+  const [confetti] = useState(() =>
+    Array.from({ length: 40 }, (_, i) => ({
+      left: Math.random() * 100,
+      top: Math.random() * 20,
+      delay: Math.random() * 3,
+      duration: 3 + Math.random() * 2,
+      icon: ['ri-heart-fill text-blue-500', 'ri-star-fill text-amber-500', 'ri-gift-fill text-blue-500'][i % 3],
+    }))
+  );
   const [verifying, setVerifying] = useState(false);
+
+  // Orders are loaded through the lookup API, which checks the order id from the payment redirect.
+  const loadOrder = async (): Promise<any | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+    const res = await fetch('/api/orders/lookup', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ id: orderId, order: orderNumber }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => null);
+    return json?.order ?? null;
+  };
 
   useEffect(() => {
     async function fetchOrder() {
-      if (!orderNumber) {
+      if (!orderNumber && !orderId) {
         setLoading(false);
         return;
       }
 
       try {
-        const { data: orderData, error } = await supabase
-          .from('orders')
-          .select(`
-                    *,
-                    order_items (*)
-                `)
-          .eq('order_number', orderNumber)
-          .single();
-
-        if (error) throw error;
+        const orderData = await loadOrder();
         setOrder(orderData);
 
         // If redirected from payment and order is still pending, try to verify
         if (paymentSuccess === 'true' && orderData && orderData.payment_status !== 'paid') {
-          verifyPayment(orderNumber, orderData);
+          verifyPayment(orderData.order_number);
         }
       } catch (err) {
         console.error('Error fetching order:', err);
@@ -46,47 +63,36 @@ function OrderSuccessContent() {
       }
     }
     fetchOrder();
-  }, [orderNumber, paymentSuccess]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per order in the URL
+  }, [orderNumber, orderId, paymentSuccess]);
 
   // Payment verification - called when user is redirected from Moolre with payment_success=true
-  const verifyPayment = async (orderNum: string, initialOrder: any) => {
+  const verifyPayment = async (orderNum: string) => {
     setVerifying(true);
-    
+
     // Wait 3 seconds to give the callback a chance to process first
     await new Promise(resolve => setTimeout(resolve, 3000));
-    
+
     // Re-fetch order to check if callback already updated it
-    const { data: refreshed } = await supabase
-      .from('orders')
-      .select('*, order_items (*)')
-      .eq('order_number', orderNum)
-      .single();
-    
+    const refreshed = await loadOrder();
     if (refreshed?.payment_status === 'paid') {
       setOrder(refreshed);
       setVerifying(false);
       return;
     }
 
-    // Callback hasn't fired - verify via our endpoint
-    // Verify payment via Moolre API — we no longer trust the redirect alone
+    // Callback hasn't fired - verify via our endpoint (it asks Moolre directly)
     try {
       const res = await fetch('/api/payment/moolre/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderNumber: orderNum })
       });
-      
+
       const result = await res.json();
-      console.log('Payment verification result:', result);
-      
+
       if (result.success && result.payment_status === 'paid') {
-        // Re-fetch full order data
-        const { data: updated } = await supabase
-          .from('orders')
-          .select('*, order_items (*)')
-          .eq('order_number', orderNum)
-          .single();
+        const updated = await loadOrder();
         if (updated) setOrder(updated);
       }
     } catch (err) {
@@ -124,25 +130,25 @@ function OrderSuccessContent() {
   }
 
   const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const estimatedDelivery = new Date(new Date(order.created_at).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const pointsEarned = Math.floor(order.total / 10); // Example logic: 1 point per 10 currency units
+  const isPaid = order.payment_status === 'paid';
+  const trackHref = `/order-tracking?order=${encodeURIComponent(order.order_number)}&email=${encodeURIComponent(order.email || '')}`;
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-      {showConfetti && (
+      {showConfetti && isPaid && (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-          {[...Array(50)].map((_, i) => (
+          {confetti.map((piece, i) => (
             <div
               key={i}
               className="absolute animate-fall"
               style={{
-                left: `${Math.random() * 100}%`,
-                top: `-${Math.random() * 20}%`,
-                animationDelay: `${Math.random() * 3}s`,
-                animationDuration: `${3 + Math.random() * 2}s`
+                left: `${piece.left}%`,
+                top: `-${piece.top}%`,
+                animationDelay: `${piece.delay}s`,
+                animationDuration: `${piece.duration}s`
               }}
             >
-              <i className={`ri-${['heart', 'star', 'gift'][Math.floor(Math.random() * 3)]}-fill text-${['blue', 'amber', 'blue'][Math.floor(Math.random() * 3)]}-500 text-xl opacity-70`}></i>
+              <i className={`${piece.icon} text-xl opacity-70`} aria-hidden="true"></i>
             </div>
           ))}
         </div>
@@ -151,14 +157,29 @@ function OrderSuccessContent() {
       <section className="py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 text-center mb-8">
-            <div className="w-24 h-24 flex items-center justify-center mx-auto mb-6 bg-blue-100 rounded-full">
-              <i className="ri-checkbox-circle-fill text-6xl text-blue-600"></i>
+            <div className={`w-24 h-24 flex items-center justify-center mx-auto mb-6 rounded-full ${isPaid ? 'bg-blue-100' : 'bg-amber-100'}`}>
+              <i className={`text-6xl ${isPaid ? 'ri-checkbox-circle-fill text-blue-600' : verifying ? 'ri-loader-4-line animate-spin text-amber-600' : 'ri-time-line text-amber-600'}`}></i>
             </div>
 
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Order Confirmed!</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              {isPaid ? 'Order Confirmed!' : verifying ? 'Confirming your payment…' : 'Order received, payment pending'}
+            </h1>
             <p className="text-xl text-gray-600 mb-8">
-              Thank you for your purchase. We're processing your order now.
+              {isPaid
+                ? "Thank you for your purchase. We're processing your order now."
+                : verifying
+                  ? 'This takes a few seconds. Please keep this page open.'
+                  : "We haven't received your payment yet. If you paid, it can take a minute to show; otherwise you can pay now."}
             </p>
+            {!isPaid && !verifying && (
+              <Link
+                href={`/pay/${order.id}`}
+                className="inline-flex items-center justify-center bg-blue-700 hover:bg-blue-800 text-white px-8 py-4 rounded-lg font-semibold transition-colors mb-8"
+              >
+                <i className="ri-bank-card-line mr-2"></i>
+                Pay now
+              </Link>
+            )}
 
             <div className="bg-blue-50 rounded-xl p-6 mb-8">
               <div className="grid md:grid-cols-3 gap-6 text-center">
@@ -171,15 +192,15 @@ function OrderSuccessContent() {
                   <p className="text-lg font-bold text-gray-900">{orderDate}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Estimated Delivery</p>
-                  <p className="text-lg font-bold text-blue-700">{estimatedDelivery}</p>
+                  <p className="text-sm text-gray-600 mb-1">Payment</p>
+                  <p className={`text-lg font-bold ${isPaid ? 'text-blue-700' : 'text-amber-700'}`}>{isPaid ? 'Paid' : 'Pending'}</p>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
               <Link
-                href={`/account?tab=orders`}
+                href={trackHref}
                 className="bg-blue-700 hover:bg-blue-800 text-white px-8 py-4 rounded-lg font-semibold transition-colors inline-flex items-center justify-center whitespace-nowrap"
               >
                 <i className="ri-file-list-3-line mr-2"></i>
@@ -194,25 +215,6 @@ function OrderSuccessContent() {
               </Link>
             </div>
 
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 border-2 border-amber-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 flex items-center justify-center bg-amber-500 rounded-full">
-                    <i className="ri-star-fill text-white text-2xl"></i>
-                  </div>
-                  <div className="text-left">
-                    <p className="font-bold text-gray-900 text-lg">You Earned {pointsEarned} Points!</p>
-                    <p className="text-sm text-gray-600">Join our loyalty program to redeem.</p>
-                  </div>
-                </div>
-                <Link
-                  href="/register"
-                  className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
-                >
-                  Join Now
-                </Link>
-              </div>
-            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 mb-8">
@@ -223,7 +225,7 @@ function OrderSuccessContent() {
                   <div key={item.id} className="flex items-center space-x-4">
                     <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
                       <img
-                        src={item.metadata?.image || 'https://via.placeholder.com/150'}
+                        src={item.metadata?.image || '/placeholder-product.svg'}
                         alt={item.product_name}
                         className="w-full h-full object-cover object-center"
                       />
@@ -276,7 +278,6 @@ function OrderSuccessContent() {
                       <p className="text-sm text-gray-600 mb-1">Address</p>
                       <p className="text-gray-900">{order.shipping_address.address}</p>
                       <p className="text-gray-900">{order.shipping_address.city}, {order.shipping_address.region}</p>
-                      <p className="text-gray-900">{order.shipping_address.postalCode}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Phone</p>
@@ -326,7 +327,7 @@ function OrderSuccessContent() {
                 <i className="ri-customer-service-line mr-1"></i>
                 Contact Support
               </Link>
-              <Link href="/account/orders" className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
+              <Link href={trackHref} className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
                 <i className="ri-question-line mr-1"></i>
                 Order Help
               </Link>

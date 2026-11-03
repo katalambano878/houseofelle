@@ -4,6 +4,15 @@ import { money } from '@/lib/format-money';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
+interface Variant {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    sku: string | null;
+    image: string | null;
+}
+
 interface Product {
     id: string;
     name: string;
@@ -12,11 +21,28 @@ interface Product {
     category: string;
     image: string;
     sku: string;
+    /** False when stock is not tracked or the product may be sold past zero. */
+    limitStock: boolean;
+    variants: Variant[];
 }
 
-interface CartItem extends Product {
+interface CartItem {
+    /** productId plus variantId, so two variants of one product are separate lines. */
+    key: string;
+    productId: string;
+    variantId: string | null;
+    /** The variant's own name, exactly as in product_variants.name (mark_order_paid matches on it). */
+    variantName: string | null;
+    name: string;
+    price: number;
+    image: string;
+    sku: string | null;
+    stock: number;
+    limitStock: boolean;
     cartQuantity: number;
 }
+
+const lineKey = (productId: string, variantId: string | null) => `${productId}:${variantId || ''}`;
 
 interface Customer {
     id: string;
@@ -33,6 +59,9 @@ export default function POSPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+    const [loadError, setLoadError] = useState('');
+    const [variantPicker, setVariantPicker] = useState<Product | null>(null);
+    const [cartNotice, setCartNotice] = useState('');
 
     // Checkout State
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -63,76 +92,126 @@ export default function POSPage() {
 
     useEffect(() => {
         fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
     }, []);
 
     const fetchData = async () => {
-        try {
-            setLoading(true);
-            // Fetch Products
-            const { data: prodData } = await supabase
+        setLoading(true);
+        setLoadError('');
+
+        const [{ data: prodData, error: prodError }, { data: custData }] = await Promise.all([
+            supabase
                 .from('products')
                 .select(`
-          id, name, price, quantity, sku,
+          id, name, price, quantity, sku, track_quantity, continue_selling,
           categories(name),
-          product_images(url)
+          product_images(url, position),
+          product_variants(id, name, price, quantity, sku, image_url)
         `)
-                .order('name');
-
-            if (prodData) {
-                const formatted: Product[] = prodData.map((p: any) => ({
-                    id: p.id,
-                    name: p.name,
-                    price: p.price,
-                    quantity: p.quantity,
-                    category: p.categories?.name || 'Uncategorized',
-                    image: p.product_images?.[0]?.url || '/house-of-elle-logo.png',
-                    sku: p.sku
-                }));
-                setProducts(formatted);
-
-                // Extract Categories
-                const cats = Array.from(new Set(formatted.map(p => p.category))).sort();
-                setCategories(['All', ...cats]);
-            }
-
-            // Fetch Customers from customers table (not profiles)
-            const { data: custData } = await supabase
+                .eq('status', 'active')
+                .order('name'),
+            supabase
                 .from('customers')
                 .select('id, full_name, email, phone')
                 .order('full_name')
-                .limit(200);
+                .limit(200),
+        ]);
 
-            if (custData) setCustomers(custData);
-
-        } catch (error) {
-            console.error('Error fetching POS data:', error);
-        } finally {
-            setLoading(false);
+        if (prodError) {
+            setLoadError(prodError.message || 'Could not load products.');
+        } else {
+            const formatted: Product[] = (prodData || []).map((p: any) => {
+                const images = Array.isArray(p.product_images) ? [...p.product_images] : [];
+                images.sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+                const category = Array.isArray(p.categories) ? p.categories[0] : p.categories;
+                const variants: Variant[] = (Array.isArray(p.product_variants) ? p.product_variants : [])
+                    .map((v: any) => ({
+                        id: v.id,
+                        name: v.name,
+                        price: Number(v.price) || 0,
+                        quantity: Number(v.quantity) || 0,
+                        sku: v.sku || null,
+                        image: v.image_url || null,
+                    }))
+                    .sort((a: Variant, b: Variant) => a.name.localeCompare(b.name));
+                return {
+                    id: p.id,
+                    name: p.name,
+                    price: Number(p.price) || 0,
+                    quantity: variants.length
+                        ? variants.reduce((sum, v) => sum + v.quantity, 0)
+                        : Number(p.quantity) || 0,
+                    category: category?.name || 'Uncategorized',
+                    image: images[0]?.url || '/house-of-elle-logo.png',
+                    sku: p.sku || '',
+                    limitStock: p.track_quantity !== false && !p.continue_selling,
+                    variants,
+                };
+            });
+            setProducts(formatted);
+            const cats = Array.from(new Set(formatted.map(p => p.category))).sort();
+            setCategories(['All', ...cats]);
         }
+
+        if (custData) setCustomers(custData as Customer[]);
+        setLoading(false);
+    };
+
+    const flashNotice = (text: string) => {
+        setCartNotice(text);
+        setTimeout(() => setCartNotice((current) => (current === text ? '' : current)), 2500);
     };
 
     // Cart Functions
-    const addToCart = (product: Product) => {
+    const addLine = (product: Product, variant: Variant | null) => {
+        const key = lineKey(product.id, variant?.id || null);
+        const stock = variant ? variant.quantity : product.quantity;
+        const existing = cart.find(item => item.key === key);
+        const nextQty = (existing?.cartQuantity || 0) + 1;
+        if (product.limitStock && nextQty > stock) {
+            flashNotice(stock > 0 ? `Only ${stock} of ${product.name}${variant ? ` (${variant.name})` : ''} in stock` : `${product.name}${variant ? ` (${variant.name})` : ''} is out of stock`);
+            return;
+        }
         setCart(prev => {
-            const existing = prev.find(item => item.id === product.id);
-            if (existing) {
-                return prev.map(item =>
-                    item.id === product.id
-                        ? { ...item, cartQuantity: item.cartQuantity + 1 }
-                        : item
-                );
+            if (prev.some(item => item.key === key)) {
+                return prev.map(item => item.key === key ? { ...item, cartQuantity: item.cartQuantity + 1 } : item);
             }
-            return [...prev, { ...product, cartQuantity: 1 }];
+            return [...prev, {
+                key,
+                productId: product.id,
+                variantId: variant?.id || null,
+                variantName: variant?.name || null,
+                name: product.name,
+                price: variant ? variant.price : product.price,
+                image: variant?.image || product.image,
+                sku: variant?.sku || product.sku || null,
+                stock,
+                limitStock: product.limitStock,
+                cartQuantity: 1,
+            }];
         });
     };
 
-    const removeFromCart = (productId: string) => {
-        setCart(prev => prev.filter(item => item.id !== productId));
+    const addToCart = (product: Product) => {
+        if (product.variants.length > 0) {
+            setVariantPicker(product);
+            return;
+        }
+        addLine(product, null);
     };
 
-    const updateQuantity = (productId: string, delta: number) => {
+    const removeFromCart = (key: string) => {
+        setCart(prev => prev.filter(item => item.key !== key));
+    };
+
+    const updateQuantity = (key: string, delta: number) => {
+        const line = cart.find(item => item.key === key);
+        if (line && delta > 0 && line.limitStock && line.cartQuantity + delta > line.stock) {
+            flashNotice(`Only ${line.stock} of ${line.name}${line.variantName ? ` (${line.variantName})` : ''} in stock`);
+            return;
+        }
         setCart(prev => prev.map(item => {
-            if (item.id === productId) {
+            if (item.key === key) {
                 const newQty = item.cartQuantity + delta;
                 return newQty > 0 ? { ...item, cartQuantity: newQty } : item;
             }
@@ -145,8 +224,10 @@ export default function POSPage() {
     // Computed
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                p.sku?.toLowerCase().includes(searchQuery.toLowerCase());
+            const q = searchQuery.toLowerCase();
+            const matchesSearch = p.name.toLowerCase().includes(q) ||
+                p.sku?.toLowerCase().includes(q) ||
+                p.variants.some(v => v.sku?.toLowerCase().includes(q) || v.name.toLowerCase().includes(q));
             const matchesCat = activeCategory === 'All' || p.category === activeCategory;
             return matchesSearch && matchesCat;
         });
@@ -290,11 +371,14 @@ export default function POSPage() {
             // 2. Create Order Items (with product_name, unit_price, total_price)
             const orderItems = cart.map(item => ({
                 order_id: order.id,
-                product_id: item.id,
+                product_id: item.productId,
+                variant_id: item.variantId,
                 product_name: item.name,
+                variant_name: item.variantName,
+                sku: item.sku,
                 quantity: item.cartQuantity,
                 unit_price: item.price,
-                total_price: item.price * item.cartQuantity,
+                total_price: Math.round(item.price * item.cartQuantity * 100) / 100,
                 metadata: { image: item.image, pos_sale: true }
             }));
 
@@ -302,7 +386,11 @@ export default function POSPage() {
                 .from('order_items')
                 .insert(orderItems);
 
-            if (itemsError) throw itemsError;
+            if (itemsError) {
+                // Don't leave an order with no items behind.
+                await supabase.from('orders').delete().eq('id', order.id);
+                throw itemsError;
+            }
 
             // 3. Upsert Customer Record (email is required in customers table)
             const hasRealEmail = customerEmail && customerEmail !== 'pos-walkin@store.local';
@@ -314,7 +402,7 @@ export default function POSPage() {
 
             if (upsertEmail) {
                 try {
-                    await supabase.rpc('upsert_customer_from_order', {
+                    const { error: custError } = await supabase.rpc('upsert_customer_from_order', {
                         p_email: upsertEmail,
                         p_phone: customerPhone || null,
                         p_full_name: customerName || null,
@@ -323,9 +411,10 @@ export default function POSPage() {
                         p_user_id: null,
                         p_address: addressData
                     });
+                    if (custError) console.error('Customer upsert error (non-fatal):', custError);
                     // Refresh customer list silently
                     supabase.from('customers').select('id, full_name, email, phone').order('full_name').limit(200)
-                        .then(({ data }) => { if (data) setCustomers(data); });
+                        .then(({ data }) => { if (data) setCustomers(data as Customer[]); });
                 } catch (custErr) {
                     console.error('Customer upsert error (non-fatal):', custErr);
                 }
@@ -333,19 +422,24 @@ export default function POSPage() {
 
             // 4. If Cash or Card — mark as paid, reduce stock
             if (isCashOrCard) {
-                // Call mark_order_paid to reduce stock (uses order_number as order_ref)
+                // mark_order_paid reduces product and variant stock (matched on variant_name).
+                let stockWarning = '';
                 try {
-                    await supabase.rpc('mark_order_paid', {
+                    const { error: stockErr } = await supabase.rpc('mark_order_paid', {
                         order_ref: orderNumber,
                         moolre_ref: `POS-${paymentMethod.toUpperCase()}-${Date.now()}`
                     });
-                } catch (stockErr) {
-                    console.error('Stock reduction error (non-fatal):', stockErr);
+                    if (stockErr) stockWarning = `Sale saved, but stock was not updated: ${stockErr.message}`;
+                } catch (stockErr: any) {
+                    stockWarning = `Sale saved, but stock was not updated: ${stockErr?.message || 'unknown error'}`;
                 }
 
                 // Success — show completed
-                setCompletedOrder({ id: order.id, orderNumber, total: grandTotal, items: cart });
+                const change = paymentMethod === 'cash' ? Math.max(0, (parseFloat(amountTendered || '0') || 0) - grandTotal) : 0;
+                setCompletedOrder({ id: order.id, orderNumber, total: grandTotal, items: cart, stockWarning, change });
                 setCart([]);
+                // Reflect the new stock levels in the grid.
+                fetchData();
 
                 // Send notification
                 if (customerEmail && customerEmail !== 'pos-walkin@store.local') {
@@ -463,7 +557,19 @@ export default function POSPage() {
 
                 {/* Grid Area */}
                 <div className="flex-1 overflow-y-auto p-4 content-start">
-                    {loading ? (
+                    {cartNotice && (
+                        <div role="status" className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                            {cartNotice}
+                        </div>
+                    )}
+                    {loadError ? (
+                        <div className="flex flex-col items-center justify-center h-full text-red-600 gap-3">
+                            <p>{loadError}</p>
+                            <button onClick={fetchData} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">
+                                Try again
+                            </button>
+                        </div>
+                    ) : loading ? (
                         <div className="flex items-center justify-center h-full text-gray-500">Loading products...</div>
                     ) : filteredProducts.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -484,14 +590,23 @@ export default function POSPage() {
                                             alt={product.name}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                         />
-                                        <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
-                                            Qty: {product.quantity}
+                                        <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm ${product.limitStock && product.quantity <= 0 ? 'bg-red-600/80' : 'bg-black/60'}`}>
+                                            {product.limitStock && product.quantity <= 0 ? 'Out of stock' : `Qty: ${product.quantity}`}
                                         </div>
+                                        {product.variants.length > 0 && (
+                                            <div className="absolute top-2 left-2 bg-white/90 text-gray-800 text-xs px-2 py-1 rounded-full">
+                                                {product.variants.length} options
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="p-3 flex flex-col flex-1">
                                         <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-auto">{product.name}</h3>
                                         <div className="flex items-center justify-between mt-2 pt-2">
-                                            <span className="text-blue-700 font-bold">GH₵{money(product.price)}</span>
+                                            <span className="text-blue-700 font-bold">
+                                                {product.variants.length > 0 && new Set(product.variants.map(v => v.price)).size > 1
+                                                    ? `From GH₵${money(Math.min(...product.variants.map(v => v.price)))}`
+                                                    : `GH₵${money(product.variants[0]?.price ?? product.price)}`}
+                                            </span>
                                             <button className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-700 group-hover:text-white transition-colors">
                                                 <i className="ri-add-line"></i>
                                             </button>
@@ -550,24 +665,27 @@ export default function POSPage() {
                         </div>
                     ) : (
                         cart.map(item => (
-                            <div key={item.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors">
+                            <div key={item.key} className="flex gap-3 p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors">
                                 <div className="w-16 h-16 bg-white rounded-md overflow-hidden flex-shrink-0 border border-gray-200">
                                     <img src={item.image} className="w-full h-full object-cover" alt="" />
                                 </div>
                                 <div className="flex-1 min-w-0 flex flex-col justify-between">
                                     <div className="flex justify-between items-start">
-                                        <p className="text-sm font-semibold text-gray-900 line-clamp-1">{item.name}</p>
-                                        <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-gray-900 line-clamp-1">{item.name}</p>
+                                            {item.variantName && <p className="text-xs text-gray-500 line-clamp-1">{item.variantName}</p>}
+                                        </div>
+                                        <button onClick={() => removeFromCart(item.key)} aria-label={`Remove ${item.name}`} className="text-gray-400 hover:text-red-500">
                                             <i className="ri-delete-bin-line"></i>
                                         </button>
                                     </div>
                                     <div className="flex items-center justify-between mt-2">
                                         <div className="flex items-center space-x-2 bg-white rounded border border-gray-200 px-1 py-0.5">
-                                            <button onClick={() => updateQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded">
+                                            <button onClick={() => updateQuantity(item.key, -1)} aria-label="Decrease quantity" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded">
                                                 <i className="ri-subtract-line text-xs"></i>
                                             </button>
                                             <span className="text-sm font-semibold w-6 text-center">{item.cartQuantity}</span>
-                                            <button onClick={() => updateQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded">
+                                            <button onClick={() => updateQuantity(item.key, 1)} aria-label="Increase quantity" className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded">
                                                 <i className="ri-add-line text-xs"></i>
                                             </button>
                                         </div>
@@ -631,10 +749,16 @@ export default function POSPage() {
                                     </h2>
                                     <p className="text-gray-500 mt-1">Order #{completedOrder.orderNumber}</p>
 
-                                    {!completedOrder.paymentPending && paymentMethod === 'cash' && changeDue > 0 && (
+                                    {!completedOrder.paymentPending && completedOrder.change > 0 && (
                                         <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
                                             <p className="text-sm text-blue-700">Change Due</p>
-                                            <p className="text-2xl font-bold text-blue-800">GH₵{money(changeDue)}</p>
+                                            <p className="text-2xl font-bold text-blue-800">GH₵{money(completedOrder.change)}</p>
+                                        </div>
+                                    )}
+
+                                    {completedOrder.stockWarning && (
+                                        <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                                            {completedOrder.stockWarning}
                                         </div>
                                     )}
 
@@ -974,6 +1098,63 @@ export default function POSPage() {
                                 </div>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Variant Picker */}
+            {variantPicker && (
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setVariantPicker(null)}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Choose an option for ${variantPicker.name}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+                    >
+                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                            <div className="min-w-0">
+                                <h2 className="text-lg font-bold text-gray-900 truncate">{variantPicker.name}</h2>
+                                <p className="text-sm text-gray-500">Choose an option</p>
+                            </div>
+                            <button
+                                onClick={() => setVariantPicker(null)}
+                                aria-label="Close"
+                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500"
+                            >
+                                <i className="ri-close-line text-xl"></i>
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto p-2">
+                            {variantPicker.variants.map((v) => {
+                                const inCart = cart.find((c) => c.key === lineKey(variantPicker.id, v.id))?.cartQuantity || 0;
+                                const soldOut = variantPicker.limitStock && v.quantity - inCart <= 0;
+                                return (
+                                    <button
+                                        key={v.id}
+                                        disabled={soldOut}
+                                        onClick={() => {
+                                            addLine(variantPicker, v);
+                                            setVariantPicker(null);
+                                        }}
+                                        className="w-full flex items-center justify-between gap-3 p-3 rounded-lg text-left hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-medium text-gray-900 truncate">{v.name}</p>
+                                            <p className="text-xs text-gray-500">
+                                                {soldOut ? 'Out of stock' : `${v.quantity} in stock`}
+                                                {inCart > 0 ? ` · ${inCart} in cart` : ''}
+                                                {v.sku ? ` · ${v.sku}` : ''}
+                                            </p>
+                                        </div>
+                                        <span className="font-bold text-blue-700 whitespace-nowrap">GH₵{money(v.price)}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             )}

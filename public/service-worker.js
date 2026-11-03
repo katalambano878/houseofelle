@@ -1,5 +1,5 @@
 // House of Elle - network-first pages; no HTML shell cache (playbook section 16)
-const CACHE_VERSION = 'sw-v2.5-houseofelle';
+const CACHE_VERSION = 'sw-v2.6-houseofelle';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const IMAGE_CACHE = `images-${CACHE_VERSION}`;
 const API_CACHE = `api-${CACHE_VERSION}`;
@@ -32,8 +32,13 @@ self.addEventListener('install', (event) => {
           console.warn('[SW] Some assets failed to cache:', err);
         })
       )
-      .then(() => self.skipWaiting())
   );
+  // No automatic skipWaiting: the new version waits until the shopper taps
+  // "Update" (UpdatePrompt), so nobody is reloaded in the middle of checkout.
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -81,7 +86,7 @@ self.addEventListener('fetch', (event) => {
       event.respondWith(
         fetch(request).catch(() => {
           const html =
-            '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin â€“ Connection required</title><style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-center;background:#f3f4f6}.box{text-align:center;max-width:24rem;padding:2rem}h1{font-size:1.5rem;color:#064e3b;margin-bottom:.5rem}p{color:#6b7280;margin-bottom:1.5rem}a{display:inline-block;background:#064e3b;color:#fff;padding:.75rem 1.5rem;border-radius:.5rem;text-decoration:none;font-weight:600}</style></head><body><div class="box"><h1>Connection required</h1><p>Admin needs an internet connection.</p><a href="/admin">Try again</a></div></body></html>';
+            '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin - Connection required</title><style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6}.box{text-align:center;max-width:24rem;padding:2rem}h1{font-size:1.5rem;color:#2A2623;margin-bottom:.5rem}p{color:#6b7280;margin-bottom:1.5rem}a{display:inline-block;background:#6B4F3A;color:#fff;padding:.75rem 1.5rem;border-radius:.5rem;text-decoration:none;font-weight:600}</style></head><body><div class="box"><h1>Connection required</h1><p>Admin needs an internet connection.</p><a href="/admin">Try again</a></div></body></html>';
           return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         })
       );
@@ -125,6 +130,7 @@ self.addEventListener('fetch', (event) => {
             (cached) =>
               cached ||
               new Response(JSON.stringify({ error: 'Offline' }), {
+                status: 503,
                 headers: { 'Content-Type': 'application/json' },
               })
           )
@@ -199,8 +205,8 @@ self.addEventListener('push', (event) => {
   const data = event.data.json();
   const options = {
     body: data.body || 'New update from House of Elle',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
+    icon: '/favicon/android-chrome-192x192.png',
+    badge: '/favicon/favicon-32x32.png',
     vibrate: [100, 50, 100],
     data: {
       url: data.url || '/',

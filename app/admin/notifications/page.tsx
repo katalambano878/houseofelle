@@ -3,6 +3,22 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+type Audience = 'all' | 'newsletter' | 'buyers' | 'vip';
+
+const AUDIENCE_LABELS: Record<Audience, string> = {
+    all: 'All Customers',
+    newsletter: 'Newsletter Subscribers',
+    buyers: 'Customers who have ordered',
+    vip: 'VIP Customers',
+};
+
+/** Real mailbox only: skips POS placeholder addresses like 0241234567@pos.local. */
+const isMailable = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !email.endsWith('.local');
+
+const hasTag = (tags: unknown, tag: string) =>
+    Array.isArray(tags) && tags.some((t) => String(t).toLowerCase() === tag);
+
 export default function NotificationsPage() {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState('');
@@ -12,8 +28,10 @@ export default function NotificationsPage() {
         subject: '',
         message: '',
         channels: { email: true, sms: false },
-        audience: 'all'
+        audience: 'all' as Audience
     });
+
+    const smsSegments = form.message.length <= 160 ? 1 : Math.ceil(form.message.length / 153);
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -31,9 +49,16 @@ export default function NotificationsPage() {
             // 2. Fetch Recipients from the customers table (includes secondary contacts)
             const { data: customers, error: fetchError } = await supabase
                 .from('customers')
-                .select('email, phone, full_name, secondary_phone, secondary_email');
+                .select('email, phone, full_name, secondary_phone, secondary_email, tags, total_orders');
 
             if (fetchError) throw fetchError;
+
+            const audience = (customers || []).filter((c: any) => {
+                if (form.audience === 'newsletter') return hasTag(c.tags, 'newsletter');
+                if (form.audience === 'vip') return hasTag(c.tags, 'vip');
+                if (form.audience === 'buyers') return (Number(c.total_orders) || 0) > 0;
+                return true;
+            });
 
             // Build recipients with deduplication
             const seenPhones = new Set<string>();
@@ -42,9 +67,12 @@ export default function NotificationsPage() {
             const normalizePhone = (p: string) => p.replace(/[\s\-\(\)\.]+/g, '').replace(/^00/, '+');
 
             const recipients: any[] = [];
-            for (const c of (customers || [])) {
+            for (const c of audience as any[]) {
                 const phones = [c.phone, c.secondary_phone].filter(Boolean).map((p: string) => normalizePhone(p));
-                const emails = [c.email, c.secondary_email].filter(Boolean).map((e: string) => e.toLowerCase().trim());
+                const emails = [c.email, c.secondary_email]
+                    .filter(Boolean)
+                    .map((e: string) => e.toLowerCase().trim())
+                    .filter(isMailable);
 
                 // Pick first unique phone for this customer
                 const uniquePhone = phones.find(p => !seenPhones.has(p)) || null;
@@ -58,17 +86,20 @@ export default function NotificationsPage() {
                 phones.forEach(p => seenPhones.add(p));
                 emails.forEach(e => seenEmails.add(e));
 
-                const recipient = { email: uniqueEmail, phone: uniquePhone, name: c.full_name };
-
-                // Filter based on selected channels
-                if (form.channels.sms && !form.channels.email && !recipient.phone) continue;
-                if (form.channels.email && !form.channels.sms && !recipient.email) continue;
+                // Only send on the channels that were picked.
+                const recipient = {
+                    email: form.channels.email ? uniqueEmail : null,
+                    phone: form.channels.sms ? uniquePhone : null,
+                    name: c.full_name
+                };
                 if (!recipient.email && !recipient.phone) continue;
 
                 recipients.push(recipient);
             }
 
-            if (recipients.length === 0) throw new Error('No recipients found with valid contact info');
+            if (recipients.length === 0) {
+                throw new Error(`No ${AUDIENCE_LABELS[form.audience].toLowerCase()} have a ${form.channels.email && form.channels.sms ? 'valid email or phone' : form.channels.email ? 'valid email' : 'phone number'}.`);
+            }
 
             // Confirm before sending
             const smsCount = recipients.filter(r => r.phone).length;
@@ -77,7 +108,7 @@ export default function NotificationsPage() {
             if (form.channels.sms) summary.push(`${smsCount} SMS (deduplicated)`);
             if (form.channels.email) summary.push(`${emailCount} emails`);
 
-            if (!window.confirm(`This will send ${summary.join(' and ')} to your customers. Continue?`)) {
+            if (!window.confirm(`This will send ${summary.join(' and ')} to ${AUDIENCE_LABELS[form.audience]}. Continue?`)) {
                 setLoading(false);
                 return;
             }
@@ -101,7 +132,8 @@ export default function NotificationsPage() {
                         type: 'campaign',
                         payload: {
                             recipients: batch,
-                            subject: form.subject,
+                            // The API needs a subject even for SMS-only sends; it is not part of the SMS text.
+                            subject: form.channels.email ? form.subject : (form.subject.trim() || 'Message from House of Elle'),
                             message: form.message,
                             channels: form.channels,
                         }
@@ -155,14 +187,16 @@ export default function NotificationsPage() {
 
                 <form onSubmit={handleSend} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Audience</label>
+                        <label htmlFor="campaign-audience" className="block text-sm font-semibold text-gray-700 mb-2">Audience</label>
                         <select
+                            id="campaign-audience"
                             value={form.audience}
-                            onChange={e => setForm({ ...form, audience: e.target.value })}
+                            onChange={e => setForm({ ...form, audience: e.target.value as Audience })}
                             className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                            <option value="all">All Customers</option>
-                            <option value="newsletter">Newsletter Subscribers</option>
+                            {(Object.keys(AUDIENCE_LABELS) as Audience[]).map((a) => (
+                                <option key={a} value={a}>{AUDIENCE_LABELS[a]}</option>
+                            ))}
                         </select>
                     </div>
 
@@ -210,7 +244,10 @@ export default function NotificationsPage() {
                             placeholder="Write your message here... For emails, this supports plain text."
                             required
                         />
-                        <p className="text-sm text-gray-500 mt-1">This message will be used for the email body (wrapped in a template) and SMS content (if selected).</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                            This message will be used for the email body (wrapped in a template) and SMS content (if selected).
+                            {form.channels.sms && ` ${form.message.length} characters · ${smsSegments} SMS credit${smsSegments === 1 ? '' : 's'} per recipient.`}
+                        </p>
                     </div>
 
                     <button

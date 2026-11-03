@@ -94,8 +94,8 @@ export default function Footer() {
                 <ul className="space-y-3 text-brand-ivory/75 text-sm">
                   <li><Link href="/shop" className="hover:text-brand-gold transition-colors">All Products</Link></li>
                   <li><Link href="/categories" className="hover:text-brand-gold transition-colors">Collections</Link></li>
-                  <li><Link href="/shop?sort=newest" className="hover:text-brand-gold transition-colors">New Arrivals</Link></li>
-                  <li><Link href="/shop?sort=bestsellers" className="hover:text-brand-gold transition-colors">Best Sellers</Link></li>
+                  <li><Link href="/shop?sort=new" className="hover:text-brand-gold transition-colors">New Arrivals</Link></li>
+                  <li><Link href="/shop?sort=popular" className="hover:text-brand-gold transition-colors">Most Popular</Link></li>
                 </ul>
               </div>
 
@@ -115,7 +115,6 @@ export default function Footer() {
                   <li><Link href="/about" className="hover:text-brand-gold transition-colors">Our Story</Link></li>
                   <li><Link href="/privacy" className="hover:text-brand-gold transition-colors">Privacy Policy</Link></li>
                   <li><Link href="/terms" className="hover:text-brand-gold transition-colors">Terms of Service</Link></li>
-                  <li><Link href="/admin" className="hover:text-brand-gold transition-colors">Admin Access</Link></li>
                 </ul>
               </div>
 
@@ -124,11 +123,10 @@ export default function Footer() {
 
           <div className="border-t border-brand-gold/30 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-brand-ivory/60">
             <p>&copy; {new Date().getFullYear()} {siteName}. All rights reserved.</p>
-            <div className="flex gap-4 opacity-70 text-brand-gold">
-              <i className="ri-visa-line text-2xl"></i>
-              <i className="ri-mastercard-line text-2xl"></i>
-              <i className="ri-paypal-line text-2xl"></i>
-            </div>
+            <p className="flex items-center gap-2 text-brand-gold/80">
+              <i className="ri-smartphone-line text-lg" aria-hidden="true"></i>
+              Secure Mobile Money payments
+            </p>
           </div>
         </div>
       </div>

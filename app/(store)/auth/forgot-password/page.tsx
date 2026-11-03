@@ -9,7 +9,7 @@ export default function ForgotPasswordPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { getToken, verifying } = useRecaptcha();
+  const { getRawToken, verifying } = useRecaptcha();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,18 +27,31 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    // reCAPTCHA verification
-    const isHuman = await getToken('forgot_password');
-    if (!isHuman) {
+    // reCAPTCHA token is checked by the API route
+    const recaptchaToken = await getRawToken('forgot_password');
+    if (recaptchaToken === null) {
       setError('Security verification failed. Please try again.');
       setIsLoading(false);
       return;
     }
 
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const res = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, recaptchaToken }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(result.error || 'Could not send the reset email. Please try again.');
+        return;
+      }
       setIsSubmitted(true);
-    }, 1500);
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubmitted) {
@@ -51,10 +64,10 @@ export default function ForgotPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-3">Check Your Email</h1>
             <p className="text-gray-600 mb-6">
-              We've sent a password reset link to <strong>{email}</strong>
+              If an account exists for <strong>{email}</strong>, we&apos;ve sent it a link to choose a new password.
             </p>
             <p className="text-sm text-gray-500 mb-8">
-              If you don't receive an email within a few minutes, please check your spam folder.
+              The link expires in 1 hour. If it doesn&apos;t arrive within a few minutes, check your spam folder.
             </p>
             <Link
               href="/auth/login"

@@ -21,10 +21,11 @@ export async function POST(req: Request) {
             );
         }
 
-        const body = await req.json();
-        const { orderId, customerEmail } = body;
+        const body = await req.json().catch(() => ({}));
+        const orderId = typeof body?.orderId === 'string' ? body.orderId.trim() : '';
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
 
-        if (!orderId || typeof orderId !== 'string') {
+        if (!isUuid && !/^ORD-\d+-\d+$/.test(orderId)) {
             return NextResponse.json({ success: false, message: 'Missing or invalid orderId' }, { status: 400 });
         }
 
@@ -38,8 +39,8 @@ export async function POST(req: Request) {
         // NEVER trust the amount from the client.
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
-            .select('id, order_number, total, email, payment_status')
-            .or(`id.eq.${orderId},order_number.eq.${orderId}`)
+            .select('id, order_number, total, email, payment_status, status, metadata')
+            .eq(isUuid ? 'id' : 'order_number', orderId)
             .single();
 
         if (orderError || !order) {
@@ -50,6 +51,9 @@ export async function POST(req: Request) {
         // Don't allow payment for already-paid orders
         if (order.payment_status === 'paid') {
             return NextResponse.json({ success: false, message: 'Order is already paid' }, { status: 400 });
+        }
+        if (order.status === 'cancelled' || order.status === 'refunded') {
+            return NextResponse.json({ success: false, message: 'This order was cancelled. Please place a new order.' }, { status: 400 });
         }
 
         // Use the database amount, NOT the client-provided amount
@@ -70,15 +74,16 @@ export async function POST(req: Request) {
         const payload = {
             type: 1,
             amount: amount.toString(),
-            email: process.env.MOOLRE_MERCHANT_EMAIL || 'admin@standardecom.com',
+            email: process.env.MOOLRE_MERCHANT_EMAIL || process.env.ADMIN_EMAIL || 'admin@standardecom.com',
             externalref: uniqueRef,
             callback: `${baseUrl}/api/payment/moolre/callback`,
-            redirect: `${baseUrl}/order-success?order=${orderRef}&payment_success=true`,
+            // The order id lets the success page load the order without asking for the email.
+            redirect: `${baseUrl}/order-success?order=${encodeURIComponent(orderRef)}&id=${order.id}&payment_success=true`,
             reusable: "0",
             currency: "GHS",
             accountnumber: process.env.MOOLRE_ACCOUNT_NUMBER,
             metadata: {
-                customer_email: customerEmail || order.email,
+                customer_email: order.email,
                 original_order_number: orderRef
             }
         };
@@ -99,6 +104,11 @@ export async function POST(req: Request) {
         console.log('[Payment] Response status:', result.status, '| Has URL:', !!result.data?.authorization_url);
 
         if (result.status === 1 && result.data?.authorization_url) {
+            // Remember the reference so /verify can ask Moolre about this exact attempt.
+            await supabaseAdmin
+                .from('orders')
+                .update({ metadata: { ...(order.metadata || {}), moolre_externalref: uniqueRef } })
+                .eq('id', order.id);
             return NextResponse.json({ success: true, url: result.data.authorization_url, reference: result.data.reference });
         } else {
             return NextResponse.json({ success: false, message: result.message || 'Failed to generate payment link' }, { status: 400 });

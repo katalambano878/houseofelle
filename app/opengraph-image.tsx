@@ -43,7 +43,7 @@ export default function OpenGraphImage() {
           style={{ objectFit: 'contain', marginBottom: 24 }}
         />
         <div style={{ fontSize: 70, fontWeight: 600, letterSpacing: '-0.02em' }}>Elevate Your Style</div>
-        <div style={{ fontSize: 34, marginTop: 16, color: '#6b4f2c' }}>Premium Fashion in Accra</div>
+        <div style={{ fontSize: 34, marginTop: 16, color: '#6b4f2c' }}>Perfumes, Body Mists & Candles · Accra</div>
       </div>
     ),
     {

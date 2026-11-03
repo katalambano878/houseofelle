@@ -104,6 +104,15 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
     ? reviews
     : reviews.filter(r => r.rating === parseInt(filter));
 
+  // Guests sign in first and come back to this product.
+  const openReviewForm = () => {
+    if (!user) {
+      window.location.href = `/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
+    setShowReviewForm(true);
+  };
+
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -127,13 +136,12 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
         rating: reviewForm.rating,
         title: reviewForm.title,
         content: reviewForm.content,
-        status: 'approved', // Auto-approve for demo
-        verified_purchase: false // We could check orders here but keeping it simple
       }]);
+      // Status defaults to 'pending'; the review shows after approval in Admin → Reviews.
 
       if (error) throw error;
 
-      alert('Review submitted successfully!');
+      alert('Thank you! Your review will appear once our team has checked it.');
       setShowReviewForm(false);
       setReviewForm({ rating: 5, title: '', content: '' });
       invalidateCache(`reviews:${productId}`); // Clear cache so fresh data is fetched
@@ -157,7 +165,7 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
         <div className="text-center py-8 mb-8 border-b border-gray-200">
           <p className="text-gray-500 mb-4">No reviews yet. Be the first to review!</p>
           <button
-            onClick={() => setShowReviewForm(true)}
+            onClick={openReviewForm}
             className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
           >
             Write a Review
@@ -220,7 +228,7 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
 
             {!showReviewForm && (
               <button
-                onClick={() => setShowReviewForm(true)}
+                onClick={openReviewForm}
                 className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg font-semibold transition-colors whitespace-nowrap"
               >
                 Write a Review
@@ -318,7 +326,7 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
                     {review.verified && (
                       <span className="flex items-center text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded">
                         <i className="ri-checkbox-circle-fill mr-1"></i>
-                        Verified Must Have
+                        Verified Purchase
                       </span>
                     )}
                   </div>
@@ -340,12 +348,12 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
             <h4 className="font-semibold text-gray-900 mb-2">{review.title}</h4>
             <p className="text-gray-700 mb-4">{review.content}</p>
 
-            <div className="flex items-center space-x-4 text-sm">
-              <button className="flex items-center space-x-1 text-gray-600 hover:text-blue-700 transition-colors">
-                <i className="ri-thumb-up-line"></i>
-                <span>Helpful ({review.helpful})</span>
-              </button>
-            </div>
+            {review.helpful > 0 && (
+              <p className="flex items-center space-x-1 text-sm text-gray-600">
+                <i className="ri-thumb-up-line" aria-hidden="true"></i>
+                <span>{review.helpful} found this helpful</span>
+              </p>
+            )}
           </div>
         ))}
       </div>

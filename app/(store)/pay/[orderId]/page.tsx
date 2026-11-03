@@ -21,16 +21,20 @@ export default function PaymentPage() {
   useEffect(() => {
     async function fetchOrder() {
       try {
-        // Fetch order by ID (UUID) or order_number
-        let query = supabase
-          .from('orders')
-          .select('*')
-          .or(`id.eq.${orderId},order_number.eq.${orderId}`)
-          .single();
+        // The payment link carries the order id, which the lookup API accepts on its own
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        const res = await fetch('/api/orders/lookup', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(isUuid ? { id: orderId } : { order: orderId }),
+        });
+        const json = await res.json().catch(() => ({}));
+        const data = json?.order;
 
-        const { data, error: fetchError } = await query;
-
-        if (fetchError || !data) {
+        if (!res.ok || !data) {
           setError('Order not found. Please check your link and try again.');
           setLoading(false);
           return;
@@ -40,7 +44,7 @@ export default function PaymentPage() {
 
         // If already paid, redirect to success page
         if (data.payment_status === 'paid') {
-          router.push(`/order-success?order=${data.order_number}`);
+          router.push(`/order-success?order=${data.order_number}&id=${data.id}`);
           return;
         }
 
@@ -67,11 +71,7 @@ export default function PaymentPage() {
       const paymentRes = await fetch('/api/payment/moolre', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: order.order_number,
-          amount: order.total,
-          customerEmail: order.email
-        })
+        body: JSON.stringify({ orderId: order.id })
       });
 
       const paymentResult = await paymentRes.json();

@@ -17,8 +17,8 @@ interface SEOProps {
 }
 
 export function generateMetadata({
-  title = 'House of Elle | Premium Women’s Fashion in Accra',
-  description = 'Shop premium women’s fashion at House of Elle. Discover stylish, modern outfits designed for confidence and elegance. Located in Accra, Ghana.',
+  title = 'House of Elle | Perfumes, Body Mists & Candles in Accra',
+  description = 'Shop curated perfumes, body mists, scented candles and body care at House of Elle in Accra, Ghana. Wholesale options available.',
   keywords = [],
   ogImage,
   ogType = 'website',
@@ -38,11 +38,11 @@ export function generateMetadata({
   const fullTitle = title.includes(siteName) ? title : `${title} | ${siteName}`;
 
   const defaultKeywords = [
-    'women’s fashion Ghana',
-    'boutique Accra',
-    'stylish outfits Ghana',
-    'ladies wear Accra',
-    'premium fashion Ghana',
+    'perfume shop Accra',
+    'perfumes Ghana',
+    'body mist Ghana',
+    'scented candles Accra',
+    'wholesale perfume Ghana',
     'House of Elle'
   ];
 
@@ -203,7 +203,7 @@ export function StructuredData({ data }: { data: any }) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\\u003c') }}
     />
   );
 }

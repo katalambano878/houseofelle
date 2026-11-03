@@ -5,6 +5,7 @@ import Link from 'next/link';
 import MiniCart from './MiniCart';
 import { useCart } from '@/context/CartContext';
 import { supabase } from '@/lib/supabase';
+import { useWishlist } from '@/context/WishlistContext';
 import { useCMS } from '@/context/CMSContext';
 import AnnouncementBar from './AnnouncementBar';
 
@@ -12,7 +13,7 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [wishlistCount, setWishlistCount] = useState(0);
+  const { wishlistCount } = useWishlist();
   const [user, setUser] = useState<any>(null);
 
   const { cartCount, isCartOpen, setIsCartOpen } = useCart();
@@ -22,15 +23,6 @@ export default function Header() {
   const headerLogo = getSetting('site_logo') || '/house-of-elle-logo.png';
 
   useEffect(() => {
-    // Wishlist logic
-    const updateWishlistCount = () => {
-      const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
-      setWishlistCount(wishlist.length);
-    };
-
-    updateWishlistCount();
-    window.addEventListener('wishlistUpdated', updateWishlistCount);
-
     // Auth logic
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -44,7 +36,6 @@ export default function Header() {
     });
 
     return () => {
-      window.removeEventListener('wishlistUpdated', updateWishlistCount);
       subscription.unsubscribe();
     };
   }, []);

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { notFound } from 'next/navigation';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import ProductDetailClient from './ProductDetailClient';
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com';
@@ -8,30 +9,25 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
 
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return {};
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const { data: product } = await supabase
+    // Server-side read straight from the database (no HTTP round trip to our own /rest/v1).
+    const { data: product } = await supabaseAdmin
       .from('products')
-      .select('name, description, price, quantity, slug, product_images(url)')
+      .select('name, description, price, quantity, slug, product_images(url, position)')
       .eq('slug', slug)
-      .single();
+      .eq('status', 'active')
+      .maybeSingle();
 
     if (!product) {
       return {
-        title: 'Product | House of Elle',
-        description: 'Premium fashion and lifestyle essentials by House of Elle.',
+        title: 'Product not found',
+        robots: { index: false },
       };
     }
 
-    const title = `${product.name} - House of Elle`;
+    const title = product.name; // the root layout's template appends "| House of Elle"
     const description = (product.description || `Shop ${product.name} at House of Elle, Accra.`).slice(0, 155);
-    const image = product.product_images?.[0]?.url || `${siteUrl}/opengraph-image`;
+    const images = [...(product.product_images || [])].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+    const image = images[0]?.url || `${siteUrl}/opengraph-image`;
 
     return {
       title,
@@ -59,5 +55,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  // Real 404 for unknown or hidden products (instead of a "soft 404" page with status 200).
+  const { data: exists, error } = await supabaseAdmin
+    .from('products')
+    .select('id')
+    .eq('slug', slug)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (!error && !exists) notFound();
   return <ProductDetailClient slug={slug} />;
 }

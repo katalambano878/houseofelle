@@ -7,10 +7,13 @@ import OrderHistory from './OrderHistory';
 import AddressBook from './AddressBook';
 import { supabase } from '@/lib/supabase';
 
+const TABS = ['profile', 'orders', 'addresses', 'security'];
+
 function AccountContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'profile';
+  const requestedTab = searchParams.get('tab');
+  const initialTab = requestedTab && TABS.includes(requestedTab) ? requestedTab : 'profile';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [user, setUser] = useState<any>(null);
@@ -19,7 +22,7 @@ function AccountContent() {
   // Update active tab when URL param changes
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['profile', 'orders', 'addresses', 'security'].includes(tab)) {
+    if (tab && TABS.includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -46,7 +49,9 @@ function AccountContent() {
     async function checkUser() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        router.push('/auth/login');
+        const tab = searchParams.get('tab');
+        const back = tab && TABS.includes(tab) ? `/account?tab=${tab}` : '/account';
+        router.push(`/auth/login?redirect=${encodeURIComponent(back)}`);
         return;
       }
 
@@ -55,12 +60,19 @@ function AccountContent() {
         firstName: session.user.user_metadata?.first_name || '',
         lastName: session.user.user_metadata?.last_name || '',
         email: session.user.email || '',
-        phone: session.user.phone || ''
+        phone: session.user.user_metadata?.phone || session.user.phone || ''
       });
       setLoading(false);
     }
     checkUser();
+    // Only run on mount; tab changes are handled above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  const selectTab = (tab: string) => {
+    setActiveTab(tab);
+    router.replace(tab === 'profile' ? '/account' : `/account?tab=${tab}`, { scroll: false });
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,9 +82,10 @@ function AccountContent() {
     try {
       const { error } = await supabase.auth.updateUser({
         data: {
-          first_name: profileData.firstName,
-          last_name: profileData.lastName,
-          phone: profileData.phone // Storing phone in metadata for now
+          first_name: profileData.firstName.trim(),
+          last_name: profileData.lastName.trim(),
+          full_name: [profileData.firstName.trim(), profileData.lastName.trim()].filter(Boolean).join(' '),
+          phone: profileData.phone.trim()
         }
       });
 
@@ -91,8 +104,8 @@ function AccountContent() {
       setPasswordMessage({ type: 'error', text: 'Passwords do not match' });
       return;
     }
-    if (passwordData.password.length < 6) {
-      setPasswordMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+    if (passwordData.password.length < 8) {
+      setPasswordMessage({ type: 'error', text: 'Password must be at least 8 characters' });
       return;
     }
 
@@ -126,38 +139,6 @@ function AccountContent() {
       </div>
     );
   }
-
-  const quickActions = [
-    {
-      icon: 'ri-medal-line',
-      title: 'Loyalty Program',
-      description: 'Earn points and rewards',
-      link: '/loyalty'
-    },
-    {
-      icon: 'ri-user-add-line',
-      title: 'Refer & Earn',
-      description: 'Invite friends and earn rewards',
-      link: '/referral'
-    }
-  ];
-
-  const securityOptions = [
-    {
-      icon: 'ri-mail-check-line',
-      title: 'Verify Email',
-      description: user?.email,
-      status: user?.email_confirmed_at ? 'verified' : 'unverified',
-      link: '#' // /account/verify-email
-    },
-    {
-      icon: 'ri-phone-line',
-      title: 'Verify Phone',
-      description: user?.phone || 'No phone added',
-      status: user?.phone_confirmed_at ? 'verified' : 'unverified',
-      link: '#' // /account/verify-phone
-    }
-  ];
 
   return (
     <>
@@ -197,7 +178,7 @@ function AccountContent() {
                   ].map(tab => (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => selectTab(tab.id)}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-left group ${activeTab === tab.id
                         ? 'bg-blue-50 text-blue-700 shadow-sm'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -222,7 +203,7 @@ function AccountContent() {
                 ].map(tab => (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => selectTab(tab.id)}
                     className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium whitespace-nowrap transition-all border shadow-sm ${activeTab === tab.id
                       ? 'bg-blue-700 text-white border-blue-700 ring-2 ring-blue-100'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
@@ -369,36 +350,46 @@ function AccountContent() {
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-6">Security Settings</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {securityOptions.map((option, index) => (
-                        <Link
-                          key={index}
-                          href={option.link}
-                          className="flex items-center justify-between p-5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:shadow-md transition-all group bg-white"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors flex-shrink-0">
-                              <i className={`${option.icon} text-xl`}></i>
-                            </div>
-                            <div className="min-w-0">
-                              <h3 className="font-bold text-gray-900 truncate">{option.title}</h3>
-                              <p className="text-sm text-gray-500 truncate">{option.description}</p>
-                            </div>
+                      <div className="flex items-center gap-3 p-5 border border-gray-200 rounded-2xl bg-white min-w-0">
+                        <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center flex-shrink-0">
+                          <i className="ri-mail-line text-xl"></i>
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-gray-900">Sign-in email</h3>
+                          <p className="text-sm text-gray-500 truncate">{user?.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => selectTab('profile')}
+                        className="flex items-center justify-between p-5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:shadow-md transition-all group bg-white text-left"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors flex-shrink-0">
+                            <i className="ri-lock-password-line text-xl"></i>
                           </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {option.status === 'verified' && (
-                              <span className="text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-full flex items-center gap-1">
-                                <i className="ri-verified-badge-fill"></i> <span className="hidden sm:inline">Verified</span>
-                              </span>
-                            )}
-                            {option.status === 'unverified' && (
-                              <span className="text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1 bg-amber-100 text-amber-700 rounded-full flex items-center gap-1">
-                                <i className="ri-error-warning-fill"></i> <span className="hidden sm:inline">Verify</span>
-                              </span>
-                            )}
-                            <i className="ri-arrow-right-line text-gray-300 group-hover:text-blue-500 transition-colors"></i>
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-gray-900">Password</h3>
+                            <p className="text-sm text-gray-500">Change your password</p>
                           </div>
-                        </Link>
-                      ))}
+                        </div>
+                        <i className="ri-arrow-right-line text-gray-300 group-hover:text-blue-500 transition-colors"></i>
+                      </button>
+                      <Link
+                        href="/account/privacy"
+                        className="flex items-center justify-between p-5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:shadow-md transition-all group bg-white"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors flex-shrink-0">
+                            <i className="ri-shield-user-line text-xl"></i>
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-gray-900">Privacy &amp; data</h3>
+                            <p className="text-sm text-gray-500 truncate">Download your data or request account deletion</p>
+                          </div>
+                        </div>
+                        <i className="ri-arrow-right-line text-gray-300 group-hover:text-blue-500 transition-colors"></i>
+                      </Link>
                     </div>
                   </div>
                 )}

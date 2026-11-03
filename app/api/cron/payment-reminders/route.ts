@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendPaymentLink } from '@/lib/notifications';
+import { secretsMatch } from '@/lib/moolre';
 
 // This endpoint is called by a cron job to send payment reminders
 // for orders that haven't been paid within 15 minutes
@@ -10,7 +11,8 @@ export async function GET(request: Request) {
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
     
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Fail closed: without a configured secret anyone could trigger paid SMS sends.
+    if (!cronSecret || !secretsMatch(authHeader || '', `Bearer ${cronSecret}`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -24,6 +26,7 @@ export async function GET(request: Request) {
       .from('orders')
       .select('id, order_number, email, phone, total, shipping_address, metadata')
       .neq('payment_status', 'paid')
+      .neq('status', 'cancelled')
       .eq('payment_reminder_sent', false)
       .lt('created_at', fifteenMinutesAgo)
       .order('created_at', { ascending: true })
@@ -78,6 +81,6 @@ export async function GET(request: Request) {
 
   } catch (error: any) {
     console.error('[Payment Reminders] Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Reminder run failed' }, { status: 500 });
   }
 }

@@ -9,8 +9,9 @@ import { cachedQuery } from '@/lib/query-cache';
 import ProductCard from '@/components/ProductCard';
 import ProductReviews from '@/components/ProductReviews';
 import { StructuredData, generateProductSchema, generateBreadcrumbSchema } from '@/components/SEOHead';
-import { notFound } from 'next/navigation';
+import { notFound, useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
 // Map common color names to hex values for the swatch preview
@@ -28,6 +29,13 @@ function colorNameToHex(name: string): string {
   return map[name.toLowerCase().trim()] || '#d1d5db';
 }
 
+/** Accepts a list, or text with one item per line / comma, from product metadata. */
+function toList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v) => typeof v === 'string' && v.trim()).map((v) => v.trim());
+  if (typeof value === 'string') return value.split(/\n|,/).map((v) => v.trim()).filter(Boolean);
+  return [];
+}
+
 export default function ProductDetailClient({ slug }: { slug: string }) {
   const [product, setProduct] = useState<any>(null);
   usePageTitle(product?.name || 'Product');
@@ -38,7 +46,8 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const router = useRouter();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
 
   const { addToCart } = useCart();
@@ -62,7 +71,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
               .from('products')
               .select(`
                 *,
-                categories(name),
+                categories(name, slug),
                 product_variants(*),
                 product_images(url, position, alt_text)
               `);
@@ -108,23 +117,24 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
           ...productData,
           images: productData.product_images?.sort((a: any, b: any) => a.position - b.position).map((img: any) => img.url) || [],
           category: productData.categories?.name || 'Shop',
+          categorySlug: productData.categories?.slug || '',
           rating: productData.rating_avg || 0,
-          reviewCount: 0,
+          reviewCount: productData.review_count || 0,
           stockCount: productData.quantity,
           moq: productData.moq || 1,
           colors: [...new Set(rawVariants.map((v: any) => v.color).filter(Boolean))],
           colorHexMap,
           variants: rawVariants,
           sizes: rawVariants.map((v: any) => v.name) || [],
-          features: ['Premium Quality', 'Authentic Design'],
-          featured: ['Premium Quality', 'Authentic Design'],
-          care: 'Handle with care.',
+          // Optional details the team can add in product metadata; tabs hide when empty.
+          features: toList(productData.metadata?.features ?? productData.metadata?.notes),
+          care: typeof productData.metadata?.care === 'string' ? productData.metadata.care : '',
           preorderShipping: productData.metadata?.preorder_shipping || null
         };
 
         // Ensure at least one image/placeholder
         if (transformedProduct.images.length === 0) {
-          transformedProduct.images = ['https://via.placeholder.com/800x800?text=No+Image'];
+          transformedProduct.images = ['/placeholder-product.svg'];
         }
 
         setProduct(transformedProduct);
@@ -165,7 +175,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 slug: p.slug,
                 name: p.name,
                 price: p.price,
-                image: p.product_images?.[0]?.url || 'https://via.placeholder.com/800?text=No+Image',
+                image: p.product_images?.[0]?.url || '/placeholder-product.svg',
                 rating: p.rating_avg || 0,
                 reviewCount: 0,
                 inStock: effectiveStock > 0,
@@ -222,6 +232,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
       image: product.images[0],
       quantity: quantity,
       variant: variantLabel,
+      variantId: selectedVariant?.id || undefined,
       slug: product.slug,
       maxStock: activeStock,
       moq: product.moq || 1
@@ -230,7 +241,27 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
   const handleBuyNow = () => {
     handleAddToCart();
-    window.location.href = '/checkout';
+    router.push('/checkout');
+  };
+
+  const wishlisted = product ? isInWishlist(product.id) : false;
+  const toggleWishlist = () => {
+    if (!product) return;
+    if (wishlisted) {
+      removeFromWishlist(product.id);
+    } else {
+      addToWishlist({
+        id: product.id,
+        name: product.name,
+        price: product.variants?.length ? Math.min(...product.variants.map((v: any) => v.price || product.price)) : product.price,
+        originalPrice: product.compare_at_price || undefined,
+        image: product.images?.[0] || '/placeholder-product.svg',
+        rating: product.rating,
+        reviewCount: product.reviewCount,
+        inStock: (product.stockCount ?? 0) > 0 || product.continue_selling,
+        slug: product.slug,
+      });
+    }
   };
 
   if (loading) {
@@ -271,11 +302,13 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     category: product.category
   });
 
+  const siteOrigin = (process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
+  const categoryHref = product.categorySlug ? `/shop?category=${product.categorySlug}` : '/shop';
   const breadcrumbSchema = generateBreadcrumbSchema([
-    { name: 'Home', url: 'https://example.com' },
-    { name: 'Shop', url: 'https://example.com/shop' },
-    { name: product.category, url: `https://example.com/shop?category=${product.category.toLowerCase().replace(/\s+/g, '-')}` },
-    { name: product.name, url: `https://example.com/product/${slug}` }
+    { name: 'Home', url: siteOrigin || '/' },
+    { name: 'Shop', url: `${siteOrigin}/shop` },
+    { name: product.category, url: `${siteOrigin}${categoryHref}` },
+    { name: product.name, url: `${siteOrigin}/product/${product.slug || slug}` }
   ]);
 
   return (
@@ -291,7 +324,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
               <i className="ri-arrow-right-s-line text-brand-gold/70"></i>
               <Link href="/shop" className="text-brand-brown hover:text-brand-gold transition-colors">Shop</Link>
               <i className="ri-arrow-right-s-line text-brand-gold/70"></i>
-              <Link href="#" className="text-brand-brown hover:text-brand-gold transition-colors">{product.category}</Link>
+              <Link href={categoryHref} className="text-brand-brown hover:text-brand-gold transition-colors">{product.category}</Link>
               <i className="ri-arrow-right-s-line text-brand-gold/70"></i>
               <span className="text-brand-black font-medium truncate max-w-[220px]">{renderNameWithPlainAmpersand(product.name)}</span>
             </nav>
@@ -349,10 +382,13 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     <h1 className="text-3xl lg:text-4xl font-serif text-brand-black mb-3 leading-tight">{renderNameWithPlainAmpersand(product.name)}</h1>
                   </div>
                   <button
-                    onClick={() => setIsWishlisted(!isWishlisted)}
+                    type="button"
+                    onClick={toggleWishlist}
+                    aria-pressed={wishlisted}
+                    aria-label={wishlisted ? 'Remove from wishlist' : 'Save to wishlist'}
                     className="w-11 h-11 flex items-center justify-center border border-brand-gold/35 hover:border-brand-gold bg-brand-ivory/30 rounded-full transition-colors cursor-pointer"
                   >
-                    <i className={`${isWishlisted ? 'ri-heart-fill text-brand-gold' : 'ri-heart-line text-brand-brown'} text-xl`}></i>
+                    <i className={`${wishlisted ? 'ri-heart-fill text-brand-gold' : 'ri-heart-line text-brand-brown'} text-xl`}></i>
                   </button>
                 </div>
 
@@ -443,11 +479,9 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                       : product.variants;
 
                   // Check if we need to show the name selector (skip if all visible variants have the same name or only 1)
-                  const uniqueNames = [...new Set(visibleVariants.map((v: any) => v.name).filter(Boolean))];
-                  const showNameSelector = visibleVariants.length > 1 || (!hasColors && visibleVariants.length > 0);
 
-                  if (!showNameSelector && !hasColors) {
-                    // Single variant with no colors — show standard picker
+                  if (!hasColors) {
+                    // No colours: always show the standard picker (a single option must still be selectable)
                     return (
                       <div className="mb-8">
                         <label className="block font-semibold text-brand-black mb-3">
@@ -616,12 +650,12 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     <span>Free store pickup available</span>
                   </div>
                   <div className="flex items-center text-brand-brown">
-                    <i className="ri-arrow-left-right-line text-xl text-brand-gold mr-3"></i>
-                    <span>30-day easy returns and exchanges</span>
+                    <i className="ri-truck-line text-xl text-brand-gold mr-3"></i>
+                    <span>Delivery across Ghana, fee confirmed after you order</span>
                   </div>
                   <div className="flex items-center text-brand-brown">
                     <i className="ri-shield-check-line text-xl text-brand-gold mr-3"></i>
-                    <span>Secure payment & buyer protection</span>
+                    <span>Secure Mobile Money payment</span>
                   </div>
                   {product.sku && (
                     <div className="flex items-center text-brand-brown">
@@ -639,7 +673,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="border-b border-brand-gold/25 mb-8">
               <div className="flex space-x-4 sm:space-x-8 overflow-x-auto">
-                {['description', 'features', 'care', 'reviews'].map((tab) => (
+                {['description', ...(product.features.length ? ['features'] : []), ...(product.care ? ['care'] : []), 'reviews'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}

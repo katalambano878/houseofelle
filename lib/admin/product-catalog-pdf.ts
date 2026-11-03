@@ -17,19 +17,62 @@ export type GenerateCatalogPdfOptions = {
   onProgress?: (current: number, total: number) => void;
 };
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * jsPDF only reliably embeds PNG and JPEG. Other formats (WebP, AVIF, GIF, …) are decoded by the
+ * browser, drawn onto a canvas over a white background and re-exported as JPEG.
+ */
+async function blobToJpegDataUrl(blob: Blob, maxSide = 600): Promise<string | null> {
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('Image could not be decoded'));
+      el.src = objectUrl;
+    });
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return null;
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; format: 'PNG' | 'JPEG' } | null> {
   try {
     const response = await fetch(url, { mode: 'cors' });
     if (!response.ok) return null;
     const blob = await response.blob();
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-    const format: 'PNG' | 'JPEG' = blob.type.includes('png') ? 'PNG' : 'JPEG';
-    return { dataUrl, format };
+    const type = blob.type.toLowerCase();
+    if (type === 'image/png') {
+      return { dataUrl: await blobToDataUrl(blob), format: 'PNG' };
+    }
+    if (type === 'image/jpeg' || type === 'image/jpg') {
+      return { dataUrl: await blobToDataUrl(blob), format: 'JPEG' };
+    }
+    const jpeg = await blobToJpegDataUrl(blob);
+    return jpeg ? { dataUrl: jpeg, format: 'JPEG' } : null;
   } catch {
     return null;
   }
@@ -51,7 +94,7 @@ function addPageFooter(doc: jsPDF, pageNum: number, totalPages: number) {
   doc.setFontSize(8);
   doc.setTextColor(120);
   doc.text(
-    `House of EL — Product catalog — Page ${pageNum} of ${totalPages}`,
+    `House of Elle — Product catalog — Page ${pageNum} of ${totalPages}`,
     pageWidth / 2,
     pageHeight - 8,
     { align: 'center' }
@@ -84,7 +127,7 @@ export async function generateProductCatalogPdf(
   // Header
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text(options.title ?? 'House of EL', margin, y);
+  doc.text(options.title ?? 'House of Elle', margin, y);
   y += 9;
 
   doc.setFont('helvetica', 'normal');

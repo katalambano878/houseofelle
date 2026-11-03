@@ -6,7 +6,6 @@ import Link from 'next/link';
 export default function CookieConsent() {
   const [showBanner, setShowBanner] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const [preferences, setPreferences] = useState({
     necessary: true,
@@ -18,9 +17,23 @@ export default function CookieConsent() {
   useEffect(() => {
     const consent = localStorage.getItem('cookieConsent');
     if (!consent) {
-      setTimeout(() => setShowBanner(true), 1000);
+      const timer = setTimeout(() => setShowBanner(true), 1000);
+      return () => clearTimeout(timer);
     }
   }, []);
+
+  // Tell Google Analytics (consent mode, see app/layout.tsx) what the visitor chose.
+  const applyConsent = (choice: { analytics: boolean; marketing: boolean }) => {
+    const w = window as any;
+    if (typeof w.gtag === 'function') {
+      w.gtag('consent', 'update', {
+        analytics_storage: choice.analytics ? 'granted' : 'denied',
+        ad_storage: choice.marketing ? 'granted' : 'denied',
+        ad_user_data: choice.marketing ? 'granted' : 'denied',
+        ad_personalization: choice.marketing ? 'granted' : 'denied',
+      });
+    }
+  };
 
   const acceptAll = () => {
     const allAccepted = {
@@ -31,6 +44,7 @@ export default function CookieConsent() {
       timestamp: new Date().toISOString()
     };
     localStorage.setItem('cookieConsent', JSON.stringify(allAccepted));
+    applyConsent(allAccepted);
     setShowBanner(false);
   };
 
@@ -43,6 +57,7 @@ export default function CookieConsent() {
       timestamp: new Date().toISOString()
     };
     localStorage.setItem('cookieConsent', JSON.stringify(rejected));
+    applyConsent(rejected);
     setShowBanner(false);
   };
 
@@ -52,6 +67,7 @@ export default function CookieConsent() {
       timestamp: new Date().toISOString()
     };
     localStorage.setItem('cookieConsent', JSON.stringify(saved));
+    applyConsent(saved);
     setShowBanner(false);
     setShowPreferences(false);
   };
@@ -60,7 +76,7 @@ export default function CookieConsent() {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]" onClick={() => !showPreferences && rejectAll()} />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]" aria-hidden="true" />
       
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t-4 border-blue-700 shadow-2xl z-[9999] animate-slide-up">
         <div className="max-w-7xl mx-auto px-4 py-6">
@@ -79,24 +95,6 @@ export default function CookieConsent() {
                       Read our Privacy Policy
                     </Link>
                   </p>
-                  <label className="flex items-start space-x-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      className="w-4 h-4 mt-0.5 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                    />
-                    <span className="text-xs text-gray-600 group-hover:text-gray-900">
-                      I agree to the{' '}
-                      <Link href="/terms" className="text-blue-700 hover:text-blue-900 font-medium">
-                        Terms & Conditions
-                      </Link>
-                      {' '}and{' '}
-                      <Link href="/privacy" className="text-blue-700 hover:text-blue-900 font-medium">
-                        Privacy Policy
-                      </Link>
-                    </span>
-                  </label>
                 </div>
               </div>
 
@@ -115,13 +113,7 @@ export default function CookieConsent() {
                 </button>
                 <button
                   onClick={acceptAll}
-                  disabled={!acceptedTerms}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap ${
-                    acceptedTerms
-                      ? 'bg-blue-700 hover:bg-blue-800 text-white cursor-pointer'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                  title={!acceptedTerms ? 'Please accept Terms & Conditions first' : ''}
+                  className="px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap bg-blue-700 hover:bg-blue-800 text-white cursor-pointer"
                 >
                   Accept All
                 </button>
@@ -213,25 +205,6 @@ export default function CookieConsent() {
                 </div>
               </div>
 
-              <label className="flex items-start space-x-2 cursor-pointer group mb-4">
-                <input
-                  type="checkbox"
-                  checked={acceptedTerms}
-                  onChange={(e) => setAcceptedTerms(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                />
-                <span className="text-sm text-gray-600 group-hover:text-gray-900">
-                  I agree to the{' '}
-                  <Link href="/terms" className="text-blue-700 hover:text-blue-900 font-medium">
-                    Terms & Conditions
-                  </Link>
-                  {' '}and{' '}
-                  <Link href="/privacy" className="text-blue-700 hover:text-blue-900 font-medium">
-                    Privacy Policy
-                  </Link>
-                </span>
-              </label>
-
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={rejectAll}
@@ -241,23 +214,13 @@ export default function CookieConsent() {
                 </button>
                 <button
                   onClick={savePreferences}
-                  disabled={!acceptedTerms}
-                  className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap ${
-                    acceptedTerms
-                      ? 'bg-blue-700 hover:bg-blue-800 text-white cursor-pointer'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
+                  className="flex-1 px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap bg-blue-700 hover:bg-blue-800 text-white cursor-pointer"
                 >
                   Save Preferences
                 </button>
                 <button
                   onClick={acceptAll}
-                  disabled={!acceptedTerms}
-                  className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap ${
-                    acceptedTerms
-                      ? 'bg-gray-900 hover:bg-blue-700 text-white cursor-pointer'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
+                  className="flex-1 px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap bg-gray-900 hover:bg-blue-700 text-white cursor-pointer"
                 >
                   Accept All
                 </button>

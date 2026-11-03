@@ -3,9 +3,8 @@ import { money } from '@/lib/format-money';
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
-import CartCountdown from '@/components/CartCountdown';
-import AdvancedCouponSystem from '@/components/AdvancedCouponSystem';
+import { useEffect, useState } from 'react';
+import AdvancedCouponSystem, { checkCoupon, type AppliedCoupon } from '@/components/AdvancedCouponSystem';
 import { useCart } from '@/context/CartContext';
 import PageHero from '@/components/PageHero';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -13,49 +12,72 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 export default function CartPage() {
   usePageTitle('Shopping Cart');
   const { cart: cartItems, removeFromCart, updateQuantity, subtotal, addToCart } = useCart();
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-  const [savedItems, setSavedItems] = useState<any[]>([]);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [savedItems, setSavedItemsState] = useState<any[]>([]);
 
-  // Function to move item to saved for later (local state only for now)
-  const saveForLater = (id: string) => {
-    const item = cartItems.find(item => item.id === id);
+  // "Saved for later" survives reloads; items leave the cart, so losing them would lose the shopper's picks.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('savedForLater');
+      if (raw) setSavedItemsState(JSON.parse(raw));
+    } catch {}
+  }, []);
+  const setSavedItems = (items: any[]) => {
+    setSavedItemsState(items);
+    try { localStorage.setItem('savedForLater', JSON.stringify(items)); } catch {}
+  };
+
+  const sameLine = (a: { id: string; variant?: string }, id: string, variant?: string) =>
+    a.id === id && (a.variant || '') === (variant || '');
+
+  const saveForLater = (id: string, variant?: string) => {
+    const item = cartItems.find(i => sameLine(i, id, variant));
     if (item) {
-      setSavedItems([...savedItems, item]);
-      removeFromCart(item.id, item.variant); // Use context's removeFromCart
+      setSavedItems([...savedItems.filter(i => !sameLine(i, id, variant)), item]);
+      removeFromCart(item.id, item.variant);
     }
   };
 
-  const moveToCart = (id: string) => {
-    const item = savedItems.find(item => item.id === id);
+  const moveToCart = (id: string, variant?: string) => {
+    const item = savedItems.find(i => sameLine(i, id, variant));
     if (item) {
-      // addToCart expects a CartItem object which already includes quantity
       addToCart(item);
-      setSavedItems(savedItems.filter(item => item.id !== id));
+      setSavedItems(savedItems.filter(i => !sameLine(i, id, variant)));
     }
   };
 
-  const applyCoupon = (coupon: any) => {
+  // Restore a coupon applied earlier and re-check it whenever the subtotal changes.
+  useEffect(() => {
+    let code = '';
+    try { code = localStorage.getItem('appliedCoupon') || ''; } catch {}
+    if (!code || subtotal <= 0) {
+      setAppliedCoupon(null);
+      return;
+    }
+    let cancelled = false;
+    checkCoupon(code, subtotal)
+      .then((coupon) => { if (!cancelled) setAppliedCoupon(coupon); })
+      .catch(() => {
+        if (cancelled) return;
+        setAppliedCoupon(null);
+        try { localStorage.removeItem('appliedCoupon'); } catch {}
+      });
+    return () => { cancelled = true; };
+  }, [subtotal]);
+
+  const applyCoupon = (coupon: AppliedCoupon) => {
     setAppliedCoupon(coupon);
+    try { localStorage.setItem('appliedCoupon', coupon.code); } catch {}
   };
 
   const removeCoupon = () => {
     setAppliedCoupon(null);
+    try { localStorage.removeItem('appliedCoupon'); } catch {}
   };
 
-  // Savings calculation is tricky without originalPrice in Context.
-  // Assuming 0 for now unless we update Context.
-  const savings = 0;
-
-  let couponDiscount = 0;
-  if (appliedCoupon) {
-    if (appliedCoupon.type === 'percentage') {
-      couponDiscount = subtotal * (appliedCoupon.discount / 100);
-    } else {
-      couponDiscount = appliedCoupon.discount;
-    }
-  }
-
-  const shipping = subtotal >= 200 ? 0 : 15;
+  const couponDiscount = appliedCoupon ? Math.min(appliedCoupon.discount, subtotal) : 0;
+  // Delivery is arranged after the order, so no fee is added here (matches checkout).
+  const shipping = 0;
   const total = subtotal - couponDiscount + shipping;
 
   return (
@@ -63,8 +85,6 @@ export default function CartPage() {
       <PageHero title="Shopping Cart" backgroundImage="/Whisk_a4071984faa45f6b45b4ac8f2119754ddr.jpeg" />
       <div className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <CartCountdown />
-        {/* <FreeShippingBar currentAmount={subtotal} threshold={200} /> */}
 
         {cartItems.length === 0 && savedItems.length === 0 ? (
           <section className="py-20">
@@ -73,7 +93,7 @@ export default function CartPage() {
                 <i className="ri-shopping-cart-line text-5xl text-gray-400"></i>
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
-              <p className="text-gray-600 mb-8 text-lg">Looks like you&#39;t added anything to your cart yet</p>
+              <p className="text-gray-600 mb-8 text-lg">Looks like you haven&#39;t added anything to your cart yet</p>
               <Link href="/shop" className="inline-block bg-gray-900 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-semibold transition-colors whitespace-nowrap">
                 Continue Shopping
               </Link>
@@ -87,9 +107,6 @@ export default function CartPage() {
                   <div className="bg-white rounded-xl shadow-sm p-6 overflow-hidden">
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-2xl font-bold text-gray-900">Cart Items ({cartItems.length})</h2>
-                      {savings > 0 && (
-                        <span className="text-blue-700 font-semibold">You save GH₵{money(savings)}</span>
-                      )}
                     </div>
 
                     <div className="space-y-6">
@@ -114,8 +131,7 @@ export default function CartPage() {
 
                             <div className="text-sm text-gray-600 mb-3 space-y-1">
                               {item.variant && <p>Variant: {item.variant}</p>}
-                              {/* Stock status assuming always available if in cart for now */}
-                              <p className="text-blue-600 font-medium">In Stock</p>
+                              {item.moq && item.moq > 1 && <p>Minimum order: {item.moq}</p>}
                             </div>
 
                             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -143,7 +159,7 @@ export default function CartPage() {
                                       onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || (item.moq || 1), item.variant)}
                                       className="w-12 h-10 text-center border-x-2 border-gray-300 focus:outline-none font-semibold"
                                       min={item.moq || 1}
-                                      max={item.maxStock}
+                                      max={item.maxStock > 0 ? item.maxStock : undefined}
                                     />
                                     <button
                                       onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant)}
@@ -161,15 +177,13 @@ export default function CartPage() {
                               </div>
                             </div>
 
-                            {/* Saved for later functionality temporarily disabled until fully implemented with Context integration if requested */}
-                            {/*
                             <button
-                              onClick={() => saveForLater(item.id)}
+                              type="button"
+                              onClick={() => saveForLater(item.id, item.variant)}
                               className="mt-3 text-sm text-blue-700 hover:text-blue-900 font-medium whitespace-nowrap"
                             >
                               Save for Later
                             </button>
-                            */}
                           </div>
                         </div>
                       ))}
@@ -181,14 +195,21 @@ export default function CartPage() {
                       <h3 className="text-xl font-bold text-gray-900 mb-4">Saved for Later ({savedItems.length})</h3>
                       <div className="space-y-4">
                         {savedItems.map((item) => (
-                          <div key={item.id} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0 last:pb-0">
+                          <div key={`${item.id}-${item.variant || ''}`} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0 last:pb-0">
                             <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
                               <Image src={item.image} alt={item.name} fill className="object-cover object-top" sizes="80px" quality={60} />
                             </div>
                             <div className="flex-1">
                               <p className="font-semibold text-gray-900 mb-1">{item.name}</p>
+                              {item.variant && <p className="text-sm text-gray-500 mb-1">{item.variant}</p>}
                               <p className="text-lg font-bold text-gray-900 mb-2">GH₵{money(item.price)}</p>
-                              {/* Move to cart disabled for now */}
+                              <button
+                                type="button"
+                                onClick={() => moveToCart(item.id, item.variant)}
+                                className="text-sm text-blue-700 hover:text-blue-900 font-medium"
+                              >
+                                Move to Cart
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -217,15 +238,9 @@ export default function CartPage() {
                       )}
 
                       <div className="flex justify-between text-gray-700">
-                        <span>Shipping</span>
-                        <span className="font-semibold">{shipping === 0 ? 'FREE' : `GH₵${money(shipping)}`}</span>
+                        <span>Delivery</span>
+                        <span className="text-sm text-gray-600">Arranged after your order</span>
                       </div>
-
-                      {shipping > 0 && (
-                        <p className="text-sm text-amber-600">
-                          {/* Shipping threshold text removed */}
-                        </p>
-                      )}
                     </div>
 
                     <div className="border-t border-gray-200 pt-4 mb-6">
@@ -262,12 +277,12 @@ export default function CartPage() {
                         <span>Secure checkout</span>
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
-                        <i className="ri-arrow-left-right-line text-blue-700 mr-2"></i>
-                        <span>30-day returns</span>
+                        <i className="ri-smartphone-line text-blue-700 mr-2"></i>
+                        <span>Pay with Mobile Money</span>
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
                         <i className="ri-customer-service-line text-blue-700 mr-2"></i>
-                        <span>24/7 support</span>
+                        <span>Help from our Accra team</span>
                       </div>
                     </div>
                   </div>

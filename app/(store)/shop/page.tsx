@@ -35,8 +35,11 @@ function ShopContent() {
     const sort = searchParams.get('sort');
     const search = searchParams.get('search');
 
-    if (category) setSelectedCategory(category);
-    if (sort) setSortBy(sort);
+    // Mirror the URL exactly, so leaving ?category= or starting a new search resets the filters.
+    setSelectedCategory(category || 'all');
+    const sortAliases: Record<string, string> = { newest: 'new', bestsellers: 'popular' };
+    setSortBy(sort ? sortAliases[sort] || sort : 'popular');
+    setPage(1);
     // Search is handled in the fetch function via searchParams directly or we could add a state for it
   }, [searchParams]);
 
@@ -60,11 +63,22 @@ function ShopContent() {
   useEffect(() => {
     async function fetchProducts() {
       setLoading(true);
+      // Wait for categories before filtering by one (this effect re-runs when they arrive).
+      if (selectedCategory !== 'all' && categories.length === 0) return;
       try {
         const search = searchParams.get('search');
 
+        // A category filter needs the category list to resolve slugs to ids (including subcategories).
+        let categoryIds: string[] | null = null;
+        if (selectedCategory !== 'all') {
+          const categoryObj = categories.find(c => c.slug === selectedCategory);
+          categoryIds = categoryObj
+            ? [categoryObj.id, ...categories.filter(c => c.parent_id === categoryObj.id).map(c => c.id)]
+            : [];
+        }
+
         // Build cache key from all filter params
-        const cacheKey = `shop:${selectedCategory}:${search || ''}:${priceRange.join('-')}:${selectedRating}:${sortBy}:${page}`;
+        const cacheKey = `shop:${(categoryIds || ['all']).join(',')}:${search || ''}:${priceRange.join('-')}:${selectedRating}:${sortBy}:${page}`;
 
         const { data, count, error } = await cachedQuery<{ data: any; count: any; error: any }>(
           cacheKey,
@@ -73,7 +87,7 @@ function ShopContent() {
               .from('products')
               .select(`
                 *,
-                categories!inner(name, slug),
+                categories(name, slug),
                 product_images!product_id(url, position),
                 product_variants(id, name, price, quantity, option1, option2, image_url)
               `, { count: 'exact' })
@@ -85,19 +99,8 @@ function ShopContent() {
             }
 
             // Category Filter with Subcategories
-            if (selectedCategory !== 'all') {
-              const categoryObj = categories.find(c => c.slug === selectedCategory);
-
-              if (categoryObj) {
-                const targetSlugs = [selectedCategory];
-                const childSlugs = categories
-                  .filter(c => c.parent_id === categoryObj.id)
-                  .map(c => c.slug);
-                targetSlugs.push(...childSlugs);
-                query = query.in('categories.slug', targetSlugs);
-              } else {
-                query = query.eq('categories.slug', selectedCategory);
-              }
+            if (categoryIds) {
+              query = query.in('category_id', categoryIds);
             }
 
             // Price Filter
@@ -126,7 +129,7 @@ function ShopContent() {
                 break;
               case 'popular':
               default:
-                query = query.order('created_at', { ascending: false });
+                query = query.order('review_count', { ascending: false }).order('created_at', { ascending: false });
                 break;
             }
 
@@ -169,9 +172,9 @@ function ShopContent() {
               name: p.name,
               price: p.price,
               originalPrice: p.compare_at_price,
-              image: p.product_images?.[0]?.url || 'https://via.placeholder.com/800x800?text=No+Image',
+              image: p.product_images?.[0]?.url || '/placeholder-product.svg',
               rating: p.rating_avg || 0,
-              reviewCount: 0, // Need to implement reviews relation
+              reviewCount: p.review_count || 0,
               badge: p.compare_at_price > p.price ? 'Sale' : undefined, // Simple badge logic
               inStock: effectiveStock > 0,
               maxStock: effectiveStock || 50,

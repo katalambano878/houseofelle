@@ -1,7 +1,7 @@
 'use client';
 import { money } from '@/lib/format-money';
 
-import { Fragment, useState } from 'react';
+import { Fragment } from 'react';
 import Link from 'next/link';
 import LazyImage from './LazyImage';
 import { useCart } from '@/context/CartContext';
@@ -75,7 +75,6 @@ export default function ProductCard({
   colorVariants = []
 }: ProductCardProps) {
   const { addToCart } = useCart();
-  const [activeColor, setActiveColor] = useState<string | null>(null);
   const displayPrice = hasVariants && minVariantPrice ? minVariantPrice : price;
   const discount = originalPrice ? Math.round((1 - displayPrice / originalPrice) * 100) : 0;
   const MAX_SWATCHES = 5;
@@ -148,20 +147,14 @@ export default function ProductCard({
         </Link>
 
         {colorVariants.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center gap-1.5 mb-2" aria-label="Available options">
+            {/* Indicators only: the option is chosen on the product page. */}
             {colorVariants.slice(0, MAX_SWATCHES).map((color) => (
-              <button
+              <span
                 key={color.name}
                 title={color.name}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setActiveColor(activeColor === color.name ? null : color.name);
-                }}
-                className={`w-4 h-4 rounded-full border transition-all duration-200 flex-shrink-0 ${
-                  activeColor === color.name
-                    ? 'ring-2 ring-offset-1 ring-blue-600 scale-110'
-                    : 'hover:scale-110'
-                } ${color.hex === '#FFFFFF' ? 'border-gray-300' : 'border-transparent'}`}
+                aria-label={color.name}
+                className={`w-4 h-4 rounded-full border flex-shrink-0 ${color.hex === '#FFFFFF' ? 'border-gray-300' : 'border-transparent'}`}
                 style={{ backgroundColor: color.hex }}
               />
             ))}

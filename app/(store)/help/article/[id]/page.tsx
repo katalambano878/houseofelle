@@ -1,235 +1,265 @@
-'use client';
-
-import { useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
-import { sanitizeHtml } from '@/lib/sanitize';
+import { notFound } from 'next/navigation';
 
-const articles: any = {
+type Block =
+  | { type: 'h'; text: string }
+  | { type: 'p'; text: string; link?: { href: string; label: string } }
+  | { type: 'ul' | 'ol'; items: string[] };
+
+interface Article {
+  title: string;
+  category: string;
+  blocks: Block[];
+  related: string[];
+}
+
+// Keep the ids and titles in sync with app/(store)/help/page.tsx.
+const articles: Record<string, Article> = {
   '1': {
-    id: 1,
     title: 'How do I track my order?',
     category: 'Orders & Delivery',
-    views: 1247,
-    helpful: 234,
-    updated: 'January 15, 2024',
-    content: `
-      <h2>Tracking Your Order</h2>
-      <p>We make it easy to track your order every step of the way. Here's how:</p>
-      
-      <h3>Method 1: Track via Email</h3>
-      <ol>
-        <li>Check your email for the order confirmation</li>
-        <li>Click on the "Track Order" button in the email</li>
-        <li>You'll be redirected to the tracking page with real-time updates</li>
-      </ol>
-      
-      <h3>Method 2: Track on Website</h3>
-      <ol>
-        <li>Go to the <a href="/order-tracking">Order Tracking</a> page</li>
-        <li>Enter your order number and email address</li>
-        <li>Click "Track Order" to see your delivery status</li>
-      </ol>
-      
-      <h3>Method 3: Track in Your Account</h3>
-      <ol>
-        <li>Log in to your account</li>
-        <li>Go to "Order History"</li>
-        <li>Click on any order to see detailed tracking information</li>
-      </ol>
-      
-      <h2>Understanding Tracking Statuses</h2>
-      <ul>
-        <li><strong>Order Confirmed:</strong> We've received your order</li>
-        <li><strong>Processing:</strong> We're preparing your items</li>
-        <li><strong>Packaged:</strong> Your order has been packaged</li>
-        <li><strong>Out for Delivery:</strong> Your order will arrive today</li>
-        <li><strong>Delivered:</strong> Your order has been delivered</li>
-      </ul>
-      
-      <h2>Need More Help?</h2>
-      <p>If you can't find your tracking information or have questions about your delivery, please <a href="/support/ticket">contact our support team</a>.</p>
-    `
+    blocks: [
+      { type: 'h', text: 'On our website' },
+      {
+        type: 'ol',
+        items: [
+          'Go to the Order Tracking page.',
+          'Enter your order number (it starts with ORD-) and the email you used at checkout.',
+          'Select "Track Order" to see the latest status.',
+        ],
+      },
+      { type: 'p', text: 'Open the tracking page:', link: { href: '/order-tracking', label: 'Order Tracking' } },
+      { type: 'h', text: 'In your account' },
+      { type: 'p', text: 'If you placed the order while signed in, it appears under Account → Order History, with a Track Order button.', link: { href: '/account?tab=orders', label: 'Go to Order History' } },
+      { type: 'h', text: 'What the statuses mean' },
+      {
+        type: 'ul',
+        items: [
+          'Pending / Awaiting payment: we have your order and are waiting for your Mobile Money payment to be confirmed.',
+          'Processing: payment is confirmed and we are preparing your items.',
+          'Packaged: your order is packed and ready for delivery.',
+          'Delivered: your order has been delivered.',
+        ],
+      },
+    ],
+    related: ['2', '3', '11'],
+  },
+  '2': {
+    title: 'How much is delivery and how long does it take?',
+    category: 'Orders & Delivery',
+    blocks: [
+      { type: 'p', text: 'We deliver within Ghana from our shop at Spintex Lashibi, Shalom Spot Junction, Accra.' },
+      { type: 'p', text: 'Delivery fees depend on your location and are confirmed after you order. Checkout does not charge a delivery fee; we contact you to confirm the fee and the expected delivery time before your order goes out.' },
+      { type: 'p', text: 'If you have a question about delivery to your area, get in touch:', link: { href: '/contact?subject=Delivery%20question', label: 'Contact us' } },
+    ],
+    related: ['1', '3'],
+  },
+  '3': {
+    title: 'Can I change my delivery address?',
+    category: 'Orders & Delivery',
+    blocks: [
+      { type: 'p', text: 'Contact us as soon as possible with your order number and the new address. We can usually update it if your order has not left our shop yet.' },
+      { type: 'p', text: 'Send us the details:', link: { href: '/contact?subject=Change%20delivery%20address', label: 'Contact us' } },
+      { type: 'p', text: 'To save addresses for future orders, add them to your account address book.', link: { href: '/help/article/20', label: 'Managing saved addresses' } },
+    ],
+    related: ['1', '20'],
   },
   '6': {
-    id: 6,
-    title: 'How do I return an item?',
-    category: 'Returns & Refunds',
-    views: 2341,
-    helpful: 456,
-    updated: 'January 20, 2024',
-    content: `
-      <h2>Our Return Process</h2>
-      <p>We want you to love your purchase! If you're not satisfied, returns are easy.</p>
-      
-      <h3>Step 1: Start Your Return</h3>
-      <ol>
-        <li>Go to the <a href="/returns">Returns Portal</a></li>
-        <li>Enter your order number and email</li>
-        <li>Select the items you want to return</li>
-        <li>Choose a return reason</li>
-      </ol>
-      
-      <h3>Step 2: Print Your Return Label</h3>
-      <p>After submitting your return request, you'll receive a prepaid return label via email. Simply print it and attach it to your package.</p>
-      
-      <h3>Step 3: Ship Your Return</h3>
-      <p>Drop off your package at any authorized shipping location. You can find locations near you on our returns page.</p>
-      
-      <h3>Step 4: Get Your Refund</h3>
-      <p>Once we receive your return, we'll process it within 3-5 business days. Your refund will be issued to your original payment method.</p>
-      
-      <h2>Return Policy Details</h2>
-      <ul>
-        <li>You have 30 days from delivery to start a return</li>
-        <li>Items must be unused and in original packaging</li>
-        <li>Return shipping is free for defective items</li>
-        <li>Standard returns have a small shipping fee</li>
-      </ul>
-      
-      <h2>Exchange Instead?</h2>
-      <p>Looking for a different size or color? You can choose to exchange your item instead of returning it for a refund.</p>
-    `
-  }
+    title: 'My item arrived damaged, leaking or wrong. What do I do?',
+    category: 'Returns & Problems',
+    blocks: [
+      { type: 'p', text: 'We are sorry something went wrong. Let us know as soon as possible so we can put it right.' },
+      {
+        type: 'ol',
+        items: [
+          'Open the Returns page and enter your order number and email.',
+          'Select the affected items and tell us what happened (damaged or leaking, wrong item, missing item, not as described).',
+          'Submit the request. We will contact you to agree the next steps.',
+        ],
+      },
+      { type: 'p', text: 'Please keep the item and all its packaging until we have been in touch. Photos of the damage help us sort it out faster.' },
+      { type: 'p', text: 'Start here:', link: { href: '/returns', label: 'Report a problem with an order' } },
+    ],
+    related: ['1', '11'],
+  },
+  '11': {
+    title: 'How do I pay?',
+    category: 'Payment',
+    blocks: [
+      { type: 'p', text: 'We accept Mobile Money, processed securely by Moolre. Prices on our website are in Ghana cedis (GH₵).' },
+      {
+        type: 'ol',
+        items: [
+          'Add your items to the cart and go to checkout.',
+          'Enter your delivery details and place your order.',
+          "You are taken to Moolre's secure payment page. Choose Mobile Money and follow the steps to approve the payment.",
+        ],
+      },
+      { type: 'p', text: 'Once the payment is confirmed you will see your order confirmation. If the payment does not go through, you can try again, or contact us with your order number and we will help.' },
+      { type: 'p', text: 'Payment problem?', link: { href: '/contact?subject=Payment%20problem', label: 'Contact us' } },
+    ],
+    related: ['1', '2'],
+  },
+  '16': {
+    title: 'Creating an account and resetting your password',
+    category: 'Account',
+    blocks: [
+      { type: 'p', text: 'An account lets you see your order history, save addresses and keep track of support requests. You can also check out as a guest.' },
+      { type: 'p', text: 'Create an account:', link: { href: '/auth/signup', label: 'Sign up' } },
+      { type: 'h', text: 'Forgot your password?' },
+      { type: 'p', text: 'Request a reset link and we will email you a link to choose a new password (at least 8 characters).', link: { href: '/auth/forgot-password', label: 'Reset password' } },
+    ],
+    related: ['20', '19'],
+  },
+  '19': {
+    title: 'Can I download my data or delete my account?',
+    category: 'Account',
+    blocks: [
+      { type: 'p', text: 'Yes. Sign in and open Privacy & Data in your account. You can download a copy of your profile, saved addresses and orders, or send us a request to delete your account. We confirm deletion requests by email.' },
+      { type: 'p', text: 'Open privacy settings:', link: { href: '/account/privacy', label: 'Privacy & Data' } },
+    ],
+    related: ['16', '20'],
+  },
+  '20': {
+    title: 'How do I manage my saved addresses?',
+    category: 'Account',
+    blocks: [
+      {
+        type: 'ol',
+        items: [
+          'Sign in and go to Account → Addresses.',
+          'Select "Add New Address" and fill in the recipient, phone number, street or landmark, city and region.',
+          'Tick "Set as default address" for the address you use most.',
+        ],
+      },
+      { type: 'p', text: 'You can edit or delete an address at any time.', link: { href: '/account?tab=addresses', label: 'Go to Addresses' } },
+    ],
+    related: ['3', '16'],
+  },
+  '21': {
+    title: 'Do you sell wholesale?',
+    category: 'Products & Wholesale',
+    blocks: [
+      { type: 'p', text: 'Yes. Some products are sold in wholesale quantities; where a minimum order quantity applies it is shown on the product page and the cart starts at that quantity.' },
+      { type: 'p', text: 'For bulk orders, gift sets or business enquiries, get in touch and tell us what you need.', link: { href: '/contact?subject=Wholesale%20enquiry', label: 'Contact us about wholesale' } },
+    ],
+    related: ['11', '25'],
+  },
+  '25': {
+    title: 'How should I store my perfume?',
+    category: 'Products & Wholesale',
+    blocks: [
+      { type: 'p', text: 'Heat, light and air break down fragrance over time. A few simple habits help your perfumes and body mists last longer:' },
+      {
+        type: 'ul',
+        items: [
+          'Keep bottles in a cool, dry place away from direct sunlight.',
+          'Avoid storing fragrance in a hot car or a steamy bathroom.',
+          'Close the cap tightly after each use.',
+          'Keep scented candles away from heat and trim the wick before lighting.',
+        ],
+      },
+    ],
+    related: ['21', '6'],
+  },
 };
 
-const relatedArticles = [
-  { id: 7, title: 'What is your return policy?', category: 'Returns' },
-  { id: 8, title: 'When will I get my refund?', category: 'Returns' },
-  { id: 9, title: 'Can I exchange instead of return?', category: 'Returns' },
-  { id: 10, title: 'How do I print a return label?', category: 'Returns' }
-];
+export function generateStaticParams() {
+  return Object.keys(articles).map((id) => ({ id }));
+}
 
-export default function ArticlePage() {
-  const params = useParams();
-  const articleId = params.id as string;
-  const article = articles[articleId] || articles['1'];
-  
-  const [wasHelpful, setWasHelpful] = useState<boolean | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const article = articles[id];
+  return { title: article ? `${article.title} | Help Center` : 'Help Center' };
+}
 
-  const handleHelpful = (helpful: boolean) => {
-    setWasHelpful(helpful);
-    setShowFeedback(true);
-  };
+export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const article = articles[id];
+  if (!article) notFound();
+
+  const related = article.related
+    .filter((rid) => articles[rid])
+    .map((rid) => ({ id: rid, ...articles[rid] }));
 
   return (
-    <>
-      <Header />
-      <main className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-4xl mx-auto px-4">
+    <main className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-4xl mx-auto px-4">
+        <Link
+          href="/help"
+          className="inline-flex items-center text-blue-700 hover:text-blue-900 font-semibold mb-6 whitespace-nowrap"
+        >
+          <i className="ri-arrow-left-line mr-2"></i>
+          Back to Help Center
+        </Link>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold whitespace-nowrap mb-4">
+              {article.category}
+            </span>
+            <h1 className="text-3xl font-bold text-gray-900">{article.title}</h1>
+          </div>
+
+          <article className="space-y-4 text-gray-700 leading-relaxed">
+            {article.blocks.map((block, i) => {
+              if (block.type === 'h') {
+                return <h2 key={i} className="text-xl font-bold text-gray-900 pt-2">{block.text}</h2>;
+              }
+              if (block.type === 'p') {
+                return (
+                  <p key={i}>
+                    {block.text}
+                    {block.link && (
+                      <>
+                        {' '}
+                        <Link href={block.link.href} className="text-blue-700 font-semibold hover:underline">
+                          {block.link.label}
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                );
+              }
+              const ListTag = block.type;
+              return (
+                <ListTag key={i} className={`${block.type === 'ol' ? 'list-decimal' : 'list-disc'} pl-6 space-y-2`}>
+                  {block.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ListTag>
+              );
+            })}
+          </article>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6 text-center">
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Still need help?</h3>
+          <p className="text-gray-600 mb-4">Our team is happy to help with orders, payments and fragrance questions.</p>
           <Link
-            href="/help"
-            className="inline-flex items-center text-blue-700 hover:text-blue-900 font-semibold mb-6 whitespace-nowrap"
+            href="/support/ticket"
+            className="inline-block bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
           >
-            <i className="ri-arrow-left-line mr-2"></i>
-            Back to Help Center
+            Contact Support
           </Link>
+        </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-8 mb-6">
-            <div className="mb-6 pb-6 border-b border-gray-200">
-              <div className="flex items-center space-x-3 mb-4">
-                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold whitespace-nowrap">
-                  {article.category}
-                </span>
-                <span className="text-sm text-gray-500">
-                  Updated {article.updated}
-                </span>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{article.title}</h1>
-              <div className="flex items-center space-x-6 text-sm text-gray-600">
-                <div className="flex items-center space-x-2">
-                  <i className="ri-eye-line"></i>
-                  <span>{article.views.toLocaleString()} views</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <i className="ri-thumb-up-line"></i>
-                  <span>{article.helpful} found this helpful</span>
-                </div>
-              </div>
-            </div>
-
-            <article
-              className="prose prose-blue max-w-none"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) }}
-              style={{
-                lineHeight: '1.8'
-              }}
-            />
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm p-8 mb-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Was this article helpful?</h3>
-            {!showFeedback ? (
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => handleHelpful(true)}
-                  className="flex-1 py-3 px-6 border-2 border-blue-700 text-blue-700 hover:bg-blue-700 hover:text-white rounded-lg font-semibold transition-colors whitespace-nowrap"
-                >
-                  <i className="ri-thumb-up-line mr-2"></i>
-                  Yes, it was helpful
-                </button>
-                <button
-                  onClick={() => handleHelpful(false)}
-                  className="flex-1 py-3 px-6 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg font-semibold transition-colors whitespace-nowrap"
-                >
-                  <i className="ri-thumb-down-line mr-2"></i>
-                  No, I need more help
-                </button>
-              </div>
-            ) : (
-              <div className="text-center">
-                {wasHelpful ? (
-                  <>
-                    <div className="w-16 h-16 flex items-center justify-center bg-blue-100 rounded-full mx-auto mb-4">
-                      <i className="ri-check-line text-3xl text-blue-700"></i>
-                    </div>
-                    <p className="text-lg font-semibold text-gray-900 mb-2">
-                      Thank you for your feedback!
-                    </p>
-                    <p className="text-gray-600">
-                      We're glad we could help. Have a great day!
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-16 h-16 flex items-center justify-center bg-blue-100 rounded-full mx-auto mb-4">
-                      <i className="ri-customer-service-line text-3xl text-blue-700"></i>
-                    </div>
-                    <p className="text-lg font-semibold text-gray-900 mb-2">
-                      Sorry we couldn't help
-                    </p>
-                    <p className="text-gray-600 mb-4">
-                      Our support team is here for you!
-                    </p>
-                    <Link
-                      href="/support/ticket"
-                      className="inline-block bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
-                    >
-                      Contact Support
-                    </Link>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm p-8">
+        {related.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8">
             <h3 className="text-xl font-bold text-gray-900 mb-6">Related Articles</h3>
             <div className="space-y-3">
-              {relatedArticles.map((related) => (
+              {related.map((item) => (
                 <Link
-                  key={related.id}
-                  href={`/help/article/${related.id}`}
+                  key={item.id}
+                  href={`/help/article/${item.id}`}
                   className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors"
                 >
                   <div className="flex items-center space-x-3">
                     <i className="ri-file-text-line text-xl text-blue-700"></i>
                     <div>
-                      <p className="font-semibold text-gray-900">{related.title}</p>
-                      <p className="text-sm text-gray-600">{related.category}</p>
+                      <p className="font-semibold text-gray-900">{item.title}</p>
+                      <p className="text-sm text-gray-600">{item.category}</p>
                     </div>
                   </div>
                   <i className="ri-arrow-right-s-line text-2xl text-gray-400"></i>
@@ -237,9 +267,8 @@ export default function ArticlePage() {
               ))}
             </div>
           </div>
-        </div>
-      </main>
-      <Footer />
-    </>
+        )}
+      </div>
+    </main>
   );
 }

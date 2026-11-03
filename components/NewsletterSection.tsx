@@ -14,11 +14,15 @@ export default function NewsletterSection() {
     setSubmitStatus('idle');
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const res = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error('Signup failed');
       setSubmitStatus('success');
       setEmail('');
-    } catch (error) {
+    } catch {
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
@@ -86,6 +90,11 @@ export default function NewsletterSection() {
         {submitStatus === 'success' && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-brand-gold text-brand-black px-6 py-2 rounded-full font-bold shadow-lg animate-in fade-in slide-in-from-bottom-2">
             <i className="ri-checkbox-circle-line mr-2"></i> Welcome to the club!
+          </div>
+        )}
+        {submitStatus === 'error' && (
+          <div role="alert" className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white text-red-700 px-6 py-2 rounded-full font-semibold shadow-lg">
+            <i className="ri-error-warning-line mr-2"></i> Couldn&apos;t sign you up. Please try again.
           </div>
         )}
       </div>

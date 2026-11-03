@@ -1,8 +1,8 @@
 import { MetadataRoute } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Built per request so `next build` never needs the database and new products appear right away.
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com';
@@ -46,8 +46,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let categoryPages: MetadataRoute.Sitemap = [];
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     // Fetch active products
     const { data: products } = await supabase
       .from('products')
@@ -55,7 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .eq('status', 'active');
 
     if (products) {
-      productPages = products.map((product) => ({
+      productPages = products.map((product: { slug: string; updated_at: string }) => ({
         url: `${baseUrl}/product/${product.slug}`,
         lastModified: new Date(product.updated_at),
         changeFrequency: 'weekly' as const,
@@ -70,7 +68,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .eq('status', 'active');
 
     if (categories) {
-      categoryPages = categories.map((category) => ({
+      categoryPages = categories.map((category: { slug: string; updated_at: string }) => ({
         url: `${baseUrl}/shop?category=${category.slug}`,
         lastModified: new Date(category.updated_at),
         changeFrequency: 'weekly' as const,

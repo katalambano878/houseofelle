@@ -4,6 +4,31 @@ import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
+/** CSV cell: always quoted, inner quotes doubled, formula-looking values defused. */
+function csvCell(value: unknown): string {
+  let v = value == null ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+  return `"${v.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, header: string[], rows: unknown[][]) {
+  const csv = [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Real mailbox only: skips POS placeholder addresses like walkin@pos.local. */
+function isMailable(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !email.toLowerCase().endsWith('.local');
+}
+
 export default function AdminCustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
@@ -11,6 +36,9 @@ export default function AdminCustomersPage() {
   const [loading, setLoading] = useState(true);
   const [sortOption, setSortOption] = useState('Sort by Join Date');
   const [filterStatus, setFilterStatus] = useState('All Customers');
+  const [loadError, setLoadError] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     fetchCustomers();
@@ -18,170 +46,60 @@ export default function AdminCustomersPage() {
   }, []);
 
   const fetchCustomers = async () => {
-    try {
-      setLoading(true);
+    setLoading(true);
+    setLoadError('');
+    // The customers table holds both guests and registered shoppers (filled from orders).
+    const { data: customerData, error: cError } = await supabase
+      .from('customers')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      // Fetch from new customers table (includes both guests and registered users)
-      const { data: customerData, error: cError } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (cError) {
-        // Fallback to old profiles-based approach if customers table doesn't exist yet
-        console.warn('Customers table not available, falling back to profiles');
-        await fetchCustomersFromProfiles();
-        return;
-      }
-
-      if (customerData) {
-        const processed = customerData.map((customer: any) => {
-          // Determine status dynamically
-          let status = 'New';
-          const totalSpent = Number(customer.total_spent) || 0;
-          const totalOrders = customer.total_orders || 0;
-
-          if (totalSpent > 1000) status = 'VIP';
-          else if (totalOrders > 0) status = 'Active';
-          else if (new Date(customer.created_at).getTime() < Date.now() - 30 * 24 * 60 * 60 * 1000) status = 'Inactive';
-
-          const displayName = customer.full_name ||
-            (customer.first_name && customer.last_name ? `${customer.first_name} ${customer.last_name}` : null) ||
-            customer.first_name ||
-            'No Name';
-
-          return {
-            id: customer.id,
-            name: displayName,
-            email: customer.email,
-            phone: customer.phone || 'N/A',
-            avatar: getInitials(displayName !== 'No Name' ? displayName : customer.email),
-            orders: totalOrders,
-            totalSpent: totalSpent,
-            joined: new Date(customer.created_at).toLocaleDateString(),
-            lastOrder: customer.last_order_at ? timeAgo(new Date(customer.last_order_at)) : 'Never',
-            status: status,
-            rawJoined: new Date(customer.created_at),
-            rawLastOrder: customer.last_order_at ? new Date(customer.last_order_at) : null,
-            isGuest: !customer.user_id
-          };
-        });
-        setCustomers(processed);
-      }
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-    } finally {
+    if (cError) {
+      setLoadError(cError.message || 'Could not load customers.');
+      setCustomers([]);
       setLoading(false);
+      return;
     }
-  };
 
-  // Fallback for when customers table doesn't exist
-  const fetchCustomersFromProfiles = async () => {
-    try {
-      const { data: profiles, error: pError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const processed = (customerData || []).map((customer: any) => {
+      const totalSpent = Number(customer.total_spent) || 0;
+      const totalOrders = Number(customer.total_orders) || 0;
+      const tags: string[] = Array.isArray(customer.tags) ? customer.tags : [];
+      const isVipTagged = tags.some((t) => String(t).toLowerCase() === 'vip');
 
-      if (pError) throw pError;
+      let status = 'New';
+      if (isVipTagged || totalSpent > 1000) status = 'VIP';
+      else if (totalOrders > 0) status = 'Active';
+      else if (customer.created_at && new Date(customer.created_at).getTime() < Date.now() - 30 * 24 * 60 * 60 * 1000) status = 'Inactive';
 
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('id, user_id, email, total, created_at, status, shipping_address');
+      const displayName = customer.full_name ||
+        (customer.first_name && customer.last_name ? `${customer.first_name} ${customer.last_name}` : null) ||
+        customer.first_name ||
+        'No Name';
+      const email = customer.email || '';
+      const joinedAt = customer.created_at ? new Date(customer.created_at) : new Date(0);
 
-      // Process registered users
-      const registeredCustomers = (profiles || []).map((profile: any) => {
-        const userOrders = orders?.filter(o => o.user_id === profile.id && o.status !== 'cancelled') || [];
-        const totalSpent = userOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-        let lastOrderDate: Date | null = null;
-        if (userOrders.length > 0) {
-          const dates = userOrders.map(o => new Date(o.created_at).getTime());
-          lastOrderDate = new Date(Math.max(...dates));
-        }
-
-        let status = 'New';
-        if (totalSpent > 1000) status = 'VIP';
-        else if (userOrders.length > 0) status = 'Active';
-
-        return {
-          id: profile.id,
-          name: profile.full_name || 'No Name',
-          email: profile.email,
-          phone: profile.phone || 'N/A',
-          avatar: getInitials(profile.full_name || profile.email),
-          orders: userOrders.length,
-          totalSpent,
-          joined: new Date(profile.created_at).toLocaleDateString(),
-          lastOrder: lastOrderDate ? timeAgo(lastOrderDate) : 'Never',
-          status,
-          rawJoined: new Date(profile.created_at),
-          rawLastOrder: lastOrderDate,
-          isGuest: false
-        };
-      });
-
-      // Process guest orders (no user_id)
-      const guestOrders = orders?.filter(o => !o.user_id && o.email) || [];
-      const guestMap = new Map<string, any>();
-
-      guestOrders.forEach(order => {
-        const existing = guestMap.get(order.email);
-        const orderTotal = Number(order.total) || 0;
-        const orderDate = new Date(order.created_at);
-
-        const firstName = order.shipping_address?.firstName || '';
-        const lastName = order.shipping_address?.lastName || '';
-        const fullName = order.shipping_address?.full_name || `${firstName} ${lastName}`.trim();
-
-        if (!existing) {
-          guestMap.set(order.email, {
-            email: order.email,
-            name: fullName || 'Guest',
-            phone: order.shipping_address?.phone || 'N/A',
-            orders: order.status !== 'cancelled' ? 1 : 0,
-            totalSpent: order.status !== 'cancelled' ? orderTotal : 0,
-            firstOrder: orderDate,
-            lastOrder: orderDate
-          });
-        } else {
-          if (order.status !== 'cancelled') {
-            existing.orders += 1;
-            existing.totalSpent += orderTotal;
-          }
-          if (orderDate < existing.firstOrder) existing.firstOrder = orderDate;
-          if (orderDate > existing.lastOrder) existing.lastOrder = orderDate;
-          if (!existing.name || existing.name === 'Guest') existing.name = fullName || existing.name;
-        }
-      });
-
-      const guestCustomers = Array.from(guestMap.values()).map((guest, idx) => {
-        let status = 'New';
-        if (guest.totalSpent > 1000) status = 'VIP';
-        else if (guest.orders > 0) status = 'Active';
-
-        return {
-          id: `guest-${idx}-${guest.email}`,
-          name: guest.name || 'Guest',
-          email: guest.email,
-          phone: guest.phone,
-          avatar: getInitials(guest.name || guest.email),
-          orders: guest.orders,
-          totalSpent: guest.totalSpent,
-          joined: guest.firstOrder.toLocaleDateString(),
-          lastOrder: timeAgo(guest.lastOrder),
-          status,
-          rawJoined: guest.firstOrder,
-          rawLastOrder: guest.lastOrder,
-          isGuest: true
-        };
-      });
-
-      setCustomers([...registeredCustomers, ...guestCustomers]);
-    } catch (error) {
-      console.error('Error in fallback fetch:', error);
-    } finally {
-      setLoading(false);
-    }
+      return {
+        id: customer.id,
+        name: displayName,
+        email,
+        phone: customer.phone || '',
+        avatar: getInitials(displayName !== 'No Name' ? displayName : email),
+        orders: totalOrders,
+        totalSpent,
+        joined: customer.created_at ? joinedAt.toLocaleDateString() : '',
+        lastOrder: customer.last_order_at ? timeAgo(new Date(customer.last_order_at)) : 'Never',
+        lastOrderAt: customer.last_order_at || '',
+        status,
+        tags,
+        isVipTagged,
+        rawJoined: joinedAt,
+        rawLastOrder: customer.last_order_at ? new Date(customer.last_order_at) : null,
+        isGuest: !customer.user_id
+      };
+    });
+    setCustomers(processed);
+    setLoading(false);
   };
 
   const getInitials = (name: string) => {
@@ -215,11 +133,9 @@ export default function AdminCustomersPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedCustomers.length === customers.length) {
-      setSelectedCustomers([]);
-    } else {
-      setSelectedCustomers(customers.map(c => c.id));
-    }
+    const visibleIds = filteredCustomers.map(c => c.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedCustomers.includes(id));
+    setSelectedCustomers(allSelected ? [] : visibleIds);
   };
 
   const handleSelectCustomer = (customerId: string) => {
@@ -244,8 +160,8 @@ export default function AdminCustomersPage() {
       const q = searchQuery.toLowerCase();
       result = result.filter(c =>
         c.name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.phone.toLowerCase().includes(q)
+        (c.email || '').toLowerCase().includes(q) ||
+        (c.phone || '').toLowerCase().includes(q)
       );
     }
 
@@ -260,6 +176,71 @@ export default function AdminCustomersPage() {
 
     return result;
   }, [customers, searchQuery, sortOption, filterStatus]);
+
+  const selectedRows = useMemo(
+    () => customers.filter(c => selectedCustomers.includes(c.id)),
+    [customers, selectedCustomers]
+  );
+
+  const exportCustomers = (rows: any[]) => {
+    if (rows.length === 0) {
+      setNotice({ type: 'error', text: 'No customers to export.' });
+      return;
+    }
+    const header = ['Name', 'Email', 'Phone', 'Orders', 'Total spent (GHS)', 'Last order', 'Joined', 'Status', 'Guest', 'Tags'];
+    const data = rows.map(c => [
+      c.name,
+      c.email,
+      c.phone,
+      c.orders,
+      c.totalSpent.toFixed(2),
+      c.lastOrderAt ? new Date(c.lastOrderAt).toISOString().slice(0, 10) : '',
+      c.rawJoined.getTime() > 0 ? c.rawJoined.toISOString().slice(0, 10) : '',
+      c.status,
+      c.isGuest ? 'Yes' : 'No',
+      (c.tags || []).join('; '),
+    ]);
+    downloadCsv(`house-of-elle-customers-${new Date().toISOString().slice(0, 10)}.csv`, header, data);
+  };
+
+  const emailSelected = () => {
+    const emails = Array.from(new Set(selectedRows.map(c => c.email).filter(isMailable)));
+    if (emails.length === 0) {
+      setNotice({ type: 'error', text: 'None of the selected customers has a real email address.' });
+      return;
+    }
+    window.location.href = `mailto:?bcc=${emails.map(encodeURIComponent).join(',')}`;
+  };
+
+  const allSelectedAreVip = selectedRows.length > 0 && selectedRows.every(c => c.isVipTagged);
+
+  const toggleVipForSelected = async () => {
+    if (selectedRows.length === 0) return;
+    const makeVip = !allSelectedAreVip;
+    setBulkBusy(true);
+    let failed = 0;
+    for (const c of selectedRows) {
+      const current: string[] = (c.tags || []).filter((t: string) => String(t).toLowerCase() !== 'vip');
+      const nextTags = makeVip ? [...current, 'vip'] : current;
+      const { error } = await supabase
+        .from('customers')
+        .update({ tags: nextTags, updated_at: new Date().toISOString() })
+        .eq('id', c.id);
+      if (error) failed++;
+    }
+    setBulkBusy(false);
+    if (failed > 0) {
+      setNotice({ type: 'error', text: `Could not update ${failed} of ${selectedRows.length} customers.` });
+    } else {
+      setNotice({
+        type: 'success',
+        text: makeVip
+          ? `Marked ${selectedRows.length} customer${selectedRows.length > 1 ? 's' : ''} as VIP.`
+          : `Removed the VIP tag from ${selectedRows.length} customer${selectedRows.length > 1 ? 's' : ''}.`,
+      });
+    }
+    await fetchCustomers();
+  };
 
   // Derived Stats
   const stats = useMemo(() => ({
@@ -280,11 +261,29 @@ export default function AdminCustomersPage() {
           <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
           <p className="text-gray-600 mt-1">Manage your customer base and relationships</p>
         </div>
-        <button className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer">
+        <button
+          onClick={() => exportCustomers(filteredCustomers)}
+          disabled={loading || filteredCustomers.length === 0}
+          className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <i className="ri-download-line mr-2"></i>
           Export Customers
         </button>
       </div>
+
+      {notice && (
+        <div
+          role="status"
+          className={`p-4 rounded-lg border text-sm flex items-center justify-between ${
+            notice.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+          }`}
+        >
+          <span>{notice.text}</span>
+          <button onClick={() => setNotice(null)} aria-label="Dismiss" className="ml-4 cursor-pointer">
+            <i className="ri-close-line"></i>
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
@@ -353,15 +352,25 @@ export default function AdminCustomersPage() {
               {selectedCustomers.length} customer{selectedCustomers.length > 1 ? 's' : ''} selected
             </p>
             <div className="flex items-center space-x-2">
-              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer">
+              <button
+                onClick={emailSelected}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
+              >
                 <i className="ri-mail-line mr-2"></i>
                 Send Email
               </button>
-              <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer">
+              <button
+                onClick={toggleVipForSelected}
+                disabled={bulkBusy}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
+              >
                 <i className="ri-vip-crown-line mr-2"></i>
-                Mark as VIP
+                {bulkBusy ? 'Saving...' : allSelectedAreVip ? 'Remove VIP' : 'Mark as VIP'}
               </button>
-              <button className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer">
+              <button
+                onClick={() => exportCustomers(selectedRows)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer"
+              >
                 <i className="ri-download-line mr-2"></i>
                 Export
               </button>
@@ -376,7 +385,7 @@ export default function AdminCustomersPage() {
                 <th className="py-4 px-6">
                   <input
                     type="checkbox"
-                    checked={selectedCustomers.length === filteredCustomers.length && filteredCustomers.length > 0}
+                    checked={filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomers.includes(c.id))}
                     onChange={handleSelectAll}
                     className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                   />
@@ -393,6 +402,13 @@ export default function AdminCustomersPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={8} className="p-10 text-center text-gray-500">Loading customers...</td></tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={8} className="p-10 text-center">
+                    <p className="text-red-600 mb-3">{loadError}</p>
+                    <button onClick={fetchCustomers} className="text-blue-700 font-semibold hover:underline cursor-pointer">Try again</button>
+                  </td>
+                </tr>
               ) : filteredCustomers.length === 0 ? (
                 <tr><td colSpan={8} className="p-10 text-center text-gray-500">No customers found.</td></tr>
               ) : (
@@ -420,8 +436,8 @@ export default function AdminCustomersPage() {
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <p className="text-gray-700 text-sm">{customer.email}</p>
-                      <p className="text-gray-600 text-sm">{customer.phone}</p>
+                      <p className="text-gray-700 text-sm">{customer.email || 'No email'}</p>
+                      <p className="text-gray-600 text-sm">{customer.phone || 'No phone'}</p>
                     </td>
                     <td className="py-4 px-4 font-semibold text-gray-900">{customer.orders}</td>
                     <td className="py-4 px-4 font-semibold text-blue-700 whitespace-nowrap">GH₵ {customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -446,12 +462,16 @@ export default function AdminCustomersPage() {
                         >
                           <i className="ri-eye-line text-lg"></i>
                         </Link>
-                        <button className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer">
-                          <i className="ri-mail-line text-lg"></i>
-                        </button>
-                        <button className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer">
-                          <i className="ri-delete-bin-line text-lg"></i>
-                        </button>
+                        {isMailable(customer.email) && (
+                          <a
+                            href={`mailto:${customer.email}`}
+                            title={`Email ${customer.email}`}
+                            aria-label={`Email ${customer.name}`}
+                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <i className="ri-mail-line text-lg"></i>
+                          </a>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -463,9 +483,6 @@ export default function AdminCustomersPage() {
 
         <div className="p-6 border-t border-gray-200 flex items-center justify-between">
           <p className="text-gray-600">Showing {filteredCustomers.length} of {customers.length} customers</p>
-          <div className="flex items-center space-x-2">
-            {/* Simple pagination place holder logic or hidden if few */}
-          </div>
         </div>
       </div>
     </div>

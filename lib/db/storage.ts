@@ -21,11 +21,15 @@ function publicBase(): string {
 }
 
 function signingSecret(): string {
-  return (
+  const secret =
     process.env.STORAGE_SIGNING_SECRET ||
     process.env.JWT_SECRET ||
-    "storage-dev-secret"
-  );
+    process.env.AUTH_JWT_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("STORAGE_SIGNING_SECRET is not set.");
+  }
+  return "storage-dev-secret";
 }
 
 export function signObjectToken(bucket: string, objectPath: string, expEpoch: number): string {
@@ -49,11 +53,15 @@ export function verifyObjectToken(
   return out === 0;
 }
 
+export const BUCKET_NAME = /^[a-z0-9][a-z0-9_-]{0,62}$/;
+
 function safeJoin(bucket: string, objectPath: string): string {
+  if (!BUCKET_NAME.test(bucket)) throw new Error("Invalid bucket name");
   const clean = objectPath.replace(/^\/+/, "");
-  const full = path.normalize(path.join(STORAGE_ROOT, bucket, clean));
-  const base = path.normalize(path.join(STORAGE_ROOT, bucket));
-  if (!full.startsWith(base)) throw new Error("Path traversal blocked");
+  if (!clean || clean.includes("\0")) throw new Error("Invalid object path");
+  const base = path.resolve(STORAGE_ROOT, bucket);
+  const full = path.resolve(base, clean);
+  if (!full.startsWith(base + path.sep)) throw new Error("Path traversal blocked");
   return full;
 }
 
@@ -75,6 +83,16 @@ export async function readObject(
   } catch {
     return null;
   }
+}
+
+const SERVABLE_TYPES = new Set([
+  "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "application/pdf",
+]);
+
+/** Never serve stored files as HTML, SVG or script, whatever type they were saved with. */
+export function safeContentType(type: string): string {
+  const base = (type || "").split(";")[0].trim().toLowerCase();
+  return SERVABLE_TYPES.has(base) ? base : "application/octet-stream";
 }
 
 function guessContentType(p: string): string {

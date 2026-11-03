@@ -9,6 +9,7 @@ import {
   updateUserMetadata,
 } from "@/lib/db/auth";
 import { isPlainPostgres } from "@/lib/db/mode";
+import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -110,6 +111,17 @@ export async function POST(
     if (grant === "password") {
       const email = String(body.email || "");
       const password = String(body.password || "");
+      const ip = getClientIdentifier(req);
+      const perEmail = checkRateLimit(`login:${ip}:${email.trim().toLowerCase()}`, RATE_LIMITS.login);
+      const perIp = checkRateLimit(`login-ip:${ip}`, { maxRequests: 30, windowSeconds: 900 });
+      const limit = perEmail.success ? perIp : perEmail;
+      if (!limit.success) {
+        return gotrueError(
+          `Too many sign-in attempts. Try again in ${Math.ceil(limit.resetIn / 60)} minutes.`,
+          429,
+          "over_request_rate_limit"
+        );
+      }
       const { session, error } = await signInWithPassword(email, password);
       if (error || !session) {
         return gotrueError(error || "Invalid login credentials", 400, "invalid_grant");
@@ -130,6 +142,10 @@ export async function POST(
   }
 
   if (slug === "signup") {
+    const limit = checkRateLimit(`signup:${getClientIdentifier(req)}`, RATE_LIMITS.signup);
+    if (!limit.success) {
+      return gotrueError("Too many sign-ups from this network. Try again later.", 429, "over_request_rate_limit");
+    }
     const { session, error } = await signUpWithPassword({
       email: String(body.email || ""),
       password: String(body.password || ""),
@@ -146,8 +162,8 @@ export async function POST(
   }
 
   if (slug === "recover") {
-    // Password recovery email not wired in staging shim yet
-    return NextResponse.json({}, { status: 200, headers: cors() });
+    // Recovery runs through /api/auth/password-reset, which emails a signed link.
+    return gotrueError("Use the Forgot password page to reset your password.", 400);
   }
 
   return gotrueError(`Unknown auth path: ${slug}`, 404);

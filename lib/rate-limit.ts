@@ -94,22 +94,24 @@ export function checkRateLimit(
  * @returns Client identifier string
  */
 export function getClientIdentifier(request: Request): string {
-  // Try various headers for the real IP
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim();
-  }
-  
+  // Traefik (Coolify) overwrites X-Real-Ip with the connecting address, so prefer it.
+  // The first X-Forwarded-For entry is client-controlled and easy to spoof.
   const realIp = request.headers.get('x-real-ip');
   if (realIp) {
-    return realIp;
+    return realIp.trim();
   }
-  
+
   const cfConnectingIp = request.headers.get('cf-connecting-ip');
   if (cfConnectingIp) {
-    return cfConnectingIp;
+    return cfConnectingIp.trim();
   }
-  
+
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const hops = forwardedFor.split(',').map((h) => h.trim()).filter(Boolean);
+    return hops[hops.length - 1] || 'unknown';
+  }
+
   // Fallback to a default identifier
   return 'unknown';
 }
@@ -140,6 +142,36 @@ export const RATE_LIMITS = {
   productImport: {
     maxRequests: 5,
     windowSeconds: 3600 // 5 imports per hour
+  },
+
+  // Sign-in attempts per IP+email (slows password guessing)
+  login: {
+    maxRequests: 10,
+    windowSeconds: 900
+  },
+
+  // Account creation per IP
+  signup: {
+    maxRequests: 5,
+    windowSeconds: 3600
+  },
+
+  // Password reset emails per IP
+  passwordReset: {
+    maxRequests: 5,
+    windowSeconds: 3600
+  },
+
+  // Checkout order creation per IP
+  orderCreate: {
+    maxRequests: 10,
+    windowSeconds: 600
+  },
+
+  // Order lookups per IP (stops order-number guessing)
+  orderLookup: {
+    maxRequests: 30,
+    windowSeconds: 600
   },
 
   // General API - default limits

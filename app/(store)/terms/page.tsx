@@ -139,19 +139,11 @@ export default function TermsPage() {
               <ul className="space-y-2 text-gray-600">
                 <li className="flex items-center gap-2">
                   <i className="ri-smartphone-line text-blue-700"></i>
-                  <span>MOMO (Mobile Money)</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <i className="ri-bank-line text-blue-700"></i>
-                  <span>Instant Bank Transfer</span>
+                  <span>Mobile Money (online checkout, via Moolre)</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <i className="ri-money-cny-circle-line text-blue-700"></i>
-                  <span>Cash (in store only)</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <i className="ri-bank-card-line text-blue-700"></i>
-                  <span>Visa Card Payment</span>
+                  <span>Cash or card (in store only)</span>
                 </li>
               </ul>
             </div>
@@ -161,7 +153,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-bold text-gray-900 mb-4 mt-8">4.3 Order Modifications</h3>
             <p className="text-gray-600 leading-relaxed">
-              You may modify or cancel your order within 1 hour of placement. After this time, orders enter processing and cannot be changed. Contact customer service immediately if you need to make changes.
+              If you need to change or cancel an order, contact us as soon as possible. Orders that have already been dispatched cannot be changed.
             </p>
           </section>
 
@@ -181,10 +173,10 @@ export default function TermsPage() {
           <section className="mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-6">6. Returns & Refunds</h2>
             <p className="text-gray-600 leading-relaxed mb-4">
-              We offer a 14-day return policy for most products. See our Returns Policy for complete details on eligibility, process, and conditions.
+              If an item arrives damaged, leaking or wrong, contact us as soon as possible through our Returns page and we will work out a replacement or refund with you.
             </p>
             <p className="text-gray-600 leading-relaxed">
-              Refunds are processed within 5-7 business days of receiving your return. Refunds are issued to the original payment method.
+              Approved refunds are paid back to the Mobile Money number or payment method used for the order.
             </p>
           </section>
 

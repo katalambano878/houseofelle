@@ -4,7 +4,20 @@ import { useEffect, useState, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { asNumber, moneyLabel } from '@/lib/format-money';
+import { asNumber, money } from '@/lib/format-money';
+
+const ghs = (value: unknown) => `GH₵${money(value)}`;
+
+// Print only the invoice: hide the store header, footer, nav and floating widgets.
+const PRINT_CSS = `
+@media print {
+  header, footer, nav { display: none !important; }
+  body * { visibility: hidden !important; }
+  #invoice-print, #invoice-print * { visibility: visible !important; }
+  #invoice-print { position: absolute; left: 0; top: 0; width: 100%; }
+  @page { margin: 16mm; }
+}
+`;
 
 function InvoiceContent() {
   const params = useParams();
@@ -76,9 +89,18 @@ function InvoiceContent() {
   const shipping = order.shipping_address || {};
   const items = order.order_items || [];
   const total = asNumber(order.total);
+  const itemsTotal = items.reduce(
+    (sum: number, item: any) => sum + asNumber(item.total_price, asNumber(item.unit_price) * asNumber(item.quantity)),
+    0
+  );
+  const subtotal = order.subtotal != null ? asNumber(order.subtotal) : itemsTotal;
+  const discount = asNumber(order.discount_total);
+  const delivery = asNumber(order.shipping_total);
+  const tax = asNumber(order.tax_total);
 
   return (
     <main className="min-h-screen bg-white text-gray-900 py-8 px-4 print:py-0">
+      <style>{PRINT_CSS}</style>
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-8 print:hidden">
           <Link href="/account?tab=orders" className="text-sm text-gray-600 hover:text-gray-900">
@@ -93,11 +115,11 @@ function InvoiceContent() {
           </button>
         </div>
 
-        <div className="border border-gray-200 rounded-xl p-8 print:border-0 print:p-0">
+        <div id="invoice-print" className="border border-gray-200 rounded-xl p-8 print:border-0 print:p-0">
           <div className="flex items-start justify-between gap-4 mb-8">
             <div>
               <p className="text-2xl font-bold tracking-wide text-gray-900">House of Elle</p>
-              <p className="text-sm text-gray-600">Premium women&apos;s fashion</p>
+              <p className="text-sm text-gray-600">Fragrance &amp; body care · Accra</p>
             </div>
             <div className="text-right text-sm">
               <p className="font-bold text-lg">Invoice</p>
@@ -149,9 +171,9 @@ function InvoiceContent() {
                     ) : null}
                   </td>
                   <td className="py-3 pr-2">{item.quantity}</td>
-                  <td className="py-3 pr-2">{moneyLabel(item.unit_price)}</td>
+                  <td className="py-3 pr-2">{ghs(item.unit_price)}</td>
                   <td className="py-3 text-right">
-                    {moneyLabel(item.total_price ?? asNumber(item.unit_price) * item.quantity)}
+                    {ghs(item.total_price ?? asNumber(item.unit_price) * item.quantity)}
                   </td>
                 </tr>
               ))}
@@ -159,10 +181,30 @@ function InvoiceContent() {
           </table>
 
           <div className="flex justify-end">
-            <div className="w-56 space-y-2 text-sm">
+            <div className="w-64 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Subtotal</span>
+                <span>{ghs(subtotal)}</span>
+              </div>
+              {discount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Discount</span>
+                  <span>−{ghs(discount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Delivery</span>
+                <span>{delivery > 0 ? ghs(delivery) : 'Confirmed separately'}</span>
+              </div>
+              {tax > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tax</span>
+                  <span>{ghs(tax)}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-base border-t border-gray-300 pt-3">
                 <span>Total</span>
-                <span>{moneyLabel(total)}</span>
+                <span>{ghs(total)}</span>
               </div>
               <p className="text-xs text-gray-500 capitalize">
                 Status: {order.status} · Payment: {order.payment_status}

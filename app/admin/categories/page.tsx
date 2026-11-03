@@ -61,11 +61,40 @@ export default function AdminCategoriesPage() {
   };
 
   const handleDelete = async (categoryId: string) => {
+    const children = categories.filter((c) => c.parent_id === categoryId);
+    if (children.length > 0) {
+      alert(
+        `This category has ${children.length} sub-categor${children.length > 1 ? 'ies' : 'y'} (${children.map((c) => c.name).join(', ')}). ` +
+        'Move or delete those first, then delete this category.'
+      );
+      return;
+    }
     if (!confirm('Are you sure you want to delete this category? Products in it will have no category.')) return;
     try {
-      await supabase.from('products').update({ category_id: null }).eq('category_id', categoryId);
+      // products.category_id has no ON DELETE action, so products must be unlinked before the
+      // category row can go. Remember which ones we unlinked so we can put them back if the delete fails.
+      const { data: linked, error: linkedError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('category_id', categoryId);
+      if (linkedError) throw linkedError;
+      const productIds = (linked || []).map((p: any) => p.id);
+
+      if (productIds.length > 0) {
+        const { error: unlinkError } = await supabase.from('products').update({ category_id: null }).in('id', productIds);
+        if (unlinkError) throw unlinkError;
+      }
+
       const { error } = await supabase.from('categories').delete().eq('id', categoryId);
-      if (error) throw error;
+      if (error) {
+        if (productIds.length > 0) {
+          const { error: relinkError } = await supabase.from('products').update({ category_id: categoryId }).in('id', productIds);
+          if (relinkError) {
+            throw new Error(`${error.message}. Also could not restore ${productIds.length} product(s) to this category: ${relinkError.message}`);
+          }
+        }
+        throw error;
+      }
       setCategories(categories.filter((c) => c.id !== categoryId));
       alert('Category deleted successfully');
     } catch (err: any) {
@@ -74,14 +103,28 @@ export default function AdminCategoriesPage() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
     try {
-      if (!e.target.files || e.target.files.length === 0) return;
+      if (!input.files || input.files.length === 0) return;
+
+      const file = input.files[0];
+      const fileExt = (file.name.split('.').pop() || '').toLowerCase();
+      const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'];
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+      if (!allowedExts.includes(fileExt) || (file.type && !allowedTypes.includes(file.type))) {
+        alert('Please choose a JPG, PNG, WebP, GIF or AVIF image.');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`This image is ${(file.size / 1024 / 1024).toFixed(1)} MB. The maximum is 10 MB.`);
+        return;
+      }
 
       setUploading(true);
-      const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `cat-${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const randomPart = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      const filePath = `cat-${randomPart}.${fileExt}`;
 
       // Upload to 'products' bucket for simplicity, or create a 'categories' bucket
       const { error: uploadError } = await supabase.storage
@@ -97,9 +140,10 @@ export default function AdminCategoriesPage() {
       setFormData({ ...formData, image_url: publicUrl });
 
     } catch (error: any) {
-      alert('Error uploading image: ' + error.message);
+      alert('Error uploading image: ' + (error?.message || 'Please try again.'));
     } finally {
       setUploading(false);
+      input.value = '';
     }
   };
 
@@ -373,7 +417,7 @@ export default function AdminCategoriesPage() {
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg">
                         <label className="cursor-pointer bg-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-100">
                           Change Image
-                          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                          <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleImageUpload} />
                         </label>
                       </div>
                     </div>
@@ -382,7 +426,7 @@ export default function AdminCategoriesPage() {
                       <i className="ri-upload-cloud-line text-4xl text-gray-400 mb-2 w-10 h-10 flex items-center justify-center mx-auto"></i>
                       <p className="text-gray-700 font-medium">Click to upload image</p>
                       <p className="text-sm text-gray-500 mt-1">Square (1:1) Recommended (e.g., 800x800px)</p>
-                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                      <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleImageUpload} />
                     </label>
                   )}
                 </div>

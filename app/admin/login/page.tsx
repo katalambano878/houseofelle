@@ -1,13 +1,32 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useRecaptcha } from '@/hooks/useRecaptcha';
 
+const LOGIN_NOTICES: Record<string, string> = {
+  session_expired: 'Your session has ended. Please sign in again.',
+  unauthorized: 'That account does not have admin or staff access.',
+  auth_unavailable: 'Sign-in is temporarily unavailable. Please try again shortly.',
+};
+
 export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginForm />
+    </Suspense>
+  );
+}
+
+function AdminLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const notice = LOGIN_NOTICES[searchParams.get('error') || ''] || '';
+  const redirectParam = searchParams.get('redirect') || '';
+  // Only return to admin pages, never to another site.
+  const redirectTo = /^\/admin(\/|$)/.test(redirectParam) && !redirectParam.startsWith('/admin/login') ? redirectParam : '/admin';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -40,9 +59,8 @@ export default function AdminLoginPage() {
         const secureAttr = window.location.protocol === 'https:' ? '; Secure' : '';
         // Set auth cookie so middleware can verify the session server-side
         document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${secureAttr}`;
-        document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax${secureAttr}`;
 
-        router.push('/admin');
+        router.push(redirectTo);
         router.refresh();
       }
     } catch (err: any) {
@@ -64,6 +82,11 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          {notice && !error && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm" role="status">
+              {notice}
+            </div>
+          )}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
               <i className="ri-error-warning-line text-red-600 text-xl mt-0.5"></i>

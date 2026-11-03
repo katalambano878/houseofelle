@@ -2,7 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { query } from "./pool";
 import { authJwtSecret } from "./mode";
 
@@ -33,6 +33,22 @@ export interface SessionTokens {
   expires_at: number;
   token_type: "bearer";
   user: AuthUser;
+}
+
+const DUMMY_HASH = "$2a$10$I3Y1lsRwHYWcFeUq1zQkbeLIumefE7rFSfjY3IHA1PHWcIOe3qdjG";
+
+/** Profile fields a customer may store on their account; anything else is dropped. */
+const META_KEYS = ["first_name", "last_name", "full_name", "phone", "newsletter", "avatar_url"];
+
+function cleanMetadata(data: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!data || typeof data !== "object") return out;
+  for (const key of META_KEYS) {
+    const v = (data as Record<string, unknown>)[key];
+    if (typeof v === "string") out[key] = v.slice(0, 200);
+    else if (typeof v === "boolean") out[key] = v;
+  }
+  return out;
 }
 
 function secretKey(): Uint8Array {
@@ -165,9 +181,11 @@ export async function signInWithPassword(
   );
   const row = rows[0];
   if (!row?.encrypted_password) {
+    // Spend the same time as a real check so response timing doesn't reveal which emails exist.
+    await bcrypt.compare(password, DUMMY_HASH);
     return { session: null, error: "Invalid login credentials" };
   }
-  const ok = bcrypt.compareSync(password, row.encrypted_password);
+  const ok = await bcrypt.compare(password, row.encrypted_password);
   if (!ok) {
     return { session: null, error: "Invalid login credentials" };
   }
@@ -187,8 +205,11 @@ export async function signUpWithPassword(opts: {
   data?: Record<string, unknown>;
 }): Promise<{ session: SessionTokens | null; user: AuthUser | null; error: string | null }> {
   const email = opts.email.trim().toLowerCase();
-  if (!email || !opts.password || opts.password.length < 6) {
-    return { session: null, user: null, error: "Email and password (min 6 chars) required" };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return { session: null, user: null, error: "Enter a valid email address" };
+  }
+  if (!opts.password || opts.password.length < 8 || opts.password.length > 200) {
+    return { session: null, user: null, error: "Password must be at least 8 characters" };
   }
 
   const existing = await query(`SELECT id FROM auth.users WHERE lower(email) = $1 LIMIT 1`, [
@@ -199,8 +220,8 @@ export async function signUpWithPassword(opts: {
   }
 
   const id = randomUUID();
-  const hash = bcrypt.hashSync(opts.password, 10);
-  const meta = opts.data || {};
+  const hash = await bcrypt.hash(opts.password, 10);
+  const meta = cleanMetadata(opts.data || {});
 
   await query(
     `INSERT INTO auth.users (
@@ -217,11 +238,15 @@ export async function signUpWithPassword(opts: {
   );
 
   // Ensure profile row exists (app expects profiles.id = auth.users.id)
+  const fullName =
+    (meta.full_name as string) ||
+    [meta.first_name, meta.last_name].filter(Boolean).join(" ") ||
+    email.split("@")[0];
   await query(
-    `INSERT INTO profiles (id, email, full_name, role, created_at, updated_at)
-     VALUES ($1, $2, $3, 'customer', now(), now())
+    `INSERT INTO profiles (id, email, full_name, phone, role, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, 'customer', now(), now())
      ON CONFLICT (id) DO NOTHING`,
-    [id, email, (meta.full_name as string) || email.split("@")[0]]
+    [id, email, fullName, (meta.phone as string) || null]
   ).catch(() => {});
 
   const { rows } = await query(`SELECT * FROM auth.users WHERE id = $1`, [id]);
@@ -260,10 +285,10 @@ export async function updateUserPassword(
   userId: string,
   password: string
 ): Promise<{ user: AuthUser | null; error: string | null }> {
-  if (!password || password.length < 6) {
-    return { user: null, error: "Password must be at least 6 characters" };
+  if (!password || password.length < 8 || password.length > 200) {
+    return { user: null, error: "Password must be at least 8 characters" };
   }
-  const hash = bcrypt.hashSync(password, 10);
+  const hash = await bcrypt.hash(password, 10);
   await query(
     `UPDATE auth.users SET encrypted_password = $1, updated_at = now() WHERE id = $2`,
     [hash, userId]
@@ -274,8 +299,9 @@ export async function updateUserPassword(
 
 export async function updateUserMetadata(
   userId: string,
-  data: Record<string, unknown>
+  raw: Record<string, unknown>
 ): Promise<{ user: AuthUser | null; error: string | null }> {
+  const data = cleanMetadata(raw);
   await query(
     `UPDATE auth.users
      SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || $1::jsonb,
@@ -299,4 +325,64 @@ export async function updateUserMetadata(
   }
   const user = await getUserById(userId);
   return { user, error: null };
+}
+
+// ---- password reset ---------------------------------------------------------
+// The token embeds a fingerprint of the current password hash, so it stops
+// working as soon as the password changes (single use) and after one hour.
+
+const RESET_TTL_SEC = 60 * 60;
+
+function passwordFingerprint(hash: string): string {
+  return createHash("sha256").update(hash || "none").digest("hex").slice(0, 24);
+}
+
+export async function createPasswordResetToken(
+  email: string
+): Promise<{ token: string; email: string; name: string } | null> {
+  const normalized = email.trim().toLowerCase();
+  const { rows } = await query(
+    `SELECT id, email, encrypted_password, raw_user_meta_data
+     FROM auth.users WHERE lower(email) = $1 AND deleted_at IS NULL LIMIT 1`,
+    [normalized]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const token = await new SignJWT({ typ: "reset", ph: passwordFingerprint(row.encrypted_password) })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(row.id)
+    .setIssuedAt(now)
+    .setExpirationTime(now + RESET_TTL_SEC)
+    .sign(secretKey());
+  const meta =
+    typeof row.raw_user_meta_data === "string"
+      ? JSON.parse(row.raw_user_meta_data || "{}")
+      : row.raw_user_meta_data || {};
+  return { token, email: row.email, name: meta.first_name || meta.full_name || "" };
+}
+
+export async function resetPasswordWithToken(
+  token: string,
+  password: string
+): Promise<{ ok: boolean; error: string | null }> {
+  let userId: string;
+  let fingerprint: string;
+  try {
+    const { payload } = await jwtVerify(token, secretKey());
+    if (payload.typ !== "reset" || typeof payload.sub !== "string") throw new Error("bad");
+    userId = payload.sub;
+    fingerprint = String(payload.ph || "");
+  } catch {
+    return { ok: false, error: "This reset link is invalid or has expired. Request a new one." };
+  }
+  const { rows } = await query(
+    `SELECT encrypted_password FROM auth.users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+    [userId]
+  );
+  if (!rows[0] || passwordFingerprint(rows[0].encrypted_password) !== fingerprint) {
+    return { ok: false, error: "This reset link has already been used. Request a new one." };
+  }
+  const { error } = await updateUserPassword(userId, password);
+  return { ok: !error, error };
 }

@@ -69,14 +69,19 @@ export default function PWAInstaller() {
     window.addEventListener('appinstalled', handleInstalled);
 
     // Register service worker with update detection
+    let updateTimer: ReturnType<typeof setInterval> | undefined;
+    let onControllerChange: (() => void) | undefined;
     if ('serviceWorker' in navigator) {
+      // Only an update the shopper accepted should reload the page; the very
+      // first install also fires controllerchange and must not reload.
+      const hadController = !!navigator.serviceWorker.controller;
       navigator.serviceWorker
         .register('/service-worker.js', { scope: '/' })
         .then((registration) => {
           console.log('[PWA] Service Worker registered with scope:', registration.scope);
 
           // Check for updates every 60 minutes
-          setInterval(() => {
+          updateTimer = setInterval(() => {
             registration.update();
           }, 60 * 60 * 1000);
 
@@ -101,17 +106,20 @@ export default function PWAInstaller() {
 
       // Handle controller change (new SW activated)
       let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
+      onControllerChange = () => {
+        if (hadController && !refreshing) {
           refreshing = true;
           window.location.reload();
         }
-      });
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
     }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       window.removeEventListener('appinstalled', handleInstalled);
+      if (updateTimer) clearInterval(updateTimer);
+      if (onControllerChange) navigator.serviceWorker?.removeEventListener('controllerchange', onControllerChange);
     };
   }, []);
 

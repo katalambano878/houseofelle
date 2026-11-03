@@ -15,6 +15,7 @@ interface OrderItem {
   quantity: number;
   price: number;
   variant?: string | null;
+  variantId?: string | null;
   slug?: string;
 }
 
@@ -33,6 +34,7 @@ export default function OrderHistory() {
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState('');
   const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [reorderNotice, setReorderNotice] = useState<{ orderId: string; text: string } | null>(null);
   const { addToCart, setIsCartOpen } = useCart();
   const router = useRouter();
 
@@ -67,6 +69,7 @@ export default function OrderHistory() {
               quantity: item.quantity,
               price: asNumber(item.unit_price),
               variant: item.variant_name || null,
+              variantId: item.variant_id || null,
               slug: item.metadata?.slug || '',
             })),
           }));
@@ -99,41 +102,85 @@ export default function OrderHistory() {
 
   const handleReorder = async (order: Order) => {
     setReorderingId(order.id);
+    setReorderNotice(null);
+    const skipped: string[] = [];
+    let added = 0;
     try {
-      let added = 0;
       for (const item of order.items) {
-        if (!item.productId) continue;
+        if (!item.productId) {
+          skipped.push(item.name);
+          continue;
+        }
+        // Only active products are visible to customers, so a missing row means
+        // the product is no longer for sale.
         const { data: product, error } = await supabase
           .from('products')
-          .select('id, slug, name, price, quantity, moq, status, product_images(url)')
+          .select('id, slug, name, price, quantity, moq, status, product_images(url), product_variants(id, name, price, quantity)')
           .eq('id', item.productId)
-          .single();
-        if (error || !product) continue;
-        if (product.status === 'archived' || product.status === 'draft') continue;
+          .maybeSingle();
+        if (error || !product || product.status !== 'active') {
+          skipped.push(item.name);
+          continue;
+        }
 
-        const stock = asNumber(product.quantity);
+        const variants = ((product as { product_variants?: { id: string; name: string; price: unknown; quantity: unknown }[] })
+          .product_variants) || [];
+        const variant = item.variantId
+          ? variants.find((v) => v.id === item.variantId)
+          : item.variant
+            ? variants.find((v) => v.name === item.variant)
+            : undefined;
+
+        // The ordered option no longer exists, or the product now needs an option chosen.
+        if ((item.variantId || item.variant) && !variant && variants.length > 0) {
+          skipped.push(item.variant ? `${item.name} (${item.variant})` : item.name);
+          continue;
+        }
+        if (!item.variantId && !item.variant && variants.length > 0) {
+          skipped.push(item.name);
+          continue;
+        }
+
+        const stock = variant ? asNumber(variant.quantity) : asNumber(product.quantity);
+        if (stock <= 0) {
+          skipped.push(item.variant ? `${item.name} (${item.variant})` : item.name);
+          continue;
+        }
         const images = (product as { product_images?: { url: string }[] }).product_images;
         const image =
           images?.[0]?.url ||
           item.image ||
           '/placeholder-product.svg';
+        const moq = asNumber(product.moq, 1) || 1;
 
         addToCart({
           id: product.id,
           name: product.name || item.name,
-          price: asNumber(product.price, item.price),
+          price: variant ? asNumber(variant.price, item.price) : asNumber(product.price, item.price),
           image,
-          quantity: Math.max(1, item.quantity),
-          variant: item.variant || undefined,
+          quantity: Math.min(Math.max(1, item.quantity, moq), stock),
+          variant: item.variant || variant?.name || undefined,
+          variantId: variant?.id,
           slug: product.slug || item.slug || product.id,
-          maxStock: Math.max(1, stock || item.quantity || 1),
-          moq: asNumber(product.moq, 1) || 1,
+          maxStock: stock,
+          moq,
         });
         added += 1;
       }
 
       if (added === 0) {
-        window.alert('None of the items from this order are available to reorder right now.');
+        setReorderNotice({
+          orderId: order.id,
+          text: 'None of the items from this order are available to reorder right now.',
+        });
+        return;
+      }
+      if (skipped.length > 0) {
+        setReorderNotice({
+          orderId: order.id,
+          text: `Added ${added} item${added === 1 ? '' : 's'} to your cart. Not available right now: ${skipped.join(', ')}.`,
+        });
+        setIsCartOpen(true);
         return;
       }
       setIsCartOpen(true);
@@ -237,6 +284,13 @@ export default function OrderHistory() {
                   </div>
                 ))}
               </div>
+
+              {reorderNotice?.orderId === order.id && (
+                <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800 flex items-start gap-2">
+                  <i className="ri-information-line mt-0.5"></i>
+                  <span>{reorderNotice.text}</span>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row flex-wrap gap-3 pt-4 border-t border-gray-200">
                 <Link
