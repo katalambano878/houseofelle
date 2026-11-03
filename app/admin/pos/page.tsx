@@ -1,5 +1,6 @@
 'use client';
 import { money } from '@/lib/format-money';
+import { DELIVERY_OPTIONS, deliveryLabel, type DeliveryMethod } from '@/lib/delivery';
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -73,7 +74,9 @@ export default function POSPage() {
     const [processing, setProcessing] = useState(false);
     const [completedOrder, setCompletedOrder] = useState<any>(null);
     const [checkoutError, setCheckoutError] = useState<string | null>(null);
-    const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'doorstep'>('pickup');
+    const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('pickup');
+    // Delivery fee agreed with the customer for doorstep / outside-Accra orders.
+    const [deliveryFee, setDeliveryFee] = useState('');
     const [guestDetails, setGuestDetails] = useState({
         firstName: '',
         lastName: '',
@@ -246,7 +249,8 @@ export default function POSPage() {
 
     const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0);
     const tax = cartTotal * 0.0;
-    const grandTotal = cartTotal + tax;
+    const deliveryFeeAmount = deliveryMethod === 'pickup' ? 0 : Math.max(0, Math.round((parseFloat(deliveryFee) || 0) * 100) / 100);
+    const grandTotal = cartTotal + tax + deliveryFeeAmount;
     const changeDue = amountTendered ? (parseFloat(amountTendered) - grandTotal) : 0;
 
     // Get the customer email and phone for the order
@@ -286,8 +290,8 @@ export default function POSPage() {
             if (!hasName && !hasContact) return 'Please enter customer name or contact info';
         }
 
-        // Require address for doorstep delivery
-        if (deliveryMethod === 'doorstep') {
+        // Require address for anything that is delivered
+        if (deliveryMethod !== 'pickup') {
             if (!guestDetails.address.trim()) return 'Delivery address is required';
             if (!guestDetails.city.trim()) return 'City is required for delivery';
             if (!guestDetails.region) return 'Region is required for delivery';
@@ -349,7 +353,7 @@ export default function POSPage() {
                     currency: 'GHS',
                     subtotal: cartTotal,
                     tax_total: tax,
-                    shipping_total: 0,
+                    shipping_total: deliveryFeeAmount,
                     discount_total: 0,
                     total: grandTotal,
                     shipping_method: deliveryMethod,
@@ -357,6 +361,7 @@ export default function POSPage() {
                     shipping_address: addressData,
                     billing_address: addressData,
                     metadata: {
+                        source: 'pos',
                         pos_sale: true,
                         first_name: addressData.firstName,
                         last_name: addressData.lastName,
@@ -510,6 +515,7 @@ export default function POSPage() {
         setCheckoutError(null);
         setPaymentMethod('cash');
         setDeliveryMethod('pickup');
+        setDeliveryFee('');
         setGuestDetails({
             firstName: '',
             lastName: '',
@@ -704,10 +710,12 @@ export default function POSPage() {
                             <span>Subtotal</span>
                             <span>GH₵{money(cartTotal)}</span>
                         </div>
-                        <div className="flex justify-between text-gray-600">
-                            <span>Tax (0%)</span>
-                            <span>GH₵0.00</span>
-                        </div>
+                        {deliveryFeeAmount > 0 && (
+                            <div className="flex justify-between text-gray-600">
+                                <span>{deliveryLabel(deliveryMethod)} fee</span>
+                                <span>GH₵{money(deliveryFeeAmount)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t border-gray-200 mt-2">
                             <span>Total</span>
                             <span>GH₵{money(grandTotal)}</span>
@@ -919,37 +927,46 @@ export default function POSPage() {
                                     {/* Delivery Method */}
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">Delivery Method</label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <button
-                                                onClick={() => setDeliveryMethod('pickup')}
-                                                className={`p-3 rounded-lg border transition-all flex items-center space-x-3 ${deliveryMethod === 'pickup'
-                                                    ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                                    }`}
-                                            >
-                                                <i className={`ri-store-2-line text-xl ${deliveryMethod === 'pickup' ? 'text-blue-700' : 'text-gray-400'}`}></i>
-                                                <div className="text-left">
-                                                    <p className={`text-sm font-semibold ${deliveryMethod === 'pickup' ? 'text-blue-800' : 'text-gray-700'}`}>Store Pickup</p>
-                                                    <p className="text-xs text-gray-500">Customer picks up</p>
-                                                </div>
-                                            </button>
-                                            <button
-                                                onClick={() => setDeliveryMethod('doorstep')}
-                                                className={`p-3 rounded-lg border transition-all flex items-center space-x-3 ${deliveryMethod === 'doorstep'
-                                                    ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                                    }`}
-                                            >
-                                                <i className={`ri-truck-line text-xl ${deliveryMethod === 'doorstep' ? 'text-blue-700' : 'text-gray-400'}`}></i>
-                                                <div className="text-left">
-                                                    <p className={`text-sm font-semibold ${deliveryMethod === 'doorstep' ? 'text-blue-800' : 'text-gray-700'}`}>Doorstep Delivery</p>
-                                                    <p className="text-xs text-gray-500">Deliver to address</p>
-                                                </div>
-                                            </button>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            {DELIVERY_OPTIONS.map((option) => (
+                                                <button
+                                                    key={option.id}
+                                                    type="button"
+                                                    onClick={() => setDeliveryMethod(option.id)}
+                                                    className={`p-3 rounded-lg border transition-all flex items-center space-x-3 ${deliveryMethod === option.id
+                                                        ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                        }`}
+                                                >
+                                                    <i className={`${option.icon} text-xl ${deliveryMethod === option.id ? 'text-blue-700' : 'text-gray-400'}`}></i>
+                                                    <div className="text-left">
+                                                        <p className={`text-sm font-semibold ${deliveryMethod === option.id ? 'text-blue-800' : 'text-gray-700'}`}>{option.label}</p>
+                                                        <p className="text-xs text-gray-500">{option.id === 'pickup' ? 'Customer picks up' : option.id === 'doorstep' ? 'Within Accra' : 'Via bus station'}</p>
+                                                    </div>
+                                                </button>
+                                            ))}
                                         </div>
 
-                                        {/* Delivery Address (shown for doorstep delivery) */}
-                                        {deliveryMethod === 'doorstep' && (
+                                        {deliveryMethod !== 'pickup' && (
+                                            <div className="mt-3">
+                                                <label htmlFor="pos-delivery-fee" className="block text-sm font-semibold text-gray-700 mb-1">Delivery fee (GH₵)</label>
+                                                <input
+                                                    id="pos-delivery-fee"
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={deliveryFee}
+                                                    onChange={(e) => setDeliveryFee(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">Added to the total. Leave empty if the customer pays the rider directly.</p>
+                                            </div>
+                                        )}
+
+                                        {/* Delivery Address (shown for anything delivered) */}
+                                        {deliveryMethod !== 'pickup' && (
                                             <div className="mt-3 bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-3">
                                                 <h4 className="text-sm font-bold text-gray-900 flex items-center">
                                                     <i className="ri-map-pin-line mr-2 text-blue-600"></i>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { money, asNumber } from '@/lib/format-money';
 import { supabase } from '@/lib/supabase';
 import { useCart } from '@/context/CartContext';
+import { deliveryLabel } from '@/lib/delivery';
 
 interface OrderItem {
   id: string;
@@ -26,6 +27,7 @@ interface Order {
   date: string;
   status: string;
   total: number;
+  delivery: string;
   items: OrderItem[];
 }
 
@@ -59,6 +61,7 @@ export default function OrderHistory() {
             orderNumber: order.order_number,
             email: order.email || session.user.email || '',
             date: order.created_at,
+            delivery: deliveryLabel(order.shipping_method),
             status: order.status,
             total: asNumber(order.total),
             items: order.order_items.map((item: any) => ({
@@ -251,6 +254,10 @@ export default function OrderHistory() {
                         year: 'numeric'
                       })}
                     </p>
+                  </div>
+                  <div className="w-full sm:w-auto">
+                    <p className="text-xs text-gray-600 mb-1">Delivery</p>
+                    <p className="font-semibold text-gray-900">{order.delivery}</p>
                   </div>
                   <div className="w-full sm:w-auto">
                     <p className="text-xs text-gray-600 mb-1">Total</p>

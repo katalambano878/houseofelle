@@ -5,6 +5,7 @@ import { verifyAuth } from '@/lib/auth';
 import { verifyRecaptcha } from '@/lib/recaptcha';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
 import { evaluateCoupon, recordCouponUse } from '@/lib/coupons';
+import { DELIVERY_METHOD_IDS } from '@/lib/delivery';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -13,7 +14,6 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_ITEMS = 50;
 const MAX_QTY = 1000;
-const SHIPPING_METHODS = new Set(['pickup', 'standard', 'express']);
 const PAYMENT_METHODS = new Set(['moolre']);
 
 type CartLine = { id?: unknown; variantId?: unknown; variant?: unknown; quantity?: unknown };
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Enter a valid phone number.' }, { status: 400 });
   }
 
-  const shippingMethod = SHIPPING_METHODS.has(body.shippingMethod) ? body.shippingMethod : 'pickup';
+  const shippingMethod = DELIVERY_METHOD_IDS.has(body.shippingMethod) ? body.shippingMethod : 'pickup';
   const paymentMethod = PAYMENT_METHODS.has(body.paymentMethod) ? body.paymentMethod : 'moolre';
 
   const lines: CartLine[] = Array.isArray(body.items) ? body.items : [];
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
   }
 
   const subtotal = round2(items.reduce((sum, i) => sum + i.total_price, 0));
-  const shippingTotal = 0; // Delivery is arranged after the order; no shipping fee at checkout.
+  const shippingTotal = 0; // Doorstep / outside-Accra fees are quoted by phone and paid separately.
 
   let discountTotal = 0;
   let couponCode: string | null = null;
@@ -219,6 +219,7 @@ export async function POST(request: Request) {
       shipping_address: shipping,
       billing_address: shipping,
       metadata: {
+        source: 'web',
         guest_checkout: !userId,
         first_name: shipping.firstName,
         last_name: shipping.lastName,

@@ -68,7 +68,7 @@ export async function POST(request: Request) {
             }
             const { data: order, error: orderError } = await supabaseAdmin
                 .from('orders')
-                .select('id, order_number, email, phone, total, shipping_address, metadata, created_at, payment_method')
+                .select('id, order_number, email, phone, total, shipping_address, shipping_method, metadata, created_at, payment_method')
                 .eq(isUuid ? 'id' : 'order_number', orderRef)
                 .single();
 

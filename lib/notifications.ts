@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { escapeHtml } from '@/lib/sanitize';
+import { deliveryLabel } from '@/lib/delivery';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 'missing_api_key');
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'support@example.com';
@@ -289,6 +290,7 @@ export async function sendOrderConfirmation(order: any) {
   ${emailInfoRow('Order Number', `#${order_number || id}`)}
   ${emailInfoRow('Order Date', new Date(created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }))}
   ${trackingNumber ? emailInfoRow('Tracking', trackingNumber) : ''}
+  ${emailInfoRow('Delivery', deliveryLabel(order.shipping_method))}
   ${emailInfoRow('Total', `GH₵${Number(total).toFixed(2)}`)}
 </table>
 
@@ -315,6 +317,7 @@ ${emailButton('Track Your Order', trackingUrl)}
   ${emailInfoRow('Order', `#${order_number || id}`)}
   ${emailInfoRow('Customer', `${name}`)}
   ${emailInfoRow('Email', email)}
+  ${emailInfoRow('Delivery', deliveryLabel(order.shipping_method))}
   ${emailInfoRow('Total', `GH₵${Number(total).toFixed(2)}`)}
   ${trackingNumber ? emailInfoRow('Tracking', trackingNumber) : ''}
 </table>

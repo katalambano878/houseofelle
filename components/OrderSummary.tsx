@@ -1,4 +1,5 @@
 import { money } from '@/lib/format-money';
+import { DELIVERY_OPTIONS } from '@/lib/delivery';
 interface OrderItem {
   id: string;
   name: string;
@@ -16,9 +17,11 @@ interface OrderSummaryProps {
   total: number;
   discount?: number;
   couponCode?: string;
+  deliveryMethod?: string;
 }
 
-export default function OrderSummary({ items, subtotal, shipping, tax, total, discount = 0, couponCode }: OrderSummaryProps) {
+export default function OrderSummary({ items, subtotal, shipping, tax, total, discount = 0, couponCode, deliveryMethod }: OrderSummaryProps) {
+  const delivery = DELIVERY_OPTIONS.find((o) => o.id === deliveryMethod);
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 sticky top-4">
       <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
@@ -57,9 +60,9 @@ export default function OrderSummary({ items, subtotal, shipping, tax, total, di
           </div>
         )}
         <div className="flex justify-between text-gray-700">
-          <span>Delivery</span>
-          <span className="font-semibold">
-            {shipping === 0 ? 'Confirmed after you order' : `GH₵ ${money(shipping)}`}
+          <span>{delivery ? delivery.label : 'Delivery'}</span>
+          <span className="font-semibold text-right">
+            {shipping > 0 ? `GH₵ ${money(shipping)}` : delivery ? (delivery.id === 'pickup' ? 'Free' : 'Fee confirmed by phone') : 'Chosen at the next step'}
           </span>
         </div>
 

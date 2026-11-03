@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import FraudDetectionAlert from '@/components/FraudDetectionAlert';
+import { deliveryLabel, orderSource } from '@/lib/delivery';
 
 interface OrderDetailClientProps {
   orderId: string;
@@ -454,7 +455,8 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
           {/* Order Summary */}
           <div className="flex justify-between mb-6">
             <div>
-              <p><span className="font-semibold">Shipping Method:</span> {order?.shipping_method || 'Standard'}</p>
+              <p><span className="font-semibold">Delivery:</span> {deliveryLabel(order?.shipping_method)}</p>
+              <p><span className="font-semibold">Source:</span> {orderSource(order) === 'pos' ? 'POS (in store)' : 'Website'}</p>
               <p><span className="font-semibold">Payment:</span> {order?.payment_method} ({order?.payment_status})</p>
               {trackingNumber && <p><span className="font-semibold">Tracking #:</span> {trackingNumber}</p>}
             </div>

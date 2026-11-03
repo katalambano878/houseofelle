@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import CheckoutSteps from '@/components/CheckoutSteps';
 import OrderSummary from '@/components/OrderSummary';
 import { checkCoupon, type AppliedCoupon } from '@/components/AdvancedCouponSystem';
+import { DELIVERY_OPTIONS } from '@/lib/delivery';
 import { useCart } from '@/context/CartContext';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -478,68 +479,29 @@ export default function CheckoutPage() {
                 <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-6">Delivery Method</h2>
                   <div className="space-y-4">
-                    <label className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryMethod === 'pickup' ? 'border-blue-700 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-                      }`}>
-                      <div className="flex items-center space-x-4">
-                        <input
-                          type="radio"
-                          name="delivery"
-                          value="pickup"
-                          checked={deliveryMethod === 'pickup'}
-                          onChange={(e) => setDeliveryMethod(e.target.value)}
-                          className="w-5 h-5 text-blue-700"
-                        />
-                        <div>
-                          <p className="font-semibold text-gray-900">Store Pickup</p>
-                          <p className="text-sm text-gray-600">Pick up from our store — Ready in 24 hours</p>
+                    {DELIVERY_OPTIONS.map((option) => (
+                      <label
+                        key={option.id}
+                        className={`flex items-center justify-between gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryMethod === option.id ? 'border-blue-700 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <input
+                            type="radio"
+                            name="delivery"
+                            value={option.id}
+                            checked={deliveryMethod === option.id}
+                            onChange={(e) => setDeliveryMethod(e.target.value)}
+                            className="w-5 h-5 text-blue-700"
+                          />
+                          <i className={`${option.icon} text-2xl text-blue-700`} aria-hidden="true"></i>
+                          <div>
+                            <p className="font-semibold text-gray-900">{option.label}</p>
+                            <p className="text-sm text-gray-600">{option.description}</p>
+                          </div>
                         </div>
-                      </div>
-                      <p className="font-bold text-blue-700">FREE</p>
-                    </label>
-
-                    <label className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryMethod === 'doorstep' ? 'border-blue-700 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-                      }`}>
-                      <div className="flex items-center space-x-4">
-                        <input
-                          type="radio"
-                          name="delivery"
-                          value="doorstep"
-                          checked={deliveryMethod === 'doorstep'}
-                          onChange={(e) => setDeliveryMethod(e.target.value)}
-                          className="w-5 h-5 text-blue-700"
-                        />
-                        <div>
-                          <p className="font-semibold text-gray-900">Doorstep Delivery</p>
-                          <p className="text-sm text-gray-600">We will contact you with the delivery cost</p>
-                        </div>
-                      </div>
-                      <p className="font-semibold text-amber-600 text-sm">At a Cost</p>
-                    </label>
-
-                    {/* Comprehensive delivery options - to be re-enabled later
-                    <label className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryMethod === 'accra' ? 'border-blue-700 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-                      }`}>
-                      <div className="flex items-center space-x-4">
-                        <input type="radio" name="delivery" value="accra" checked={deliveryMethod === 'accra'} onChange={(e) => setDeliveryMethod(e.target.value)} className="w-5 h-5 text-blue-700" />
-                        <div>
-                          <p className="font-semibold text-gray-900">Accra Delivery</p>
-                          <p className="text-sm text-gray-600">Delivery within Accra</p>
-                        </div>
-                      </div>
-                      <p className="font-bold text-gray-900">GH₵ 40.00</p>
-                    </label>
-                    <label className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryMethod === 'outside-accra' ? 'border-blue-700 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-                      }`}>
-                      <div className="flex items-center space-x-4">
-                        <input type="radio" name="delivery" value="outside-accra" checked={deliveryMethod === 'outside-accra'} onChange={(e) => setDeliveryMethod(e.target.value)} className="w-5 h-5 text-blue-700" />
-                        <div>
-                          <p className="font-semibold text-gray-900">Outside Accra Delivery</p>
-                          <p className="text-sm text-gray-600">Delivery to bus stations (VIP, OA, STC, etc.)</p>
-                        </div>
-                      </div>
-                      <p className="font-bold text-gray-900">GH₵ 30.00</p>
-                    </label>
-                    */}
+                        <p className={`text-sm font-semibold text-right ${option.id === 'pickup' ? 'text-blue-700' : 'text-amber-700'}`}>{option.feeLabel}</p>
+                      </label>
+                    ))}
                   </div>
 
                   <div className="flex flex-col-reverse md:flex-row gap-4 mt-6">
@@ -586,6 +548,7 @@ export default function CheckoutPage() {
               total={total}
               discount={discount}
               couponCode={coupon?.code}
+              deliveryMethod={deliveryMethod}
             />
           </div>
         </div>

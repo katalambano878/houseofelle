@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { deliveryLabel } from '@/lib/delivery';
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
@@ -266,6 +267,13 @@ function OrderSuccessContent() {
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Delivery Details</h2>
               <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Delivery method</p>
+                  <p className="text-gray-900 font-semibold">{deliveryLabel(order.shipping_method)}</p>
+                  {order.shipping_method && order.shipping_method !== 'pickup' && Number(order.shipping_total) === 0 && (
+                    <p className="text-sm text-amber-700">We&apos;ll call you to confirm the delivery fee.</p>
+                  )}
+                </div>
                 {order.shipping_address && (
                   <>
                     <div>

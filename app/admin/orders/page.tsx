@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import ProductSalesStats from './ProductSalesStats';
+import { DELIVERY_OPTIONS, deliveryLabel, orderSource } from '@/lib/delivery';
 
 interface Order {
   id: string;
@@ -87,6 +88,7 @@ export default function AdminOrdersPage() {
   const [dateTo, setDateTo] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
   const [shippingMethodFilter, setShippingMethodFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'web' | 'pos'>('all');
   const [loadError, setLoadError] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -246,7 +248,7 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const csvHeader = ['Order ID', 'Customer', 'Email', 'Phone', 'Date', 'Items', 'Total', 'Status', 'Payment status', 'Payment method', 'Shipping method'];
+  const csvHeader = ['Order ID', 'Customer', 'Email', 'Phone', 'Date', 'Items', 'Total', 'Status', 'Payment status', 'Payment method', 'Source', 'Delivery'];
   const csvRow = (o: Order) => [
     o.order_number || o.id,
     getCustomerName(o),
@@ -258,7 +260,8 @@ export default function AdminOrdersPage() {
     formatStatus(o.status),
     o.payment_status,
     o.payment_method || '',
-    o.shipping_method || '',
+    orderSource(o) === 'pos' ? 'POS' : 'Website',
+    deliveryLabel(o.shipping_method),
   ];
 
   const handleBulkAction = async (action: string, newStatus?: string) => {
@@ -365,10 +368,13 @@ export default function AdminOrdersPage() {
     () => Array.from(new Set(orders.map(o => o.payment_method).filter(Boolean))).sort(),
     [orders]
   );
-  const shippingMethods = useMemo(
-    () => Array.from(new Set(orders.map(o => o.shipping_method).filter(Boolean))).sort(),
-    [orders]
-  );
+
+  // Older orders may carry legacy values (e.g. 'standard'); group them with doorstep delivery.
+  const deliveryKey = (o: Order) =>
+    DELIVERY_OPTIONS.some((d) => d.id === o.shipping_method) ? o.shipping_method : o.shipping_method ? 'doorstep' : 'pickup';
+  const tabOrders = orders.filter((o) => (orderViewTab === 'confirmed' ? isConfirmed(o) : !isConfirmed(o)));
+  const sourceCount = (src: 'web' | 'pos') => tabOrders.filter((o) => orderSource(o) === src).length;
+  const deliveryCount = (id: string) => tabOrders.filter((o) => deliveryKey(o) === id).length;
 
   const q = searchQuery.trim().toLowerCase();
   const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
@@ -391,8 +397,9 @@ export default function AdminOrdersPage() {
       const created = new Date(order.created_at).getTime();
       const matchesDate = (fromTime == null || created >= fromTime) && (toTime == null || created <= toTime);
       const matchesPayment = paymentMethodFilter === 'all' || order.payment_method === paymentMethodFilter;
-      const matchesShipping = shippingMethodFilter === 'all' || order.shipping_method === shippingMethodFilter;
-      return matchesViewTab && matchesSearch && matchesStatus && matchesProduct && matchesDate && matchesPayment && matchesShipping;
+      const matchesShipping = shippingMethodFilter === 'all' || deliveryKey(order) === shippingMethodFilter;
+      const matchesSource = sourceFilter === 'all' || orderSource(order) === sourceFilter;
+      return matchesViewTab && matchesSearch && matchesStatus && matchesProduct && matchesDate && matchesPayment && matchesShipping && matchesSource;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -408,7 +415,7 @@ export default function AdminOrdersPage() {
     });
 
   const activeFilterCount =
-    (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (paymentMethodFilter !== 'all' ? 1 : 0) + (shippingMethodFilter !== 'all' ? 1 : 0);
+    (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (paymentMethodFilter !== 'all' ? 1 : 0);
 
   const switchTab = (tab: 'confirmed' | 'abandoned') => {
     setOrderViewTab(tab);
@@ -592,24 +599,10 @@ export default function AdminOrdersPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label htmlFor="orders-shipping-method" className="block text-sm font-semibold text-gray-700 mb-2">Shipping Method</label>
-                <select
-                  id="orders-shipping-method"
-                  value={shippingMethodFilter}
-                  onChange={(e) => setShippingMethodFilter(e.target.value)}
-                  className="w-full px-3 py-2 pr-8 border-2 border-gray-300 rounded-lg text-sm cursor-pointer"
-                >
-                  <option value="all">All Methods</option>
-                  {shippingMethods.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
               {activeFilterCount > 0 && (
                 <div className="md:col-span-4 flex justify-end">
                   <button
-                    onClick={() => { setDateFrom(''); setDateTo(''); setPaymentMethodFilter('all'); setShippingMethodFilter('all'); }}
+                    onClick={() => { setDateFrom(''); setDateTo(''); setPaymentMethodFilter('all'); }}
                     className="text-sm font-medium text-blue-700 hover:text-blue-800"
                   >
                     Clear filters
@@ -651,6 +644,37 @@ export default function AdminOrdersPage() {
           </div>
         )}
 
+        <div className="px-6 py-4 border-b border-gray-200 flex flex-col lg:flex-row lg:items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Order source">
+            <span className="text-sm font-semibold text-gray-700 mr-1">Source</span>
+            {([['all', 'All', tabOrders.length], ['web', 'Website', sourceCount('web')], ['pos', 'POS', sourceCount('pos')]] as const).map(([id, label, count]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSourceFilter(id)}
+                aria-pressed={sourceFilter === id}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${sourceFilter === id ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'}`}
+              >
+                {label} <span className="opacity-75">({count})</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Delivery method">
+            <span className="text-sm font-semibold text-gray-700 mr-1">Delivery</span>
+            {[{ id: 'all', label: 'All', count: tabOrders.length }, ...DELIVERY_OPTIONS.map((d) => ({ id: d.id, label: d.label, count: deliveryCount(d.id) }))].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setShippingMethodFilter(opt.id)}
+                aria-pressed={shippingMethodFilter === opt.id}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${shippingMethodFilter === opt.id ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'}`}
+              >
+                {opt.label} <span className="opacity-75">({opt.count})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -666,6 +690,7 @@ export default function AdminOrdersPage() {
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Order ID</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Customer</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Date</th>
+                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Source &amp; Delivery</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Items</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Total</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Payment</th>
@@ -676,14 +701,14 @@ export default function AdminOrdersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-gray-500">
+                  <td colSpan={10} className="py-12 text-center text-gray-500">
                     <i className="ri-loader-4-line animate-spin text-3xl text-blue-700"></i>
                     <p className="mt-2">Loading orders...</p>
                   </td>
                 </tr>
               ) : filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-gray-500">
+                  <td colSpan={10} className="py-12 text-center text-gray-500">
                     <i className="ri-inbox-line text-4xl text-gray-300"></i>
                     <p className="mt-2">No orders found</p>
                     <p className="text-sm">Orders will appear here when customers place them</p>
@@ -717,6 +742,12 @@ export default function AdminOrdersPage() {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-gray-700 text-sm whitespace-nowrap">{formatDate(order.created_at)}</td>
+                    <td className="py-4 px-4 text-sm whitespace-nowrap">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${orderSource(order) === 'pos' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-800 border-blue-200'}`}>
+                        {orderSource(order) === 'pos' ? 'POS' : 'Website'}
+                      </span>
+                      <p className="text-gray-700 mt-1">{deliveryLabel(order.shipping_method)}</p>
+                    </td>
                     <td className="py-4 px-4 text-gray-700">{getItemCount(order)}</td>
                     <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">GH₵ {money(order.total)}</td>
                     <td className="py-4 px-4 text-sm whitespace-nowrap">

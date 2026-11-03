@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { asNumber, money } from '@/lib/format-money';
+import { deliveryLabel } from '@/lib/delivery';
 
 const ghs = (value: unknown) => `GH₵${money(value)}`;
 
@@ -193,8 +194,8 @@ function InvoiceContent() {
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-gray-600">Delivery</span>
-                <span>{delivery > 0 ? ghs(delivery) : 'Confirmed separately'}</span>
+                <span className="text-gray-600">{deliveryLabel(order.shipping_method)}</span>
+                <span>{delivery > 0 ? ghs(delivery) : order.shipping_method === 'pickup' ? 'Free' : 'Confirmed separately'}</span>
               </div>
               {tax > 0 && (
                 <div className="flex justify-between">
