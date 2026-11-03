@@ -63,17 +63,6 @@ async function verifyPlainPgAdmin(token: string): Promise<{ ok: boolean; userId?
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // A typed address like houseofelle.store//admin reaches here as "/admin", but the
-  // page would still load at "//admin", which the browser router reads as another
-  // host and crashes on. Send the browser to the clean address first.
-  const rawPath = request.url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '').split(/[?#]/)[0];
-  if (rawPath.includes('//')) {
-    const clean = request.nextUrl.clone();
-    clean.pathname = rawPath.replace(/\/{2,}/g, '/');
-    return NextResponse.redirect(clean, 308);
-  }
-
   const response = NextResponse.next();
 
   response.headers.set('X-Content-Type-Options', 'nosniff');

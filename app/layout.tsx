@@ -108,6 +108,14 @@ export default function RootLayout({
   return (
     <html lang="en-GH">
       <head>
+        {/* An address typed as houseofelle.store//admin crashes the router, which reads
+            "//admin" as another host; collapse the slashes before any app code runs. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "if(location.pathname.indexOf('//')>-1)history.replaceState(null,'',location.pathname.replace(/\\/{2,}/g,'/')+location.search+location.hash)",
+          }}
+        />
         {/* PWA Meta Tags */}
         <meta name="theme-color" content="#C89B3C" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
