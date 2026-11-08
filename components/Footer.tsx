@@ -123,6 +123,12 @@ export default function Footer() {
 
           <div className="border-t border-brand-gold/30 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-brand-ivory/60">
             <p>&copy; {new Date().getFullYear()} {siteName}. All rights reserved.</p>
+            <p>
+              Powered by{" "}
+              <a href="https://doctorbarns.com" target="_blank" rel="noopener" className="text-brand-ivory/60 hover:underline">
+                Doctor Barns Tech
+              </a>
+            </p>
             <p className="flex items-center gap-2 text-brand-gold/80">
               <i className="ri-smartphone-line text-lg" aria-hidden="true"></i>
               Secure Mobile Money payments
