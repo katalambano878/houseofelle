@@ -132,7 +132,7 @@ export default function PromoPopup() {
         </button>
 
         {/* Left: the offer itself */}
-        <div className="relative bg-blue-800 text-white px-6 sm:px-8 pt-9 pb-8 sm:py-10 overflow-hidden flex flex-col">
+        <div className="relative bg-blue-800 text-white px-6 sm:px-8 pt-7 pb-6 sm:py-10 overflow-hidden flex flex-col">
           <svg className="absolute -right-20 -top-20 w-72 h-72 text-blue-500/25" viewBox="0 0 200 200" fill="none" aria-hidden="true">
             <circle cx="100" cy="100" r="98" stroke="currentColor" />
             <circle cx="100" cy="100" r="74" stroke="currentColor" />
@@ -144,15 +144,15 @@ export default function PromoPopup() {
             <span className={`w-1.5 h-1.5 rounded-full bg-blue-500 ${promo.live ? 'animate-pulse motion-reduce:animate-none' : ''}`} aria-hidden="true" />
             {promo.name} · {status}
           </p>
-          <h2 id="promo-title" className="relative mt-3 font-serif text-[2rem] sm:text-[2.4rem] leading-[1.05] text-balance">
+          <h2 id="promo-title" className="relative mt-2 sm:mt-3 font-serif text-[1.75rem] sm:text-[2.4rem] leading-[1.05] text-balance">
             {title || promo.name}
           </h2>
 
           {range && (
-            <div className="relative mt-5">
+            <div className="relative mt-3 sm:mt-5">
               <p className="text-xs uppercase tracking-[0.2em] text-white/60">{range.min === range.max ? 'Save' : 'Save up to'}</p>
               <p className="flex items-baseline gap-2 leading-none mt-1">
-                <span className="text-6xl sm:text-7xl font-bold tracking-tight text-blue-500 tabular-nums">
+                <span className="text-5xl sm:text-7xl font-bold tracking-tight text-blue-500 tabular-nums">
                   {`${range.max}%`}
                 </span>
                 <span className="text-lg text-white/80">off</span>
@@ -163,11 +163,11 @@ export default function PromoPopup() {
             </div>
           )}
 
-          <div className="relative mt-6 sm:mt-auto sm:pt-8">
+          <div className="relative mt-4 sm:mt-auto sm:pt-8">
             {countdown ? (
               <CountdownTiles countdown={countdown} label={timing.label} tone="dark" />
             ) : (
-              <p className="text-sm text-white/70">
+              <p className="hidden sm:block text-sm text-white/70">
                 {promo.live ? 'Limited time only, while stocks last.' : 'Dropping soon. Be first in line for the best scents.'}
               </p>
             )}
@@ -175,17 +175,17 @@ export default function PromoPopup() {
         </div>
 
         {/* Right: what, how and the next step */}
-        <div className="px-6 sm:px-8 pt-6 pb-6 sm:pt-12 sm:pb-8 flex flex-col">
+        <div className="px-6 sm:px-8 pt-5 sm:pt-12 sm:pb-8 flex flex-col">
           {message && (
             <p id="promo-message" className="text-gray-700 leading-relaxed text-pretty">
               {message}
             </p>
           )}
 
-          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 mb-2">On sale across</p>
+          <p className="mt-4 sm:mt-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 mb-2">On sale across</p>
           <CategoryChips onNavigate={close} tone="light" />
 
-          <ul className="mt-5 space-y-2.5">
+          <ul className="hidden sm:block mt-5 space-y-2.5">
             {SALE_PERKS.map((p) => (
               <li key={p.title} className="flex items-start gap-3 text-sm">
                 <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
@@ -199,7 +199,7 @@ export default function PromoPopup() {
             ))}
           </ul>
 
-          <div className="mt-6 sm:mt-auto sm:pt-6">
+          <div className="sticky bottom-0 -mx-6 px-6 pt-3 pb-3 mt-4 bg-white border-t border-gray-100 sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:border-0 sm:mt-auto sm:pt-6">
             <Link
               href={promoHref(promo)}
               onClick={close}

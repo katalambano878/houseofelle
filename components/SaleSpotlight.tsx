@@ -74,11 +74,13 @@ export default function SaleSpotlight() {
             </h2>
 
             {range && (
-              <p className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-sm uppercase tracking-[0.2em] text-white/60">{range.min === range.max ? 'Save' : 'Save up to'}</span>
-                <span className="text-7xl sm:text-8xl font-bold tracking-tight text-blue-500 tabular-nums leading-none">{range.max}%</span>
-                <span className="text-xl text-white/80">off</span>
-              </p>
+              <div className="mt-6">
+                <p className="text-sm uppercase tracking-[0.2em] text-white/60">{range.min === range.max ? 'Save' : 'Save up to'}</p>
+                <p className="mt-1 flex items-baseline gap-3">
+                  <span className="text-7xl sm:text-8xl font-bold tracking-tight text-blue-500 tabular-nums leading-none">{range.max}%</span>
+                  <span className="text-xl text-white/80">off</span>
+                </p>
+              </div>
             )}
 
             {message && <p className="mt-5 max-w-xl text-white/80 text-lg leading-relaxed text-pretty">{message}</p>}
@@ -96,10 +98,10 @@ export default function SaleSpotlight() {
               )}
             </div>
 
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+            <div className="mt-8 flex flex-col sm:flex-row sm:flex-wrap gap-3">
               <Link
                 href={promoHref(promo)}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-500 hover:bg-blue-400 text-blue-900 font-semibold px-7 py-3.5 transition-colors active:scale-[0.98] motion-reduce:active:scale-100"
+                className="inline-flex whitespace-nowrap items-center justify-center gap-2 rounded-full bg-blue-500 hover:bg-blue-400 text-blue-900 font-semibold px-7 py-3.5 transition-colors active:scale-[0.98] motion-reduce:active:scale-100"
               >
                 {promo.live ? promo.popup?.cta_label || 'Shop the sale' : 'Browse the collection'}
                 <i className="ri-arrow-right-line" aria-hidden="true" />
@@ -108,7 +110,7 @@ export default function SaleSpotlight() {
                 href={whatsappLink(whatsapp, `Hello House of Elle, I'd like to know more about the ${promo.name} sale.`)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-full ring-1 ring-white/25 hover:bg-white/10 text-white font-medium px-7 py-3.5 transition-colors"
+                className="inline-flex whitespace-nowrap items-center justify-center gap-2 rounded-full ring-1 ring-white/25 hover:bg-white/10 text-white font-medium px-7 py-3.5 transition-colors"
               >
                 <i className="ri-whatsapp-line text-lg" aria-hidden="true" />
                 {promo.live ? 'Order on WhatsApp' : 'Reserve on WhatsApp'}
