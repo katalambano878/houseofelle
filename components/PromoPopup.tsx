@@ -3,7 +3,17 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { promoHref, usePromo, type StorefrontPromo } from '@/hooks/usePromo';
+import {
+  formatRange,
+  promoCountdownTarget,
+  promoHref,
+  promoRange,
+  useCountdown,
+  usePromo,
+  type StorefrontPromo,
+} from '@/hooks/usePromo';
+import { useCMS } from '@/context/CMSContext';
+import { CategoryChips, CountdownTiles, SALE_PERKS, whatsappLink } from '@/components/sale/SaleBits';
 
 const SEEN_PREFIX = 'hoe.promo.seen.';
 const SHOW_DELAY_MS = 1800;
@@ -31,24 +41,6 @@ function markSeen(key: string) {
   }
 }
 
-function useCountdown(endsAt: string | null) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!endsAt) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [endsAt]);
-  if (!endsAt) return null;
-  const ms = new Date(endsAt).getTime() - now;
-  if (ms <= 0) return null;
-  return {
-    days: Math.floor(ms / 86_400_000),
-    hours: Math.floor((ms % 86_400_000) / 3_600_000),
-    minutes: Math.floor((ms % 3_600_000) / 60_000),
-    seconds: Math.floor((ms % 60_000) / 1000),
-  };
-}
-
 /** Welcome popup announcing the current sale, shown once per sale to each visitor. */
 export default function PromoPopup() {
   const promo = usePromo();
@@ -56,7 +48,10 @@ export default function PromoPopup() {
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
-  const countdown = useCountdown(promo?.live ? promo.ends_at : null);
+  const { getSetting } = useCMS();
+  const whatsapp = getSetting('contact_whatsapp') || '0553347531';
+  const timing = promo ? promoCountdownTarget(promo) : { target: null, label: '' };
+  const countdown = useCountdown(timing.target);
 
   const quiet = QUIET_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) || pathname === '/sale';
 
@@ -69,28 +64,8 @@ export default function PromoPopup() {
         setOpen(true);
       }, SHOW_DELAY_MS);
     };
-    // Wait until the visitor has answered the cookie banner, so the two never stack.
-    const consentGiven = () => {
-      try {
-        return localStorage.getItem('cookieConsent') !== null;
-      } catch {
-        return true;
-      }
-    };
-    if (consentGiven()) {
-      show();
-      return () => clearTimeout(showTimer);
-    }
-    const poll = setInterval(() => {
-      if (consentGiven()) {
-        clearInterval(poll);
-        show();
-      }
-    }, 800);
-    return () => {
-      clearInterval(poll);
-      clearTimeout(showTimer);
-    };
+    show();
+    return () => clearTimeout(showTimer);
   }, [promo, quiet]);
 
   useEffect(() => {
@@ -132,99 +107,124 @@ export default function PromoPopup() {
   if (!open || !promo?.popup) return null;
 
   const { title, message, cta_label } = promo.popup;
-  const hasRange = promo.live && promo.max_percent > 0;
-  const range =
-    hasRange && promo.min_percent !== promo.max_percent
-      ? `${promo.min_percent}–${promo.max_percent}%`
-      : hasRange
-        ? `${promo.max_percent}%`
-        : null;
+  const range = promoRange(promo);
+  const status = promo.live ? 'On now' : 'Coming soon';
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4">
-      <div className="promo-backdrop-in absolute inset-0 bg-blue-900/60 backdrop-blur-[2px]" onClick={close} aria-hidden="true" />
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-6">
+      <div className="promo-backdrop-in absolute inset-0 bg-blue-900/70 backdrop-blur-[3px]" onClick={close} aria-hidden="true" />
       <div
         id="promo-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="promo-title"
         aria-describedby="promo-message"
-        className="promo-card-in relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]"
+        className="promo-card-in relative w-full sm:max-w-3xl max-h-[92dvh] overflow-y-auto overscroll-contain bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl pb-[env(safe-area-inset-bottom)] sm:grid sm:grid-cols-[1.05fr_1fr]"
       >
         <button
           ref={closeRef}
           type="button"
           onClick={close}
           aria-label="Close"
-          className="absolute top-3 right-3 z-10 w-10 h-10 flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          className="absolute top-3 right-3 z-10 w-10 h-10 flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/10 sm:text-gray-500 sm:hover:text-gray-900 sm:hover:bg-gray-100 transition-colors cursor-pointer"
         >
           <i className="ri-close-line text-2xl" aria-hidden="true" />
         </button>
 
-        <div className="relative bg-blue-800 text-white px-7 pt-9 pb-8 overflow-hidden">
-          {/* Fine gold rings, a quiet nod to a perfume bottle's cap. */}
-          <svg className="absolute -right-16 -top-16 w-64 h-64 text-blue-500/25" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+        {/* Left: the offer itself */}
+        <div className="relative bg-blue-800 text-white px-6 sm:px-8 pt-9 pb-8 sm:py-10 overflow-hidden flex flex-col">
+          <svg className="absolute -right-20 -top-20 w-72 h-72 text-blue-500/25" viewBox="0 0 200 200" fill="none" aria-hidden="true">
             <circle cx="100" cy="100" r="98" stroke="currentColor" />
             <circle cx="100" cy="100" r="74" stroke="currentColor" />
             <circle cx="100" cy="100" r="50" stroke="currentColor" />
           </svg>
-          <p className="relative text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-500">
-            {promo.live ? `${promo.name} · On now` : `${promo.name} · Coming soon`}
+          <div className="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-blue-500/15 blur-3xl" aria-hidden="true" />
+
+          <p className="relative inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-500">
+            <span className={`w-1.5 h-1.5 rounded-full bg-blue-500 ${promo.live ? 'animate-pulse motion-reduce:animate-none' : ''}`} aria-hidden="true" />
+            {promo.name} · {status}
           </p>
-          <h2 id="promo-title" className="relative mt-3 font-serif text-[2rem] leading-[1.1] text-balance">
+          <h2 id="promo-title" className="relative mt-3 font-serif text-[2rem] sm:text-[2.4rem] leading-[1.05] text-balance">
             {title || promo.name}
           </h2>
+
           {range && (
-            <p className="relative mt-4 flex items-baseline gap-2">
-              <span className="text-5xl font-bold tracking-tight text-blue-500 tabular-nums">{range}</span>
-              <span className="text-sm text-white/80">off</span>
-            </p>
+            <div className="relative mt-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/60">{range.min === range.max ? 'Save' : 'Save up to'}</p>
+              <p className="flex items-baseline gap-2 leading-none mt-1">
+                <span className="text-6xl sm:text-7xl font-bold tracking-tight text-blue-500 tabular-nums">
+                  {`${range.max}%`}
+                </span>
+                <span className="text-lg text-white/80">off</span>
+              </p>
+              {range.min !== range.max && (
+                <p className="mt-2 text-sm text-white/70">Discounts from {formatRange(range)} on selected items</p>
+              )}
+            </div>
           )}
+
+          <div className="relative mt-6 sm:mt-auto sm:pt-8">
+            {countdown ? (
+              <CountdownTiles countdown={countdown} label={timing.label} tone="dark" />
+            ) : (
+              <p className="text-sm text-white/70">
+                {promo.live ? 'Limited time only, while stocks last.' : 'Dropping soon. Be first in line for the best scents.'}
+              </p>
+            )}
+          </div>
         </div>
 
-        <div className="px-7 pt-6 pb-7">
+        {/* Right: what, how and the next step */}
+        <div className="px-6 sm:px-8 pt-6 pb-6 sm:pt-12 sm:pb-8 flex flex-col">
           {message && (
-            <p id="promo-message" className="text-gray-600 leading-relaxed text-pretty">
+            <p id="promo-message" className="text-gray-700 leading-relaxed text-pretty">
               {message}
             </p>
           )}
 
-          {countdown && (
-            <div className="mt-5" aria-label="Time left in the sale">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Ends in</p>
-              <div className="grid grid-cols-4 gap-2">
-                {(
-                  [
-                    ['days', countdown.days],
-                    ['hrs', countdown.hours],
-                    ['min', countdown.minutes],
-                    ['sec', countdown.seconds],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-blue-50 py-2 text-center">
-                    <span className="block text-xl font-bold text-blue-800 tabular-nums">{String(value).padStart(2, '0')}</span>
-                    <span className="block text-[10px] uppercase tracking-wider text-gray-500">{label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 mb-2">On sale across</p>
+          <CategoryChips onNavigate={close} tone="light" />
 
-          <Link
-            href={promoHref(promo)}
-            onClick={close}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 transition-colors active:scale-[0.98] motion-reduce:active:scale-100"
-          >
-            {cta_label || 'Shop the sale'}
-            <i className="ri-arrow-right-line" aria-hidden="true" />
-          </Link>
-          <button
-            type="button"
-            onClick={close}
-            className="mt-2 w-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
-          >
-            Maybe later
-          </button>
+          <ul className="mt-5 space-y-2.5">
+            {SALE_PERKS.map((p) => (
+              <li key={p.title} className="flex items-start gap-3 text-sm">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                  <i className={p.icon} aria-hidden="true" />
+                </span>
+                <span>
+                  <span className="font-semibold text-gray-900">{p.title}</span>
+                  <span className="text-gray-500"> · {p.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-6 sm:mt-auto sm:pt-6">
+            <Link
+              href={promoHref(promo)}
+              onClick={close}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 transition-colors active:scale-[0.98] motion-reduce:active:scale-100"
+            >
+              {promo.live ? cta_label || 'Shop the sale' : 'Browse the collection'}
+              <i className="ri-arrow-right-line" aria-hidden="true" />
+            </Link>
+            <a
+              href={whatsappLink(whatsapp, `Hello House of Elle, I'd like to know more about the ${promo.name} sale.`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl ring-1 ring-gray-200 hover:ring-gray-300 hover:bg-gray-50 text-gray-800 font-medium py-3 transition-colors"
+            >
+              <i className="ri-whatsapp-line text-lg text-green-600" aria-hidden="true" />
+              {promo.live ? 'Order on WhatsApp' : 'Reserve on WhatsApp'}
+            </a>
+            <button
+              type="button"
+              onClick={close}
+              className="mt-1 w-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+            >
+              Maybe later
+            </button>
+          </div>
         </div>
       </div>
     </div>

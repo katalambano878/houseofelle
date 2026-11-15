@@ -7,7 +7,6 @@ import MobileBottomNav from '@/components/MobileBottomNav';
 import ScrollToTop from '@/components/ScrollToTop';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import NavigationProgress from '@/components/NavigationProgress';
-import CookieConsent from '@/components/CookieConsent';
 import { CMSProvider } from '@/context/CMSContext';
 
 // Lazy-load non-critical components
@@ -46,7 +45,6 @@ export default function StoreLayout({
         <OfflineIndicator />
         <NetworkStatusMonitor />
         <UpdatePrompt />
-        <CookieConsent />
         <PromoPopup />
       </div>
     </CMSProvider>

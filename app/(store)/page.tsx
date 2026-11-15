@@ -9,6 +9,7 @@ import ProductCard, { type ColorVariant, getColorHex } from '@/components/Produc
 import ProductCardSkeleton from '@/components/skeletons/ProductCardSkeleton';
 import AnimatedSection, { AnimatedGrid } from '@/components/AnimatedSection';
 import NewsletterSection from '@/components/NewsletterSection';
+import SaleSpotlight from '@/components/SaleSpotlight';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function Home() {
@@ -273,30 +274,38 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Current or upcoming sale */}
+      <SaleSpotlight />
+
       {/* Categories Section - God Level Redesign */}
       <section className="py-20 md:py-32 bg-brand-ivory relative overflow-hidden">
         {/* Decorative Background Element */}
         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-brand-gold/30 to-transparent"></div>
 
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
-          <AnimatedSection className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+          <AnimatedSection className="flex flex-col md:flex-row md:items-end justify-between mb-10 md:mb-16 gap-6">
             <div className="relative">
-              <span className="block text-sm font-bold tracking-[0.2em] text-brand-gold mb-3 uppercase">Olfactory Families</span>
+              <div className="flex items-center justify-between gap-4 mb-3">
+                <span className="block text-sm font-bold tracking-[0.2em] text-brand-gold uppercase">Olfactory Families</span>
+                <Link href="/categories" aria-label="All categories" className="md:hidden group flex items-center justify-center w-11 h-11 shrink-0 rounded-full border border-brand-gold/50 active:bg-brand-gold active:text-brand-black transition-colors text-brand-gold">
+                  <i className="ri-arrow-right-line text-lg" aria-hidden="true"></i>
+                </Link>
+              </div>
               <h2 className="font-serif text-4xl sm:text-5xl md:text-6xl text-brand-black leading-[1.1]">
                 Shop by <span className="italic text-brand-brown">Category</span>
               </h2>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-6">
               <p className="hidden md:block text-brand-brown max-w-xs text-right font-medium leading-relaxed">
                 Explore our curated collection of fragrances, categorized by their dominant notes.
               </p>
-              <Link href="/categories" className="group flex items-center justify-center w-14 h-14 rounded-full border border-brand-gold/50 hover:border-brand-gold hover:bg-brand-gold hover:text-brand-black transition-all duration-300 text-brand-gold">
+              <Link href="/categories" aria-label="All categories" className="group flex items-center justify-center w-14 h-14 rounded-full border border-brand-gold/50 hover:border-brand-gold hover:bg-brand-gold hover:text-brand-black transition-all duration-300 text-brand-gold">
                 <i className="ri-arrow-right-line text-xl transition-transform group-hover:translate-x-1"></i>
               </Link>
             </div>
           </AnimatedSection>
 
-          <AnimatedGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+          <AnimatedGrid className="grid grid-cols-2 gap-3 sm:gap-6 md:gap-8 max-w-6xl mx-auto">
             {homepageCategories.map((category: any, index: number) => {
               const tintClasses = ['bg-blue-900', 'bg-rose-900', 'bg-amber-900', 'bg-stone-900'];
               const tint = tintClasses[index % tintClasses.length];
@@ -305,7 +314,7 @@ export default function Home() {
 
               return (
               <Link href={`/shop?category=${category.slug}`} key={category.id} className="group block h-full w-full">
-                <div className="relative aspect-[3/4] overflow-hidden isolate bg-gray-900 shadow-2xl rounded-3xl">
+                <div className="relative aspect-[3/4] md:aspect-[16/11] overflow-hidden isolate bg-gray-900 shadow-xl md:shadow-2xl rounded-2xl md:rounded-3xl">
 
                   {/* Image: Cinematic Slow Zoom & Brightness Shift */}
                   <div className="absolute inset-0 transition-transform duration-[1500ms] ease-out group-hover:scale-110 opacity-90 group-hover:opacity-100">
@@ -314,7 +323,7 @@ export default function Home() {
                       alt={category.name}
                       fill
                       className="object-cover"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      sizes="(max-width: 1200px) 50vw, 600px"
                     />
                   </div>
 
@@ -329,10 +338,10 @@ export default function Home() {
                   <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-60"></div>
 
                   {/* Content Container */}
-                  <div className="absolute inset-0 p-8 flex flex-col justify-end z-10">
+                  <div className="absolute inset-0 p-4 sm:p-6 md:p-10 flex flex-col justify-end z-10">
 
                     {/* Floating 'Explore' Tag - Reveals on Hover */}
-                    <div className="absolute top-8 right-8 overflow-hidden">
+                    <div className="absolute top-8 right-8 overflow-hidden hidden md:block">
                       <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-[10px] font-bold text-white tracking-widest uppercase transform translate-y-[-150%] opacity-0 transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
                         Explore <i className="ri-arrow-right-line"></i>
                       </span>
@@ -340,24 +349,24 @@ export default function Home() {
 
                     {/* Category Title */}
                     <div className="overflow-hidden">
-                      <h3 className="font-serif text-2xl md:text-3xl lg:text-4xl text-white leading-[1] mb-3 transform transition-transform duration-700 ease-out group-hover:-translate-y-2 drop-shadow-xl">
+                      <h3 className="font-serif text-lg sm:text-2xl md:text-3xl lg:text-4xl text-white leading-[1.1] mb-2 md:mb-3 transform transition-transform duration-700 ease-out group-hover:-translate-y-2 drop-shadow-xl">
                         {renderNameWithStyledAmpersand(category.name)}
                       </h3>
                     </div>
 
                     {/* Decorative Line */}
-                    <div className="h-[1px] w-12 bg-white/60 mb-4 transition-all duration-700 ease-out group-hover:w-full group-hover:bg-white/90"></div>
+                    <div className="h-[1px] w-8 md:w-12 bg-white/60 md:mb-4 transition-all duration-700 ease-out group-hover:w-full group-hover:bg-white/90"></div>
 
                     {/* Subtitle / Description */}
                     <div className="overflow-hidden">
-                      <p className="text-white/80 font-light text-sm tracking-widest uppercase transform translate-y-full opacity-0 transition-all duration-700 ease-out group-hover:translate-y-0 group-hover:opacity-100 delay-100">
+                      <p className="hidden md:block text-white/80 font-light text-sm tracking-widest uppercase transform translate-y-full opacity-0 transition-all duration-700 ease-out group-hover:translate-y-0 group-hover:opacity-100 delay-100">
                         {categorySubtitle}
                       </p>
                     </div>
                   </div>
 
                   {/* Premium Border Frame Effect */}
-                  <div className="absolute inset-5 border border-white/20 scale-[0.95] opacity-0 transition-all duration-700 ease-out group-hover:scale-100 group-hover:opacity-100 pointer-events-none z-20">
+                  <div className="absolute inset-5 hidden md:block border border-white/20 scale-[0.95] opacity-0 transition-all duration-700 ease-out group-hover:scale-100 group-hover:opacity-100 pointer-events-none z-20">
                     {/* Corner Accents */}
                     <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/60"></div>
                     <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/60"></div>

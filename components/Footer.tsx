@@ -61,7 +61,16 @@ export default function Footer() {
                 <img src={siteLogo} alt={siteName} className="h-24 w-auto object-contain drop-shadow-lg group-hover:scale-105 transition-transform duration-300" />
               </Link>
               <p className="text-brand-ivory/80 leading-relaxed text-sm">
-                {siteTagline} {contactAddress}. Call {contactPhone} · WhatsApp {contactWhatsapp}
+                {(() => {
+                  // The tagline's first word quietly opens the admin sign-in for the owner.
+                  const [first, ...rest] = siteTagline.split(' ');
+                  return (
+                    <>
+                      <Link href="/admin/login" className="text-inherit no-underline hover:text-inherit focus-visible:outline-none" aria-label="Staff sign in" prefetch={false}>{first}</Link>
+                      {rest.length ? ` ${rest.join(' ')}` : ''}
+                    </>
+                  );
+                })()} {contactAddress}. Call {contactPhone} · WhatsApp {contactWhatsapp}
               </p>
 
               <div className="flex gap-3 pt-2">

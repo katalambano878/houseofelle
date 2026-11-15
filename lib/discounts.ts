@@ -343,6 +343,7 @@ export interface Promo {
   live: boolean;
   banner_text: string | null;
   popup: { title: string | null; message: string | null; cta_label: string | null } | null;
+  starts_at: string | null;
   ends_at: string | null;
   product_count: number;
   max_percent: number;
@@ -374,6 +375,7 @@ export async function currentPromo(): Promise<Promo | null> {
     popup: c.popup_enabled
       ? { title: c.popup_title || c.name, message: c.popup_message, cta_label: c.popup_cta_label || 'Shop the sale' }
       : null,
+    starts_at: c.status === 'live' ? null : c.starts_at,
     ends_at: c.ends_at,
     product_count: c.product_count,
     max_percent: Number(c.max_percent) || 0,
