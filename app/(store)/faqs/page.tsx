@@ -26,7 +26,7 @@ export default function FAQsPage() {
     {
       category: 'orders',
       question: 'Can I change or cancel my order?',
-      answer: 'Contact us as soon as possible with your order number via WhatsApp or call 0553347531, or use our contact form. We\'ll do our best to help, but once an order has been packed or sent out, changes may not be possible.'
+      answer: 'Contact us as soon as possible with your order number via WhatsApp or call 0570551050, or use our contact form. We\'ll do our best to help, but once an order has been packed or sent out, changes may not be possible.'
     },
     {
       category: 'orders',
@@ -225,7 +225,7 @@ export default function FAQsPage() {
               Contact Support
             </Link>
             <a
-              href="https://wa.me/233553347531"
+              href="https://wa.me/233570551050"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-full font-medium hover:bg-blue-500 transition-colors whitespace-nowrap"

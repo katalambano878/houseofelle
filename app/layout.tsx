@@ -166,7 +166,7 @@ export default function RootLayout({
                   "contactPoint": {
                     "@type": "ContactPoint",
                     "contactType": "customer service",
-                    "telephone": "+233553347531",
+                    "telephone": "+233570551050",
                     "availableLanguage": "English",
                     "areaServed": "GH"
                   }
@@ -177,7 +177,7 @@ export default function RootLayout({
                   "name": "House of Elle",
                   "image": `${siteUrl}/house-of-elle-logo.png`,
                   "url": siteUrl,
-                  "telephone": "+233553347531",
+                  "telephone": "+233570551050",
                   "priceRange": "GH₵",
                   "address": {
                     "@type": "PostalAddress",

@@ -522,7 +522,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
           {/* Footer */}
           <div className="border-t-2 border-gray-800 pt-4 text-center text-sm text-gray-600">
             <p>Thank you for shopping with House of Elle!</p>
-            <p>Questions? Call 0553347531 or WhatsApp 0553347531 · support@houseofelle.com</p>
+            <p>Questions? Call 0570551050 or WhatsApp 0570551050 · support@houseofelle.com</p>
           </div>
         </div>
       </div>

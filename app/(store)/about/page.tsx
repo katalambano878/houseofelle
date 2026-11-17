@@ -144,7 +144,7 @@ export default function AboutPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-900">
           <h2 className="text-4xl md:text-5xl font-serif mb-8">Ready to Build Your Signature Scent Wardrobe?</h2>
           <p className="text-xl text-brand-brown mb-10 leading-relaxed max-w-2xl mx-auto">
-            Explore perfumes, body care, diffusers, candles, and gift sets. For orders, call or WhatsApp 0553347531.
+            Explore perfumes, body care, diffusers, candles, and gift sets. For orders, call or WhatsApp 0570551050.
           </p>
           <Link
             href="/shop"

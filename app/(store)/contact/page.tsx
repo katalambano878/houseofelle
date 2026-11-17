@@ -121,8 +121,8 @@ export default function ContactPage() {
 
   // Get contact details from CMS settings
   const contactEmail = getSetting('contact_email') || 'support@houseofelle.com';
-  const contactPhone = getSetting('contact_phone') || '0553347531';
-  const contactWhatsapp = getSetting('contact_whatsapp') || '0553347531';
+  const contactPhone = getSetting('contact_phone') || '0570551050';
+  const contactWhatsapp = getSetting('contact_whatsapp') || '0570551050';
   const contactAddress = getSetting('contact_address') || 'Spintex Lashibi, Shalom Spot Junction, Accra, Ghana';
 
   const heroTitle = pageContent?.title || 'Contact House of Elle';

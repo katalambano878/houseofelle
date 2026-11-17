@@ -173,7 +173,7 @@ export function generateOrganizationSchema() {
     image: `${siteUrl}/house-of-elle-logo.png`,
     contactPoint: {
       '@type': 'ContactPoint',
-      telephone: '+233553347531',
+      telephone: '+233570551050',
       contactType: 'Customer Service',
       areaServed: 'GH',
       availableLanguage: ['English']

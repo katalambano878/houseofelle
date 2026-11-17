@@ -59,7 +59,7 @@ export default function Home() {
     },
     banners: [
       { text: '📍 Visit us at Spintex Lashibi, Shalom Spot Junction', active: false },
-      { text: '📞 Call 0553347531 for wholesale & retail orders', active: false },
+      { text: '📞 Call 0570551050 for wholesale & retail orders', active: false },
       { text: '✨ New arrivals in perfumes, diffusers, candles, and gift sets', active: false }
     ]
   };

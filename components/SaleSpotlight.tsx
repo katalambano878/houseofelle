@@ -29,7 +29,7 @@ const cedi = (n: number) => `GH₵${Number(n).toLocaleString('en-GH', { minimumF
 export default function SaleSpotlight() {
   const promo = usePromo();
   const { getSetting } = useCMS();
-  const whatsapp = getSetting('contact_whatsapp') || '0553347531';
+  const whatsapp = getSetting('contact_whatsapp') || '0570551050';
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const timing = promo ? promoCountdownTarget(promo) : { target: null, label: '' };
   const countdown = useCountdown(timing.target);

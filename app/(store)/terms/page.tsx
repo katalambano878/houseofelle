@@ -300,7 +300,7 @@ export default function TermsPage() {
                   <i className="ri-phone-line text-blue-700 text-xl mt-1"></i>
                   <div>
                     <p className="font-medium text-gray-900">Phone</p>
-                    <a href="tel:0553347531" className="text-blue-700 hover:underline">0553347531</a> · WhatsApp <a href="https://wa.me/233553347531" className="text-blue-700 hover:underline">0553347531</a>
+                    <a href="tel:0570551050" className="text-blue-700 hover:underline">0570551050</a> · WhatsApp <a href="https://wa.me/233570551050" className="text-blue-700 hover:underline">0570551050</a>
                   </div>
                 </div>
 

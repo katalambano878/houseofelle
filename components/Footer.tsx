@@ -29,8 +29,8 @@ export default function Footer() {
   const siteName = getSetting('site_name') || 'House of Elle';
   const siteTagline = getSetting('site_tagline') || 'Luxury fragrances for everyone.';
   const contactEmail = getSetting('contact_email') || 'support@houseofelle.com';
-  const contactPhone = getSetting('contact_phone') || '0553347531';
-  const contactWhatsapp = getSetting('contact_whatsapp') || '0553347531';
+  const contactPhone = getSetting('contact_phone') || '0570551050';
+  const contactWhatsapp = getSetting('contact_whatsapp') || '0570551050';
   const contactAddress = getSetting('contact_address') || 'Spintex Lashibi, Shalom Spot Junction, Accra, Ghana';
   const siteLogo = getSetting('site_logo') || '/house-of-elle-logo.png';
   const socialFacebook = getSetting('social_facebook') || '';

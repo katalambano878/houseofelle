@@ -49,7 +49,7 @@ export default function PromoPopup() {
   const closeRef = useRef<HTMLButtonElement>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
   const { getSetting } = useCMS();
-  const whatsapp = getSetting('contact_whatsapp') || '0553347531';
+  const whatsapp = getSetting('contact_whatsapp') || '0570551050';
   const timing = promo ? promoCountdownTarget(promo) : { target: null, label: '' };
   const countdown = useCountdown(timing.target);
 

@@ -609,7 +609,7 @@ export default function POSPage() {
             <div style={{ textAlign: 'center', marginBottom: 8 }}>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>House of Elle</div>
                 <div>Spintex Lashibi, Accra</div>
-                <div>0553347531</div>
+                <div>0570551050</div>
             </div>
             <div>Receipt: {completedOrder.orderNumber}</div>
             <div>{new Date(completedOrder.createdAt || Date.now()).toLocaleString('en-GB')}</div>

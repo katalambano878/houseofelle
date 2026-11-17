@@ -54,7 +54,7 @@ export default function MaintenancePage() {
               Email Us
             </a>
             <a
-              href="https://wa.me/233553347531"
+              href="https://wa.me/233570551050"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-blue-700 text-white px-6 py-3 rounded-full font-medium hover:bg-blue-800 transition-colors whitespace-nowrap"
@@ -63,7 +63,7 @@ export default function MaintenancePage() {
               WhatsApp
             </a>
             <a
-              href="tel:+233553347531"
+              href="tel:+233570551050"
               className="inline-flex items-center gap-2 bg-white text-gray-900 px-6 py-3 rounded-full font-medium hover:bg-gray-50 transition-colors border border-gray-200 whitespace-nowrap"
             >
               <i className="ri-phone-line"></i>
