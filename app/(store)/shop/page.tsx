@@ -95,7 +95,9 @@ function ShopContent() {
 
             // Search
             if (search) {
-              query = query.ilike('name', `%${search}%`);
+              // Match names and descriptions, so a note like "vanilla" finds every bottle that has it.
+              const term = search.replace(/[,()%*]/g, ' ').trim();
+              if (term) query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
             }
 
             // Category Filter with Subcategories

@@ -8,13 +8,13 @@ function FooterSection({ title, children }: { title: string, children: React.Rea
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="border-b border-blue-800/50 lg:border-none last:border-0">
+    <div className="border-b border-[#F5EDE4]/10 lg:border-none last:border-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between py-4 text-left lg:py-0 lg:cursor-default lg:mb-6"
       >
         <h4 className="font-bold text-lg text-white">{title}</h4>
-        <i className={`ri-arrow-down-s-line text-blue-400 text-xl transition-transform duration-300 lg:hidden ${isOpen ? 'rotate-180' : ''}`}></i>
+        <i className={`ri-arrow-down-s-line text-[#E2BE72] text-xl transition-transform duration-300 lg:hidden ${isOpen ? 'rotate-180' : ''}`}></i>
       </button>
       <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-96 pb-6' : 'max-h-0 lg:max-h-full lg:overflow-visible'}`}>
         {children}
@@ -41,15 +41,9 @@ export default function Footer() {
   const socialYoutube = getSetting('social_youtube') || '';
 
   return (
-    <footer className="relative mt-12 z-0">
+    <footer className="relative z-0">
 
-      {/* Footer Background Shape */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#18120f] via-brand-brown to-[#17110d] rounded-t-[3rem] -z-10 overflow-hidden">
-        {/* Decorative elements inside footer bg */}
-        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-brand-gold/60 to-transparent opacity-80"></div>
-        <div className="absolute -top-16 -right-16 w-64 h-64 bg-brand-gold/20 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-20 -left-20 w-72 h-72 bg-brand-champagne/14 rounded-full blur-3xl"></div>
-      </div>
+      <div className="absolute inset-0 bg-[#14100D] -z-10" aria-hidden="true" />
 
       <div className="text-white pt-16 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">

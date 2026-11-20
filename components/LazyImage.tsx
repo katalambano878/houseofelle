@@ -12,6 +12,8 @@ interface LazyImageProps {
   priority?: boolean;
   onLoad?: () => void;
   sizes?: string;
+  /** How the photo fills its box. Product shots on white use 'contain'. */
+  fit?: 'cover' | 'contain';
 }
 
 export default function LazyImage({
@@ -22,7 +24,8 @@ export default function LazyImage({
   height,
   priority = false,
   onLoad,
-  sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw'
+  sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
+  fit = 'cover'
 }: LazyImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -50,14 +53,14 @@ export default function LazyImage({
   return (
     <div className={`relative overflow-hidden ${className}`} style={{ width, height }}>
       {!isLoaded && (
-        <div className="absolute inset-0 bg-gray-200 animate-pulse z-10"></div>
+        <div className={`absolute inset-0 animate-pulse z-10 ${fit === 'contain' ? 'bg-black/5 rounded-2xl' : 'bg-gray-200'}`}></div>
       )}
       <Image
         src={src}
         alt={alt}
         fill
         sizes={sizes}
-        className={`object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`${fit === 'contain' ? 'object-contain' : 'object-cover'} transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={handleLoad}
         onError={handleError}
         priority={priority}

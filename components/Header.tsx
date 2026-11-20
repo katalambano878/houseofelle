@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import MiniCart from './MiniCart';
 import { useCart } from '@/context/CartContext';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +24,21 @@ export default function Header() {
   // A live sale with products gets its own menu link.
   const saleLink = promo?.live && promo.product_count > 0 ? [{ label: 'Sale', href: '/sale' }] : [];
 
+  const pathname = usePathname();
+  // The home page opens on a dark photograph, so its header is dark too.
+  const dark = pathname === '/';
+  const navLinks = [
+    { label: 'Home', href: '/' },
+    { label: 'Shop', href: '/shop' },
+    ...saleLink,
+    { label: 'Categories', href: '/categories' },
+    { label: 'About', href: '/about' },
+    { label: 'Contact', href: '/contact' },
+  ];
+
   const siteName = getSetting('site_name') || 'House of Elle';
+  const whatsappDigits = (getSetting('contact_whatsapp') || '0570551050').replace(/\D/g, '');
+  const whatsappIntl = whatsappDigits.startsWith('0') ? `233${whatsappDigits.slice(1)}` : whatsappDigits;
   const headerLogo = getSetting('site_logo') || '/house-of-elle-logo.png';
 
   useEffect(() => {
@@ -55,111 +70,93 @@ export default function Header() {
     <>
       <AnnouncementBar />
 
-      <header className="bg-brand-ivory/95 backdrop-blur-md sticky top-0 z-50 border-b border-brand-gold/20 transition-all duration-300 shadow-[0_8px_30px_rgba(10,10,10,0.06)]">
+      <header
+        className={`sticky top-0 z-50 transition-colors duration-300 ${
+          dark
+            ? 'bg-[#14100D] text-[#F5EDE4] border-b border-[#F5EDE4]/10'
+            : 'bg-[#F5EDE4]/95 text-[#221B16] backdrop-blur-md border-b border-[#221B16]/10'
+        }`}
+      >
         <div className="safe-area-top" />
         <nav aria-label="Main navigation" className="relative">
-          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="h-20 grid grid-cols-[auto_1fr_auto] items-center gap-4">
-
-              {/* Left: Mobile Menu Trigger (Mobile) & Logo */}
-              <div className="flex items-center gap-4">
+          <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-12">
+            <div className="h-[72px] lg:h-[88px] grid grid-cols-[1fr_auto_1fr] lg:grid-cols-[auto_1fr_auto] items-center gap-4">
+              <div className="flex items-center gap-2">
                 <button
-                  className="lg:hidden p-2 -ml-2 text-brand-black hover:text-brand-gold transition-colors"
+                  className="lg:hidden w-11 h-11 -ml-2 inline-flex items-center justify-center rounded-full"
                   onClick={() => setIsMobileMenuOpen(true)}
                   aria-label="Open menu"
                 >
-                  <i className="ri-menu-line text-2xl"></i>
+                  <i className="ri-menu-2-line text-2xl" aria-hidden="true"></i>
                 </button>
-                <Link
-                  href="/"
-                  className="flex items-center select-none rounded-md"
-                  aria-label="Go to homepage"
-                >
-                  <img src={headerLogo} alt={siteName} className="h-10 sm:h-11 md:h-12 w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)]" />
+                <Link href="/" className="hidden lg:flex items-center select-none" aria-label="Go to homepage">
+                  <img src={headerLogo} alt={siteName} className={`h-11 w-auto object-contain ${dark ? 'brightness-0 invert-[.93] sepia-[.15]' : ''}`} />
                 </Link>
               </div>
 
-              {/* Center: Navigation Links (Desktop) */}
-              <div className="hidden lg:flex items-center justify-center">
-                <div className="flex items-center rounded-full border border-brand-gold/25 bg-white/70 px-5 py-2 shadow-sm">
-                {[
-                  { label: 'Home', href: '/' },
-                  { label: 'Shop', href: '/shop' },
-                  ...saleLink,
-                  { label: 'Categories', href: '/categories' },
-                  { label: 'About', href: '/about' },
-                  { label: 'Contact', href: '/contact' },
-                ].map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`group relative px-4 py-2 text-xs uppercase tracking-[0.2em] font-semibold transition-colors hover:text-brand-gold ${link.href === '/sale' ? 'text-red-700' : 'text-brand-black'}`}
-                  >
-                    {link.label}
-                    <span className="absolute left-4 right-4 -bottom-0.5 h-[2px] scale-x-0 bg-brand-gold transition-transform duration-300 ease-out group-hover:scale-x-100" />
-                  </Link>
-                ))}
-                </div>
+              <Link href="/" className="lg:hidden flex items-center justify-center select-none" aria-label="Go to homepage">
+                <img src={headerLogo} alt={siteName} className={`h-9 w-auto object-contain ${dark ? 'brightness-0 invert-[.93] sepia-[.15]' : ''}`} />
+              </Link>
+
+              <div className="hidden lg:flex items-center justify-center gap-8 text-sm font-medium">
+                {navLinks.map((link) => {
+                  const active = link.href === '/' ? pathname === '/' : pathname?.startsWith(link.href);
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      aria-current={active ? 'page' : undefined}
+                      className={`relative py-2.5 transition-colors ${
+                        link.href === '/sale' ? (dark ? 'text-[#E2BE72]' : 'text-[#8A6420]') : ''
+                      } ${active ? 'shadow-[inset_0_-1.5px_0_currentColor]' : dark ? 'hover:text-[#E2BE72]' : 'hover:text-[#6B4F3A]'}`}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
               </div>
 
-              {/* Right: Icons */}
-              <div className="flex items-center justify-end space-x-2 sm:space-x-4">
+              <div className="flex items-center justify-end gap-1">
                 <button
-                  className="h-9 w-9 rounded-full border border-transparent bg-transparent text-brand-black hover:text-brand-gold hover:border-brand-gold/35 hover:bg-white/70 transition-all"
+                  className="w-11 h-11 inline-flex items-center justify-center rounded-full"
                   onClick={() => setIsSearchOpen(true)}
                   aria-label="Search"
                 >
-                  <i className="ri-search-line text-xl"></i>
+                  <i className="ri-search-line text-xl" aria-hidden="true"></i>
                 </button>
-
                 <Link
                   href="/wishlist"
-                  className="h-9 w-9 rounded-full border border-transparent bg-transparent text-brand-black hover:text-brand-gold hover:border-brand-gold/35 hover:bg-white/70 transition-all relative hidden sm:flex items-center justify-center"
-                  aria-label="Wishlist"
+                  className="relative hidden sm:inline-flex w-11 h-11 items-center justify-center rounded-full"
+                  aria-label={`Wishlist${wishlistCount ? `, ${wishlistCount} items` : ''}`}
                 >
-                  <i className="ri-heart-line text-xl"></i>
+                  <i className="ri-heart-line text-xl" aria-hidden="true"></i>
                   {wishlistCount > 0 && (
-                    <span className="absolute top-1 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-brand-gold text-[10px] font-bold text-brand-black">
+                    <span className="absolute top-1.5 right-1 min-w-4 h-4 px-1 rounded-full bg-[#C89B3C] text-[10px] font-bold text-[#14100D] inline-flex items-center justify-center">
                       {wishlistCount}
                     </span>
                   )}
                 </Link>
-
-                {user ? (
-                  <Link
-                    href="/account"
-                    className="h-9 w-9 rounded-full border border-transparent bg-transparent text-brand-black hover:text-brand-gold hover:border-brand-gold/35 hover:bg-white/70 transition-all hidden sm:flex items-center justify-center"
-                    aria-label="Account"
-                  >
-                    <i className="ri-user-line text-xl"></i>
-                  </Link>
-                ) : (
-                  <Link
-                    href="/auth/login"
-                    className="h-9 w-9 rounded-full border border-transparent bg-transparent text-brand-black hover:text-brand-gold hover:border-brand-gold/35 hover:bg-white/70 transition-all hidden sm:flex items-center justify-center"
-                    aria-label="Login"
-                  >
-                    <i className="ri-user-line text-xl"></i>
-                  </Link>
-                )}
-
+                <Link
+                  href={user ? '/account' : '/auth/login'}
+                  className="hidden sm:inline-flex w-11 h-11 items-center justify-center rounded-full"
+                  aria-label={user ? 'Account' : 'Sign in'}
+                >
+                  <i className="ri-user-line text-xl" aria-hidden="true"></i>
+                </Link>
                 <div className="relative">
                   <button
-                    className="h-9 w-9 rounded-full border border-transparent bg-transparent text-brand-black hover:text-brand-gold hover:border-brand-gold/35 hover:bg-white/70 transition-all"
+                    className={`inline-flex items-center gap-2 h-11 pl-3 pr-4 rounded-full text-sm font-semibold ${
+                      dark ? 'shadow-[inset_0_0_0_1px_rgba(245,237,228,0.25)]' : 'shadow-[inset_0_0_0_1px_rgba(34,27,22,0.18)]'
+                    }`}
                     onClick={() => setIsCartOpen(!isCartOpen)}
-                    aria-label="Cart"
+                    aria-label={`Bag, ${cartCount} items`}
                   >
-                    <i className="ri-shopping-bag-line text-xl"></i>
-                    {cartCount > 0 && (
-                      <span className="absolute top-1 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-brand-gold text-[10px] font-bold text-brand-black">
-                        {cartCount}
-                      </span>
-                    )}
+                    <i className="ri-shopping-bag-line text-xl" aria-hidden="true"></i>
+                    <span className="tabular-nums">{cartCount}</span>
                   </button>
                   <MiniCart isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
                 </div>
               </div>
-
             </div>
           </div>
         </nav>
@@ -210,21 +207,21 @@ export default function Header() {
             onClick={() => setIsMobileMenuOpen(false)}
             aria-hidden="true"
           />
-          <div className="absolute top-0 left-0 bottom-0 w-4/5 max-w-xs bg-brand-ivory shadow-xl flex flex-col animate-in slide-in-from-left duration-300">
-            <div className="p-4 border-b border-brand-gold/20 flex items-center justify-between">
+          <div className="absolute inset-y-0 left-0 w-full max-w-sm bg-[#14100D] text-[#F5EDE4] shadow-xl flex flex-col animate-in slide-in-from-left duration-300">
+            <div className="h-16 px-4 flex items-center justify-between">
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
-                <img src={headerLogo} alt={siteName} className="h-9 w-auto object-contain drop-shadow-sm" />
+                <img src={headerLogo} alt={siteName} className="h-9 w-auto object-contain brightness-0 invert-[.93] sepia-[.15]" />
               </Link>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="p-2 -mr-2 text-brand-brown hover:text-brand-black"
+                className="w-11 h-11 -mr-1 inline-flex items-center justify-center rounded-full"
                 aria-label="Close menu"
               >
                 <i className="ri-close-line text-2xl"></i>
               </button>
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-6 py-8 space-y-3">
+            <nav className="flex-1 overflow-y-auto px-6 pt-4 pb-8">
               {[
                 { label: 'Home', href: '/' },
                 { label: 'Shop', href: '/shop' },
@@ -236,13 +233,14 @@ export default function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`block py-3 text-sm uppercase tracking-[0.2em] font-semibold hover:text-brand-gold transition-colors ${link.href === '/sale' ? 'text-red-700' : 'text-brand-black'}`}
+                  className={`flex items-center justify-between min-h-16 border-b border-[#F5EDE4]/10 font-serif text-[28px] ${link.href === '/sale' ? 'text-[#E2BE72]' : ''}`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {link.label}
+                  <i className="ri-arrow-right-s-line text-xl opacity-60" aria-hidden="true"></i>
                 </Link>
               ))}
-              <div className="h-px bg-brand-gold/20 my-6"></div>
+              <div className="flex flex-wrap gap-2 pt-6">
               {[
                 { label: 'Track Order', href: '/order-tracking' },
                 { label: 'Wishlist', href: '/wishlist' },
@@ -251,18 +249,20 @@ export default function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="block py-3 text-sm font-medium text-brand-brown hover:text-brand-black transition-colors"
+                  className="inline-flex items-center h-11 px-4 rounded-full text-sm shadow-[inset_0_0_0_1px_rgba(245,237,228,0.25)]"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {link.label}
                 </Link>
               ))}
+              </div>
             </nav>
 
-            <div className="p-4 border-t border-brand-gold/20">
-              <p className="text-xs text-brand-brown text-center">
-                &copy; {new Date().getFullYear()} {siteName}
-              </p>
+            <div className="p-6 flex flex-col gap-3">
+              <a href={`https://wa.me/${whatsappIntl}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 h-14 rounded-full bg-[#C89B3C] text-[#14100D] font-semibold">
+                <i className="ri-whatsapp-line text-lg" aria-hidden="true"></i>WhatsApp us
+              </a>
+              <p className="text-center text-[13px] text-[#BFAF9F]">Spintex Lashibi, Shalom Spot Junction, Accra</p>
             </div>
           </div>
         </div>

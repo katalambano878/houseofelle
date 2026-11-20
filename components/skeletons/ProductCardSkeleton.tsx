@@ -2,7 +2,7 @@ export default function ProductCardSkeleton() {
   return (
     <div className="flex flex-col h-full animate-pulse">
       {/* Image Skeleton */}
-      <div className="relative aspect-[3/4] bg-gray-200 rounded-xl mb-4 overflow-hidden">
+      <div className="relative aspect-[4/5] bg-[#EFE6DB] rounded-[22px] sm:rounded-[28px] mb-4 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer" style={{ backgroundSize: '200% 100%' }}></div>
       </div>
 

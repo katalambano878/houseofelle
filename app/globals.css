@@ -734,3 +734,9 @@ img {
   .promo-marquee-track { animation: none; }
   .promo-backdrop-in, .promo-card-in { animation-duration: 1ms; }
 }
+
+/* Home page brand banner: the list is repeated, so moving half its width loops seamlessly. */
+@keyframes hoe-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}

@@ -11,7 +11,7 @@ import {
   usePromo,
 } from '@/hooks/usePromo';
 import { useCMS } from '@/context/CMSContext';
-import { CategoryChips, CountdownTiles, SALE_PERKS, whatsappLink } from '@/components/sale/SaleBits';
+import { whatsappLink } from '@/components/sale/SaleBits';
 
 interface SaleProduct {
   id: string;
@@ -52,131 +52,100 @@ export default function SaleSpotlight() {
   const title = promo.popup?.title || promo.name;
   const message = promo.popup?.message || promo.banner_text;
 
+  const tiles = countdown
+    ? [
+        ['Days', countdown.days],
+        ['Hours', countdown.hours],
+        ['Minutes', countdown.minutes],
+        ['Seconds', countdown.seconds],
+      ]
+    : null;
+
   return (
-    <section aria-labelledby="sale-spotlight-title" className="bg-brand-ivory px-4 sm:px-6 pt-12 md:pt-20">
-      <div className="relative max-w-[1400px] mx-auto overflow-hidden rounded-[2rem] bg-blue-800 text-white">
-        <svg className="absolute -right-24 -top-24 w-[28rem] h-[28rem] text-blue-500/20" viewBox="0 0 200 200" fill="none" aria-hidden="true">
-          <circle cx="100" cy="100" r="98" stroke="currentColor" />
-          <circle cx="100" cy="100" r="74" stroke="currentColor" />
-          <circle cx="100" cy="100" r="50" stroke="currentColor" />
-        </svg>
-        <div className="absolute -bottom-32 left-1/3 w-96 h-96 rounded-full bg-blue-500/15 blur-3xl" aria-hidden="true" />
-
-        <div className="relative grid gap-10 lg:grid-cols-[1.15fr_1fr] px-6 py-10 sm:px-10 sm:py-14 lg:px-16 lg:py-16">
-          {/* The offer */}
-          <div>
-            <p className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.28em] text-blue-500">
-              <span className={`w-1.5 h-1.5 rounded-full bg-blue-500 ${promo.live ? 'animate-pulse motion-reduce:animate-none' : ''}`} aria-hidden="true" />
-              {promo.name} · {promo.live ? 'On now' : 'Coming soon'}
+    <section aria-labelledby="sale-spotlight-title" className="bg-[#C89B3C] text-[#14100D]">
+      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 py-14 md:py-24 grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:items-end">
+        <div className="flex flex-col gap-2">
+          <h2 id="sale-spotlight-title" className="font-serif italic text-[28px] md:text-[44px] leading-none">
+            {title}
+            <span className="sr-only">{promo.live ? ', on now' : ', coming soon'}</span>
+          </h2>
+          {range ? (
+            <p className="flex items-start gap-3 md:gap-5">
+              <span className="font-serif text-[132px] sm:text-[180px] lg:text-[240px] leading-[0.82] tracking-[-0.05em] tabular-nums">{range.max}%</span>
+              <span className="pt-3 md:pt-6 text-sm md:text-lg font-semibold leading-snug">
+                off
+                {range.min !== range.max && (
+                  <>
+                    <br />
+                    at most
+                  </>
+                )}
+              </span>
             </p>
-            <h2 id="sale-spotlight-title" className="mt-4 font-serif text-4xl sm:text-5xl lg:text-6xl leading-[1.05] text-balance">
-              {title}
-            </h2>
+          ) : (
+            <p className="font-serif text-6xl md:text-8xl leading-none">{promo.live ? 'On now' : 'Coming soon'}</p>
+          )}
+        </div>
 
-            {range && (
-              <div className="mt-6">
-                <p className="text-sm uppercase tracking-[0.2em] text-white/60">{range.min === range.max ? 'Save' : 'Save up to'}</p>
-                <p className="mt-1 flex items-baseline gap-3">
-                  <span className="text-7xl sm:text-8xl font-bold tracking-tight text-blue-500 tabular-nums leading-none">{range.max}%</span>
-                  <span className="text-xl text-white/80">off</span>
-                </p>
-              </div>
-            )}
+        <div className="flex flex-col gap-7">
+          {message && <p className="text-base md:text-lg leading-relaxed max-w-md text-pretty">{message}</p>}
+          {range && range.min !== range.max && (
+            <p className="-mt-4 text-sm font-medium">Savings of {formatRange(range)} on selected items.</p>
+          )}
 
-            {message && <p className="mt-5 max-w-xl text-white/80 text-lg leading-relaxed text-pretty">{message}</p>}
-            {range && range.min !== range.max && (
-              <p className="mt-2 text-sm text-white/60">Discounts from {formatRange(range)} on selected items.</p>
-            )}
-
-            <div className="mt-8">
-              {countdown ? (
-                <CountdownTiles countdown={countdown} label={timing.label} tone="dark" />
-              ) : (
-                <p className="text-sm text-white/70">
-                  {promo.live ? 'Limited time only, while stocks last.' : 'Dropping soon. Save your favourites now so you are ready.'}
-                </p>
-              )}
-            </div>
-
-            <div className="mt-8 flex flex-col sm:flex-row sm:flex-wrap gap-3">
-              <Link
-                href={promoHref(promo)}
-                className="inline-flex whitespace-nowrap items-center justify-center gap-2 rounded-full bg-blue-500 hover:bg-blue-400 text-blue-900 font-semibold px-7 py-3.5 transition-colors active:scale-[0.98] motion-reduce:active:scale-100"
-              >
-                {promo.live ? promo.popup?.cta_label || 'Shop the sale' : 'Browse the collection'}
-                <i className="ri-arrow-right-line" aria-hidden="true" />
-              </Link>
-              <a
-                href={whatsappLink(whatsapp, `Hello House of Elle, I'd like to know more about the ${promo.name} sale.`)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex whitespace-nowrap items-center justify-center gap-2 rounded-full ring-1 ring-white/25 hover:bg-white/10 text-white font-medium px-7 py-3.5 transition-colors"
-              >
-                <i className="ri-whatsapp-line text-lg" aria-hidden="true" />
-                {promo.live ? 'Order on WhatsApp' : 'Reserve on WhatsApp'}
-              </a>
-            </div>
-          </div>
-
-          {/* What's included */}
-          <div className="lg:pl-10 lg:border-l lg:border-white/10 flex flex-col gap-8">
-            {products.length > 0 ? (
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/60 mb-3">Top deals</p>
-                <ul className="grid grid-cols-2 gap-3">
-                  {products.map((p) => {
-                    const img = [...(p.product_images || [])].sort((a, b) => a.position - b.position)[0]?.url;
-                    return (
-                      <li key={p.id}>
-                        <Link href={`/product/${p.slug}`} className="group block rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition-colors overflow-hidden">
-                          <div className="relative aspect-square bg-white/5">
-                            {img && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                            )}
-                            <span className="absolute top-2 left-2 rounded-full bg-blue-500 px-2 py-0.5 text-xs font-bold text-blue-900">-{p.percent_off}%</span>
-                          </div>
-                          <div className="p-3">
-                            <p className="text-sm font-medium line-clamp-1">{p.name}</p>
-                            <p className="mt-0.5 text-sm">
-                              <span className="font-semibold text-blue-500">{cedi(p.price)}</span>
-                              {p.compare_at_price ? <span className="ml-2 text-white/50 line-through">{cedi(p.compare_at_price)}</span> : null}
-                            </p>
-                          </div>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ) : (
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/60 mb-3">On sale across</p>
-                <CategoryChips tone="dark" />
-              </div>
-            )}
-
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/60 mb-3">Why shop with us</p>
-              <ul className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                {SALE_PERKS.map((p) => (
-                  <li key={p.title} className="flex items-start gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-blue-500">
-                      <i className={p.icon} aria-hidden="true" />
-                    </span>
-                    <span className="text-sm leading-snug">
-                      <span className="block font-semibold">{p.title}</span>
-                      <span className="text-white/60">{p.text}</span>
-                    </span>
-                  </li>
+          {tiles ? (
+            <div role="timer" aria-label={`${timing.label} ${countdown!.days} days ${countdown!.hours} hours ${countdown!.minutes} minutes`}>
+              <p className="text-xs font-semibold mb-2">{timing.label}</p>
+              <div className="grid grid-cols-4 gap-2 max-w-sm">
+                {tiles.map(([label, v]) => (
+                  <span key={label as string} className="flex flex-col items-center gap-1 rounded-2xl bg-[#14100D] text-[#F5EDE4] pt-3.5 pb-2.5">
+                    <span className="text-2xl md:text-[34px] font-semibold leading-none tabular-nums">{String(v).padStart(2, '0')}</span>
+                    <span className="text-[10px] md:text-[11px] font-semibold text-[#BFAF9F]">{label}</span>
+                  </span>
                 ))}
-              </ul>
+              </div>
             </div>
+          ) : (
+            <p className="text-sm font-medium">{promo.live ? 'Limited time only, while stocks last.' : 'Dropping soon. Save your favourites now so you are ready.'}</p>
+          )}
 
-            <p className="text-sm text-white/60">
-              <i className="ri-map-pin-line mr-1 text-blue-500" aria-hidden="true" />
-              Or visit our store at {getSetting('contact_address') || 'Spintex Lashibi, Shalom Spot Junction, Accra'}.
-            </p>
+          {products.length > 0 && (
+            <ul className="grid grid-cols-4 gap-2 max-w-md" aria-label="Top deals">
+              {products.map((p) => {
+                const img = [...(p.product_images || [])].sort((a, b) => a.position - b.position)[0]?.url;
+                return (
+                  <li key={p.id}>
+                    <Link href={`/product/${p.slug}`} className="group block" aria-label={`${p.name}, ${cedi(p.price)}, ${p.percent_off}% off`}>
+                      <span className="relative block aspect-square rounded-2xl bg-[#F5EDE4] overflow-hidden">
+                        {img && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={img} alt="" loading="lazy" className="absolute inset-[8%] h-[84%] w-[84%] object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-105" />
+                        )}
+                        <span className="absolute top-1.5 left-1.5 rounded-full bg-[#14100D] px-1.5 py-0.5 text-[10px] font-bold text-[#F5EDE4] tabular-nums">-{p.percent_off}%</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              href={promoHref(promo)}
+              className="inline-flex whitespace-nowrap items-center justify-center gap-2 min-h-[54px] px-8 rounded-full bg-[#14100D] text-[#F5EDE4] font-semibold active:scale-[0.98] transition-transform motion-reduce:active:scale-100"
+            >
+              {promo.live ? promo.popup?.cta_label || 'Shop the sale' : 'Browse the collection'}
+            </Link>
+            <a
+              href={whatsappLink(whatsapp, `Hello House of Elle, I'd like to know more about the ${promo.name} sale.`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex whitespace-nowrap items-center justify-center gap-2 min-h-[54px] px-8 rounded-full shadow-[inset_0_0_0_1.5px_#14100D] font-semibold hover:bg-[#14100D]/5 transition-colors"
+            >
+              <i className="ri-whatsapp-line text-lg" aria-hidden="true" />
+              {promo.live ? 'Order on WhatsApp' : 'Reserve on WhatsApp'}
+            </a>
           </div>
         </div>
       </div>
