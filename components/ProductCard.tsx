@@ -96,7 +96,6 @@ export default function ProductCard({
       </Fragment>
     ));
 
-  const tint = tintFor(id);
   const add = (e: React.MouseEvent) => {
     e.preventDefault();
     addToCart({ id, name, price, image, quantity: moq, slug, maxStock, moq });
@@ -106,9 +105,9 @@ export default function ProductCard({
     <div className="group h-full flex flex-col gap-4">
       <Link
         href={`/product/${slug}`}
-        className="relative flex items-center justify-center aspect-[4/5] overflow-hidden rounded-[22px] sm:rounded-[28px]"
-        style={{ backgroundColor: tint }}
+        className="relative flex items-center justify-center aspect-[4/5] overflow-hidden rounded-[18px] sm:rounded-[22px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]"
       >
+        <span aria-hidden="true" className="absolute inset-2 sm:inset-2.5 rounded-[12px] sm:rounded-[14px] shadow-[inset_0_0_0_1px_rgba(74,21,32,0.2)] pointer-events-none z-[1]" />
         <LazyImage
           src={image}
           alt={name}
@@ -116,18 +115,18 @@ export default function ProductCard({
           className="w-[84%] h-[84%] object-contain mix-blend-multiply transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 motion-reduce:transition-none"
         />
 
-        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 flex flex-col items-start gap-1.5">
+        <div className="absolute top-4 left-4 sm:top-5 sm:left-5 z-[2] flex flex-col items-start gap-1.5">
           {discount > 0 && (
-            <span className="rounded-full bg-[#C89B3C] text-[#14100D] text-[11px] font-bold px-2.5 py-1 tabular-nums">-{discount}%</span>
+            <span className="rounded-full bg-[#D9A441] text-[#2B0B12] text-[11px] font-bold px-2.5 py-1 tabular-nums z-[2] relative">-{discount}%</span>
           )}
           {badge && (
-            <span className="rounded-full bg-[#14100D] text-[#F5EDE4] text-[11px] font-semibold px-2.5 py-1">{badge}</span>
+            <span className="rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[11px] font-semibold px-2.5 py-1 z-[2] relative">{badge}</span>
           )}
         </div>
 
         {!inStock && (
-          <div className="absolute inset-0 bg-[#F5EDE4]/60 flex items-center justify-center">
-            <span className="rounded-full bg-[#14100D] text-[#F5EDE4] px-4 py-2 text-sm font-medium">Sold out</span>
+          <div className="absolute inset-0 bg-[#F1E8DC]/60 flex items-center justify-center">
+            <span className="rounded-full bg-[#2B0B12] text-[#F6EDE3] px-4 py-2 text-sm font-medium">Sold out</span>
           </div>
         )}
       </Link>
@@ -135,7 +134,7 @@ export default function ProductCard({
       <div className="flex flex-col gap-1 flex-grow">
         <div className="flex items-start justify-between gap-3">
           <Link href={`/product/${slug}`} className="min-w-0">
-            <h3 className="font-serif text-[19px] sm:text-[22px] leading-[1.15] text-[#221B16] line-clamp-2">
+            <h3 className="font-serif text-[18px] sm:text-[21px] leading-[1.15] text-[#1F1115] line-clamp-2">
               {renderNameWithPlainAmpersand(name)}
             </h3>
           </Link>
@@ -143,7 +142,7 @@ export default function ProductCard({
             <Link
               href={`/product/${slug}`}
               aria-label={`Choose options for ${name}`}
-              className="flex-none w-11 h-11 -mt-1 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(34,27,22,0.2)] hover:bg-[#14100D] hover:text-[#F5EDE4] transition-colors"
+              className="flex-none w-11 h-11 -mt-1 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:bg-[#2B0B12] hover:text-[#F6EDE3] transition-colors"
             >
               <i className="ri-arrow-right-line text-lg" aria-hidden="true"></i>
             </Link>
@@ -151,7 +150,7 @@ export default function ProductCard({
             <button
               onClick={add}
               aria-label={moq > 1 ? `Add ${moq} ${name} to bag` : `Add ${name} to bag`}
-              className="flex-none w-11 h-11 -mt-1 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(34,27,22,0.2)] hover:bg-[#14100D] hover:text-[#F5EDE4] active:scale-95 transition-[background-color,color,transform] motion-reduce:active:scale-100"
+              className="flex-none w-11 h-11 -mt-1 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:bg-[#2B0B12] hover:text-[#F6EDE3] active:scale-95 transition-[background-color,color,transform] motion-reduce:active:scale-100"
             >
               <i className="ri-add-line text-xl" aria-hidden="true"></i>
             </button>
@@ -165,22 +164,22 @@ export default function ProductCard({
                 key={color.name}
                 title={color.name}
                 aria-label={color.name}
-                className="w-3.5 h-3.5 rounded-full flex-shrink-0 shadow-[inset_0_0_0_1px_rgba(34,27,22,0.15)]"
+                className="w-3.5 h-3.5 rounded-full flex-shrink-0 shadow-[inset_0_0_0_1px_rgba(31,17,21,0.15)]"
                 style={{ backgroundColor: color.hex }}
               />
             ))}
             {colorVariants.length > MAX_SWATCHES && (
-              <span className="text-xs text-[#5E5148] ml-0.5">+{colorVariants.length - MAX_SWATCHES}</span>
+              <span className="text-xs text-[#6B565B] ml-0.5">+{colorVariants.length - MAX_SWATCHES}</span>
             )}
           </div>
         )}
 
         <div className="flex items-baseline gap-2 text-[15px] tabular-nums">
-          <span className={`font-semibold ${originalPrice ? 'text-[#8A6420]' : 'text-[#221B16]'}`}>
+          <span className={`font-semibold ${originalPrice ? 'text-[#7A1F2E]' : 'text-[#1F1115]'}`}>
             {hasVariants && minVariantPrice ? `From ${formatPrice(minVariantPrice)}` : formatPrice(price)}
           </span>
-          {originalPrice && <span className="text-sm text-[#5E5148] line-through">{formatPrice(originalPrice)}</span>}
-          {moq > 1 && <span className="text-xs text-[#5E5148]">Min. {moq}</span>}
+          {originalPrice && <span className="text-sm text-[#6B565B] line-through">{formatPrice(originalPrice)}</span>}
+          {moq > 1 && <span className="text-xs text-[#6B565B]">Min. {moq}</span>}
         </div>
       </div>
     </div>

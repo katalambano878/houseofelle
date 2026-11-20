@@ -56,7 +56,7 @@ export default function PWASettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-[#F1E8DC] py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <Link
           href="/"

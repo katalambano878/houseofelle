@@ -113,7 +113,7 @@ export default function MyTicketsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center">
         <i className="ri-loader-4-line animate-spin text-4xl text-blue-700"></i>
       </main>
     );
@@ -121,7 +121,7 @@ export default function MyTicketsPage() {
 
   if (!signedIn) {
     return (
-      <main className="min-h-screen bg-gray-50 py-12">
+      <main className="min-h-screen bg-[#F1E8DC] py-12">
         <div className="max-w-md mx-auto px-4 text-center">
           <div className="bg-white rounded-xl shadow-sm p-8">
             <div className="w-16 h-16 flex items-center justify-center bg-blue-100 rounded-full mx-auto mb-4">
@@ -147,7 +147,7 @@ export default function MyTicketsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12">
+    <main className="min-h-screen bg-[#F1E8DC] py-12">
       <div className="max-w-5xl mx-auto px-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>

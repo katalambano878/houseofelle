@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Fragment, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { cachedQuery } from '@/lib/query-cache';
-import ProductCard, { tintFor } from '@/components/ProductCard';
+import ProductCard from '@/components/ProductCard';
 import { whatsappLink } from '@/components/sale/SaleBits';
 import { useCMS } from '@/context/CMSContext';
 import ProductReviews from '@/components/ProductReviews';
@@ -34,10 +34,10 @@ function colorNameToHex(name: string): string {
 const optionClass = (selected: boolean, out: boolean) =>
   `inline-flex items-center gap-2.5 min-h-12 px-5 rounded-full text-[15px] font-medium whitespace-nowrap transition-colors ${
     selected
-      ? 'bg-[#14100D] text-[#F5EDE4]'
+      ? 'bg-[#2B0B12] text-[#F6EDE3]'
       : out
-        ? 'text-[#221B16]/35 line-through shadow-[inset_0_0_0_1px_rgba(34,27,22,0.1)] cursor-not-allowed'
-        : 'shadow-[inset_0_0_0_1px_rgba(34,27,22,0.2)] hover:shadow-[inset_0_0_0_1px_#14100D]'
+        ? 'text-[#1F1115]/35 line-through shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] cursor-not-allowed'
+        : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:shadow-[inset_0_0_0_1px_#2B0B12]'
   }`;
 
 /** Accepts a list, or text with one item per line / comma, from product metadata. */
@@ -279,15 +279,15 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F5EDE4]">
+      <div className="min-h-screen bg-[#F1E8DC]">
         <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-12 grid lg:grid-cols-[1.1fr_1fr] gap-8 lg:gap-16 animate-pulse motion-reduce:animate-none" aria-label="Loading product">
           <div className="aspect-[4/5] sm:aspect-square rounded-[36px] bg-[#EFE6DB]" />
           <div className="flex flex-col gap-4 pt-4">
-            <div className="h-4 w-32 rounded bg-[#E9DCCB]" />
-            <div className="h-14 w-3/4 rounded-xl bg-[#E9DCCB]" />
-            <div className="h-8 w-40 rounded-lg bg-[#E9DCCB]" />
-            <div className="h-24 rounded-xl bg-[#E9DCCB]" />
-            <div className="h-14 rounded-full bg-[#E9DCCB]" />
+            <div className="h-4 w-32 rounded bg-[#E8DCCB]" />
+            <div className="h-14 w-3/4 rounded-xl bg-[#E8DCCB]" />
+            <div className="h-8 w-40 rounded-lg bg-[#E8DCCB]" />
+            <div className="h-24 rounded-xl bg-[#E8DCCB]" />
+            <div className="h-14 rounded-full bg-[#E8DCCB]" />
           </div>
         </div>
       </div>
@@ -296,15 +296,15 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
   if (!product) {
     return (
-      <div className="min-h-[70vh] bg-[#F5EDE4] flex flex-col items-center justify-center gap-5 px-5 text-center">
-        <h1 className="font-serif text-4xl md:text-5xl text-[#221B16]">We can&apos;t find that scent</h1>
-        <p className="text-[#5E5148] max-w-sm">It may have sold out or moved. Browse the shop or ask us on WhatsApp.</p>
-        <Link href="/shop" className="inline-flex items-center min-h-[52px] px-7 rounded-full bg-[#14100D] text-[#F5EDE4] font-semibold">Back to the shop</Link>
+      <div className="min-h-[70vh] bg-[#F1E8DC] flex flex-col items-center justify-center gap-5 px-5 text-center">
+        <h1 className="font-serif text-4xl md:text-5xl text-[#1F1115]">We can&apos;t find that scent</h1>
+        <p className="text-[#6B565B] max-w-sm">It may have sold out or moved. Browse the shop or ask us on WhatsApp.</p>
+        <Link href="/shop" className="inline-flex items-center min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold">Back to the shop</Link>
       </div>
     );
   }
 
-  const tint = tintFor(product.id);
+  const tint = '#FBF6EF';
   const discount = product.compare_at_price ? Math.round((1 - activePrice / product.compare_at_price) * 100) : 0;
   const minVariantPrice = hasVariants ? Math.min(...product.variants.map((v: any) => v.price || product.price)) : product.price;
 
@@ -335,16 +335,16 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
       <StructuredData data={productSchema} />
       <StructuredData data={breadcrumbSchema} />
 
-      <main className="min-h-screen bg-[#F5EDE4] text-[#221B16]">
+      <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
         <nav aria-label="Breadcrumb" className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-5 md:pt-8">
-          <ol className="flex items-center gap-2 text-[13px] text-[#5E5148] overflow-hidden whitespace-nowrap">
-            <li><Link href="/" className="hover:text-[#221B16]">Home</Link></li>
+          <ol className="flex items-center gap-2 text-[13px] text-[#6B565B] overflow-hidden whitespace-nowrap">
+            <li><Link href="/" className="hover:text-[#1F1115]">Home</Link></li>
             <li aria-hidden="true">/</li>
-            <li><Link href="/shop" className="hover:text-[#221B16]">Shop</Link></li>
+            <li><Link href="/shop" className="hover:text-[#1F1115]">Shop</Link></li>
             <li aria-hidden="true">/</li>
-            <li><Link href={categoryHref} className="hover:text-[#221B16]">{product.category}</Link></li>
+            <li><Link href={categoryHref} className="hover:text-[#1F1115]">{product.category}</Link></li>
             <li aria-hidden="true" className="hidden sm:block">/</li>
-            <li className="hidden sm:block truncate text-[#221B16]" aria-current="page">{renderNameWithPlainAmpersand(product.name)}</li>
+            <li className="hidden sm:block truncate text-[#1F1115]" aria-current="page">{renderNameWithPlainAmpersand(product.name)}</li>
           </ol>
         </nav>
 
@@ -361,21 +361,21 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 quality={82}
               />
               {discount > 0 && (
-                <span className="absolute top-4 left-4 md:top-6 md:left-6 rounded-full bg-[#C89B3C] text-[#14100D] text-sm font-bold px-3.5 py-1.5 tabular-nums">Save {discount}%</span>
+                <span className="absolute top-4 left-4 md:top-6 md:left-6 rounded-full bg-[#D9A441] text-[#2B0B12] text-sm font-bold px-3.5 py-1.5 tabular-nums">Save {discount}%</span>
               )}
               <button
                 type="button"
                 onClick={toggleWishlist}
                 aria-pressed={wishlisted}
                 aria-label={wishlisted ? 'Remove from wishlist' : 'Save to wishlist'}
-                className="absolute top-3 right-3 md:top-5 md:right-5 w-12 h-12 rounded-full bg-[#F5EDE4]/90 inline-flex items-center justify-center"
+                className="absolute top-3 right-3 md:top-5 md:right-5 w-12 h-12 rounded-full bg-[#F1E8DC]/90 inline-flex items-center justify-center"
               >
-                <i className={`${wishlisted ? 'ri-heart-fill text-[#8A6420]' : 'ri-heart-line'} text-xl`} aria-hidden="true" />
+                <i className={`${wishlisted ? 'ri-heart-fill text-[#7A1F2E]' : 'ri-heart-line'} text-xl`} aria-hidden="true" />
               </button>
               {product.images.length > 1 && (
                 <span className="sm:hidden absolute bottom-4 inset-x-0 flex justify-center gap-1.5" aria-hidden="true">
                   {product.images.map((_: string, i: number) => (
-                    <span key={i} className={`h-1.5 rounded-full transition-all ${i === selectedImage ? 'w-5 bg-[#221B16]' : 'w-1.5 bg-[#221B16]/25'}`} />
+                    <span key={i} className={`h-1.5 rounded-full transition-all ${i === selectedImage ? 'w-5 bg-[#1F1115]' : 'w-1.5 bg-[#1F1115]/25'}`} />
                   ))}
                 </span>
               )}
@@ -390,7 +390,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     onClick={() => setSelectedImage(index)}
                     aria-label={`Show photo ${index + 1}`}
                     aria-pressed={selectedImage === index}
-                    className={`relative aspect-square rounded-2xl overflow-hidden transition-shadow ${selectedImage === index ? 'shadow-[inset_0_0_0_2px_#14100D]' : 'shadow-[inset_0_0_0_1px_rgba(34,27,22,0.12)]'}`}
+                    className={`relative aspect-square rounded-2xl overflow-hidden transition-shadow ${selectedImage === index ? 'shadow-[inset_0_0_0_2px_#2B0B12]' : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.12)]'}`}
                     style={{ backgroundColor: tint }}
                   >
                     <Image src={image} alt="" fill className="object-contain p-2 mix-blend-multiply" sizes="96px" quality={60} />
@@ -402,13 +402,13 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
           <div className="flex flex-col gap-7">
             <div className="flex flex-col gap-4">
-              <Link href={categoryHref} className="self-start text-sm text-[#5E5148] hover:text-[#221B16]">{product.category}</Link>
-              <h1 className="font-serif text-[40px] md:text-[64px] leading-[0.98] tracking-[-0.02em] text-balance">{renderNameWithPlainAmpersand(product.name)}</h1>
+              <Link href={categoryHref} className="self-start text-sm text-[#6B565B] hover:text-[#1F1115]">{product.category}</Link>
+              <h1 className="font-serif text-[36px] md:text-[50px] leading-[0.95] tracking-[-0.02em] text-balance">{renderNameWithPlainAmpersand(product.name)}</h1>
               {product.reviewCount > 0 && (
                 <a href="#details-reviews" onClick={() => setActiveTab('reviews')} className="self-start flex items-center gap-2 text-sm">
                   <span className="flex gap-0.5" aria-hidden="true">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <i key={star} className={`${star <= Math.round(product.rating) ? 'ri-star-fill text-[#C89B3C]' : 'ri-star-line text-[#C89B3C]/40'}`} />
+                      <i key={star} className={`${star <= Math.round(product.rating) ? 'ri-star-fill text-[#D9A441]' : 'ri-star-line text-[#D9A441]/40'}`} />
                     ))}
                   </span>
                   <span className="tabular-nums">{Number(product.rating).toFixed(1)} · {product.reviewCount} {product.reviewCount === 1 ? 'review' : 'reviews'}</span>
@@ -416,11 +416,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
               )}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="flex items-baseline gap-3 tabular-nums">
-                  <span className={`text-[28px] font-semibold ${product.compare_at_price && product.compare_at_price > activePrice ? 'text-[#8A6420]' : ''}`}>
+                  <span className={`text-[28px] font-semibold ${product.compare_at_price && product.compare_at_price > activePrice ? 'text-[#7A1F2E]' : ''}`}>
                     {hasVariants && !selectedVariant ? `From GH₵${money(minVariantPrice)}` : `GH₵${money(activePrice)}`}
                   </span>
                   {product.compare_at_price && product.compare_at_price > activePrice && (
-                    <span className="text-lg text-[#5E5148] line-through">GH₵{money(product.compare_at_price)}</span>
+                    <span className="text-lg text-[#6B565B] line-through">GH₵{money(product.compare_at_price)}</span>
                   )}
                 </p>
                 <p className={`inline-flex items-center gap-2 text-sm font-medium ${activeStock === 0 ? 'text-[#A23B2A]' : activeStock <= 10 ? 'text-[#8A5A12]' : 'text-[#2F6B3A]'}`}>
@@ -429,13 +429,13 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 </p>
               </div>
               {product.description && (
-                <p className="text-base md:text-[17px] leading-relaxed text-[#4E4239] line-clamp-4 whitespace-pre-line">{product.description}</p>
+                <p className="text-base md:text-[17px] leading-relaxed text-[#4D3A3F] line-clamp-4 whitespace-pre-line">{product.description}</p>
               )}
             </div>
 
             {product.features.length > 0 && (
-              <div className="flex flex-col gap-3 p-5 rounded-[22px] bg-[#FBF7F2] shadow-[inset_0_0_0_1px_rgba(34,27,22,0.08)]">
-                <p className="text-[13px] font-semibold text-[#8A6420]">Notes and highlights</p>
+              <div className="flex flex-col gap-3 p-5 rounded-[22px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.08)]">
+                <p className="text-[13px] font-semibold text-[#7A1F2E]">Notes and highlights</p>
                 <ul className="flex flex-wrap gap-2">
                   {product.features.map((f: string, i: number) => (
                     <li key={i} className="px-3.5 py-2 rounded-full bg-white text-sm">{f}</li>
@@ -447,7 +447,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
             {hasVariants && product.colors.length > 0 && (
               <fieldset className="flex flex-col gap-3">
                 <legend className="mb-3 text-[15px] font-semibold">
-                  Colour{selectedColor ? <span className="font-normal text-[#5E5148]">: {selectedColor}</span> : <span className="font-normal text-[#8A5A12]"> · choose one</span>}
+                  Colour{selectedColor ? <span className="font-normal text-[#6B565B]">: {selectedColor}</span> : <span className="font-normal text-[#8A5A12]"> · choose one</span>}
                 </legend>
                 <div className="flex flex-wrap gap-2.5">
                   {product.colors.map((color: string) => {
@@ -473,7 +473,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                         disabled={isOutOfStock}
                         className={optionClass(isSelected, isOutOfStock)}
                       >
-                        <span className="w-5 h-5 rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.2)]" style={{ backgroundColor: product.colorHexMap?.[color] || colorNameToHex(color) }} aria-hidden="true" />
+                        <span className="w-5 h-5 rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)]" style={{ backgroundColor: product.colorHexMap?.[color] || colorNameToHex(color) }} aria-hidden="true" />
                         {color}
                       </button>
                     );
@@ -490,7 +490,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 <fieldset className="flex flex-col">
                   <legend className="mb-3 text-[15px] font-semibold">
                     {hasColors ? 'Size' : 'Option'}
-                    {selectedVariant ? <span className="font-normal text-[#5E5148]">: {selectedVariant.name}</span> : <span className="font-normal text-[#8A5A12]"> · choose one</span>}
+                    {selectedVariant ? <span className="font-normal text-[#6B565B]">: {selectedVariant.name}</span> : <span className="font-normal text-[#8A5A12]"> · choose one</span>}
                   </legend>
                   <div className="flex flex-wrap gap-2.5">
                     {visible.map((variant: any) => {
@@ -509,7 +509,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                           className={optionClass(isSelected, isOutOfStock)}
                         >
                           <span>{variant.name}</span>
-                          <span className={`tabular-nums ${isSelected ? 'text-[#F5EDE4]/75' : 'text-[#5E5148]'}`}>GH₵{money(variant.price || product.price)}</span>
+                          <span className={`tabular-nums ${isSelected ? 'text-[#F6EDE3]/75' : 'text-[#6B565B]'}`}>GH₵{money(variant.price || product.price)}</span>
                         </button>
                       );
                     })}
@@ -520,7 +520,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
             <div className="flex flex-col gap-3">
               <div className="flex gap-3">
-                <div role="group" aria-label="Quantity" className="flex-none inline-flex items-center h-14 rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.2)]">
+                <div role="group" aria-label="Quantity" className="flex-none inline-flex items-center h-14 rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)]">
                   <button
                     type="button"
                     aria-label="Decrease quantity"
@@ -555,7 +555,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                   type="button"
                   disabled={activeStock === 0 || needsVariantSelection || needsColorSelection}
                   onClick={handleAddToCart}
-                  className="flex-1 h-14 rounded-full bg-[#14100D] text-[#F5EDE4] font-semibold whitespace-nowrap tabular-nums disabled:opacity-45 active:scale-[0.98] transition-transform motion-reduce:active:scale-100"
+                  className="flex-1 h-14 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold whitespace-nowrap tabular-nums disabled:opacity-45 active:scale-[0.98] transition-transform motion-reduce:active:scale-100"
                 >
                   {activeStock === 0
                     ? 'Sold out'
@@ -567,7 +567,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 </button>
               </div>
               {activeStock > 0 && !needsVariantSelection && !needsColorSelection && (
-                <button type="button" onClick={handleBuyNow} className="h-14 rounded-full bg-[#C89B3C] text-[#14100D] font-semibold hover:bg-[#D4A94B] transition-colors">
+                <button type="button" onClick={handleBuyNow} className="h-14 rounded-full bg-[#D9A441] text-[#2B0B12] font-semibold hover:bg-[#E5B65A] transition-colors">
                   Buy now
                 </button>
               )}
@@ -576,20 +576,20 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 href={whatsappLink(whatsapp, `Hello House of Elle, I'd like to ask about ${product.name}.`)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="h-14 inline-flex items-center justify-center gap-2 rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.2)] font-medium hover:bg-white/60 transition-colors"
+                className="h-14 inline-flex items-center justify-center gap-2 rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] font-medium hover:bg-white/60 transition-colors"
               >
                 <i className="ri-whatsapp-line text-lg" aria-hidden="true" />
                 Ask about this scent on WhatsApp
               </a>
             </div>
 
-            <ul className="flex flex-col gap-3.5 pt-6 border-t border-[#221B16]/12 text-[15px] text-[#3A2F27]">
-              <li className="flex gap-3"><i className="ri-truck-line text-lg text-[#8A6420]" aria-hidden="true" />Delivery in Accra and beyond, fee agreed by phone</li>
-              <li className="flex gap-3"><i className="ri-store-2-line text-lg text-[#8A6420]" aria-hidden="true" />Free pickup at our Spintex store</li>
-              <li className="flex gap-3"><i className="ri-smartphone-line text-lg text-[#8A6420]" aria-hidden="true" />Pay with MTN, Telecel or AT Mobile Money</li>
+            <ul className="flex flex-col gap-3.5 pt-6 border-t border-[#1F1115]/12 text-[15px] text-[#4D3A3F]">
+              <li className="flex gap-3"><i className="ri-truck-line text-lg text-[#7A1F2E]" aria-hidden="true" />Delivery in Accra and beyond, fee agreed by phone</li>
+              <li className="flex gap-3"><i className="ri-store-2-line text-lg text-[#7A1F2E]" aria-hidden="true" />Free pickup at our Spintex store</li>
+              <li className="flex gap-3"><i className="ri-smartphone-line text-lg text-[#7A1F2E]" aria-hidden="true" />Pay with MTN, Telecel or AT Mobile Money</li>
             </ul>
 
-            <div className="flex flex-col border-t border-[#221B16]/12">
+            <div className="flex flex-col border-t border-[#1F1115]/12">
               {[
                 { id: 'description', title: 'Description', show: !!product.description, body: <p className="whitespace-pre-line">{product.description}</p> },
                 { id: 'care', title: 'How to use', show: !!product.care, body: <p className="whitespace-pre-line">{product.care}</p> },
@@ -612,13 +612,13 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     id={`details-${d.id}`}
                     open={activeTab === d.id}
                     onToggle={(e) => (e.currentTarget as HTMLDetailsElement).open && setActiveTab(d.id)}
-                    className="group border-b border-[#221B16]/12"
+                    className="group border-b border-[#1F1115]/12"
                   >
                     <summary className="flex items-center justify-between min-h-16 cursor-pointer list-none [&::-webkit-details-marker]:hidden font-serif text-xl">
                       {d.title}
                       <i className="ri-add-line text-xl transition-transform group-open:rotate-45" aria-hidden="true" />
                     </summary>
-                    <div className="pb-6 text-[15px] leading-relaxed text-[#4E4239]">{d.body}</div>
+                    <div className="pb-6 text-[15px] leading-relaxed text-[#4D3A3F]">{d.body}</div>
                   </details>
                 ))}
             </div>
@@ -626,9 +626,9 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
         </section>
 
         {relatedProducts.length > 0 && (
-          <section className="bg-[#FBF7F2] border-t border-[#221B16]/8 py-16 md:py-24" data-product-shop>
+          <section className="bg-[#FBF6EF] border-t border-[#1F1115]/8 py-16 md:py-24" data-product-shop>
             <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 flex flex-col gap-8 md:gap-10">
-              <h2 className="font-serif text-[34px] md:text-[56px] leading-none tracking-[-0.02em]">You may also <em>like</em></h2>
+              <h2 className="font-serif text-[30px] md:text-[40px] leading-none tracking-[-0.02em]">You may also <em>like</em></h2>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-8 sm:gap-6">
                 {relatedProducts.map((p) => <ProductCard key={p.id} {...p} />)}
               </div>

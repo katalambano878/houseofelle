@@ -184,7 +184,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     .map((rid) => ({ id: rid, ...articles[rid] }));
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12">
+    <main className="min-h-screen bg-[#F1E8DC] py-12">
       <div className="max-w-4xl mx-auto px-4">
         <Link
           href="/help"

@@ -4,7 +4,8 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useCMS } from '@/context/CMSContext';
 import { supabase } from '@/lib/supabase';
-import PageHero from '@/components/PageHero';
+import Image from 'next/image';
+import Link from 'next/link';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useRecaptcha } from '@/hooks/useRecaptcha';
 
@@ -125,45 +126,12 @@ export default function ContactPage() {
   const contactWhatsapp = getSetting('contact_whatsapp') || '0570551050';
   const contactAddress = getSetting('contact_address') || 'Spintex Lashibi, Shalom Spot Junction, Accra, Ghana';
 
-  const heroTitle = pageContent?.title || 'Contact House of Elle';
-  const heroSubtitle = pageContent?.subtitle || 'Need help with products or wholesale orders?';
   const heroContent = pageContent?.content || 'We are happy to help with perfume recommendations, gift sets, and bulk enquiries.';
 
   const waNumber = contactWhatsapp.replace(/[^0-9]/g, '');
   const waLink = waNumber.startsWith('0') ? `https://wa.me/233${waNumber.slice(1)}` : `https://wa.me/${waNumber}`;
   const telNumber = contactPhone.replace(/\s/g, '');
   const telLink = telNumber.startsWith('0') ? `tel:+233${telNumber.slice(1)}` : `tel:${telNumber}`;
-
-  const contactMethods = [
-    {
-      icon: 'ri-phone-line',
-      title: 'Call Us',
-      value: contactPhone,
-      link: telLink,
-      description: 'Mon-Sat, 9am-6pm'
-    },
-    {
-      icon: 'ri-mail-line',
-      title: 'Email Us',
-      value: contactEmail,
-      link: `mailto:${contactEmail}`,
-      description: 'We respond within 24 hours'
-    },
-    {
-      icon: 'ri-whatsapp-line',
-      title: 'WhatsApp',
-      value: contactWhatsapp,
-      link: waLink,
-      description: 'Chat with us instantly'
-    },
-    {
-      icon: 'ri-map-pin-line',
-      title: 'Visit Us',
-      value: contactAddress,
-      link: `https://www.google.com/maps?q=${MAP_QUERY}`,
-      description: 'Spintex Lashibi, Shalom Spot Junction, Accra, Ghana'
-    }
-  ];
 
   const faqs = [
     {
@@ -180,224 +148,123 @@ export default function ContactPage() {
     }
   ];
 
+  const hours = getSetting('business_hours') || '';
+  const topics = ['A scent or product', 'My order', 'Wholesale', 'Something else'];
+  const field = 'h-[50px] px-4 rounded-[14px] bg-white shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] text-[15px] text-[#1F1115] outline-none focus:shadow-[inset_0_0_0_1.5px_#2B0B12]';
+  const label = 'text-[13px] font-semibold';
+
   return (
-    <div className="min-h-screen bg-white">
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
       <Suspense fallback={null}>
         <ContactPrefill onPrefill={applyPrefill} />
       </Suspense>
-      <PageHero
-        eyebrow="Get In Touch"
-        title="Contact House of Elle"
-        subtitle="For personal orders, wholesale enquiries, or product guidance, our team is ready to help you choose the right scent."
-        backgroundImage="/Whisk_835b10a10eab0caa2c7419d4a6e01102dr.jpeg"
-      />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          {contactMethods.map((method, index) => (
-            <a
-              key={index}
-              href={method.link}
-              target={method.link.startsWith('http') ? '_blank' : '_self'}
-              rel={method.link.startsWith('http') ? 'noopener noreferrer' : ''}
-              className="bg-white border border-gray-200 p-6 rounded-2xl hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer"
-            >
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                <i className={`${method.icon} text-2xl text-blue-700`}></i>
-              </div>
-              <h3 className="font-bold text-gray-900 mb-2">{method.title}</h3>
-              <p className="text-blue-700 font-medium mb-1">{method.value}</p>
-              <p className="text-sm text-gray-500">{method.description}</p>
-            </a>
-          ))}
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 md:pt-16 pb-7 md:pb-8 flex flex-wrap items-end justify-between gap-6">
+        <div className="flex flex-col gap-2.5">
+          <h1 className="font-serif text-[40px] md:text-[56px] leading-[0.95] tracking-[-0.02em]">
+            We&apos;re here to <em>help</em>
+          </h1>
+          <p className="text-[15px] leading-relaxed text-[#6B565B] max-w-[480px]">{heroContent} WhatsApp is usually fastest.</p>
         </div>
+        {hours && (
+          <span className="inline-flex items-center gap-2 h-9 px-3.5 rounded-full bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.12)] text-[13px] text-[#4D3A3F]">
+            <span className="w-2 h-2 rounded-full bg-[#2F6B3A]" aria-hidden="true" />
+            {hours}
+          </span>
+        )}
+      </section>
 
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pb-14 md:pb-[72px] grid md:grid-cols-[1.3fr_1fr_1fr] gap-3 md:gap-4">
+        <a href={waLink} target="_blank" rel="noopener noreferrer" className="group flex flex-col justify-between gap-10 min-h-[220px] md:min-h-[260px] p-6 md:p-7 rounded-[24px] bg-[#2B0B12] text-[#F6EDE3]">
+          <span className="flex items-start justify-between">
+            <span className="w-12 h-12 rounded-full bg-[#D9A441] text-[#2B0B12] inline-flex items-center justify-center"><i className="ri-whatsapp-line text-2xl" aria-hidden="true" /></span>
+            <span className="text-xs font-semibold px-2.5 py-1.5 rounded-full bg-[#F6EDE3]/10">Fastest reply</span>
+          </span>
+          <span className="flex flex-col gap-1.5">
+            <span className="font-serif text-[26px] md:text-[30px] leading-none">Chat on WhatsApp</span>
+            <span className="text-sm text-[#E3CFC7] tabular-nums">{contactWhatsapp} · send a photo of a scent you like</span>
+          </span>
+        </a>
+        <div className="flex flex-col justify-between gap-10 min-h-[200px] md:min-h-[260px] p-6 md:p-7 rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+          <span className="w-12 h-12 rounded-full bg-[#F1E8DC] inline-flex items-center justify-center"><i className="ri-phone-line text-xl" aria-hidden="true" /></span>
+          <span className="flex flex-col gap-1.5">
+            <a href={telLink} className="font-serif text-[24px] md:text-[26px] leading-none hover:text-[#7A1F2E]">Call us</a>
+            <a href={telLink} className="text-sm text-[#6B565B] tabular-nums">{contactPhone}</a>
+            <a href={`mailto:${contactEmail}`} className="text-sm text-[#6B565B] underline underline-offset-2">{contactEmail}</a>
+          </span>
+        </div>
+        <a href={`https://www.google.com/maps?q=${MAP_QUERY}`} target="_blank" rel="noopener noreferrer" className="relative flex flex-col justify-end min-h-[200px] md:min-h-[260px] p-6 md:p-7 rounded-[24px] overflow-hidden bg-[#4A1520] text-[#F6EDE3]">
+          <Image src="/Whisk_64e2698834d1476801a4b505b30c324bdr.jpeg" alt="" fill sizes="(max-width: 768px) 100vw, 30vw" className="object-cover opacity-45" />
+          <span className="relative flex flex-col gap-1.5">
+            <span className="font-serif text-[24px] md:text-[26px] leading-none">Visit the store</span>
+            <span className="text-sm text-[#F6EDE3]">{contactAddress}</span>
+          </span>
+        </a>
+      </section>
 
-        <div className="grid lg:grid-cols-2 gap-12">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Send Us a Message</h2>
-            <p className="text-gray-600 mb-8">
-              Fill out the form below and our team will get back to you as soon as possible.
-            </p>
-
-            <form id="contactForm" onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="John Doe"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="you@example.com"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="+233 XX XXX XXXX"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                  Subject *
-                </label>
-                <input
-                  type="text"
-                  id="subject"
-                  name="subject"
-                  required
-                  value={formData.subject}
-                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="Order inquiry, product question, etc."
-                />
-              </div>
-
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                  Message *
-                </label>
-                <textarea
-                  id="message"
-                  name="message"
-                  required
-                  rows={6}
-                  maxLength={500}
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
-                  placeholder="Tell us how we can help you..."
-                ></textarea>
-                <p className="text-xs text-gray-500 mt-1">{formData.message.length}/500 characters</p>
-              </div>
-
-              {submitStatus === 'success' && (
-                <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl">
-                  <i className="ri-check-line mr-2"></i>
-                  Message sent successfully! We’ll get back to you shortly.
-                </div>
-              )}
-
-              {submitStatus === 'error' && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
-                  <i className="ri-error-warning-line mr-2"></i>
-                  We could not send your message right now. Please try again or contact us directly.
-                </div>
-              )}
-
+      <section className="bg-[#FBF6EF] border-t border-[#1F1115]/8">
+        <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 py-14 md:py-20 grid md:grid-cols-2 gap-12 md:gap-14 items-start">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <h2 className="font-serif text-[30px] md:text-[34px] leading-none mb-1">Or leave a <em>message</em></h2>
+            <div role="group" aria-label="What is it about?" className="flex flex-wrap gap-2">
+              {topics.map((t) => {
+                const on = formData.subject === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setFormData({ ...formData, subject: t })}
+                    className={`h-10 px-4 rounded-full text-sm font-semibold transition-colors ${on ? 'bg-[#2B0B12] text-[#F6EDE3]' : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:bg-white'}`}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5"><span className={label}>Your name</span><input type="text" name="name" required autoComplete="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={field} /></label>
+              <label className="flex flex-col gap-1.5"><span className={label}>Phone or WhatsApp</span><input type="tel" name="phone" autoComplete="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className={field} /></label>
+            </div>
+            <label className="flex flex-col gap-1.5"><span className={label}>Email</span><input type="email" name="email" required autoComplete="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className={field} /></label>
+            {formData.subject && !topics.includes(formData.subject) && (
+              <label className="flex flex-col gap-1.5"><span className={label}>Subject</span><input type="text" name="subject" value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })} className={field} /></label>
+            )}
+            <label className="flex flex-col gap-1.5"><span className={label}>Message</span><textarea name="message" required rows={5} placeholder="Tell us what you're looking for" value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} className={`${field} h-auto py-3.5 resize-y`} /></label>
+            {submitStatus === 'success' && <p role="status" className="rounded-2xl bg-[#DDE7D6] text-[#244A2C] px-4 py-3 text-sm">Thank you. We got your message and will reply by phone, WhatsApp or email.</p>}
+            {submitStatus === 'error' && <p role="alert" className="rounded-2xl bg-[#F6DCD7] text-[#7A1F2E] px-4 py-3 text-sm">Your message didn&apos;t send. Please try again, or WhatsApp us.</p>}
+            <div className="flex flex-wrap items-center gap-4">
               <button
                 type="submit"
-                disabled={isSubmitting || verifying}
-                className="w-full bg-blue-700 text-white py-4 rounded-xl font-medium hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
+                disabled={isSubmitting || verifying || !formData.subject}
+                className="h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold disabled:opacity-50"
               >
-                {isSubmitting || verifying ? (verifying ? 'Verifying...' : 'Sending...') : 'Send Message'}
+                {verifying ? 'Checking…' : isSubmitting ? 'Sending…' : 'Send message'}
               </button>
-            </form>
-          </div>
+              <span className="text-[13px] text-[#6B565B]">{formData.subject ? 'We usually reply the same day.' : 'Choose what it is about first.'}</span>
+            </div>
+          </form>
 
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Quick Answers</h2>
-            <p className="text-gray-600 mb-8">
-              Quick answers for orders, delivery, wholesale, and payments
-            </p>
-
-            <div className="space-y-4 mb-12">
-              {faqs.map((faq, index) => (
-                <details key={index} className="bg-gray-50 rounded-xl overflow-hidden">
-                  <summary className="px-6 py-4 font-medium text-gray-900 cursor-pointer hover:bg-gray-100 transition-colors">
+          <div className="flex flex-col gap-3.5">
+            <h2 className="font-serif text-[30px] md:text-[34px] leading-none mb-1">Quick <em>answers</em></h2>
+            <div className="border-t border-[#1F1115]/14">
+              {faqs.map((faq) => (
+                <details key={faq.question} className="group border-b border-[#1F1115]/14">
+                  <summary className="flex items-center justify-between gap-4 min-h-[58px] cursor-pointer list-none [&::-webkit-details-marker]:hidden text-[15px] font-semibold">
                     {faq.question}
+                    <i className="ri-add-line text-lg text-[#7A1F2E] transition-transform group-open:rotate-45 motion-reduce:transition-none" aria-hidden="true" />
                   </summary>
-                  <div className="px-6 pb-4 text-gray-600 leading-relaxed">
-                    {faq.answer}
-                  </div>
+                  <p className="pb-4 text-sm leading-relaxed text-[#4D3A3F]">{faq.answer}</p>
                 </details>
               ))}
             </div>
-
-            <div className="bg-gradient-to-br from-blue-700 to-blue-900 p-8 rounded-2xl text-white">
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-4">
-                <i className="ri-customer-service-2-line text-2xl"></i>
-              </div>
-              <h3 className="text-2xl font-bold mb-3">Need Immediate Help?</h3>
-              <p className="text-blue-100 mb-6 leading-relaxed">
-                Our House of Elle support team is available Mon-Sat, 9am-6pm. For urgent enquiries, reach us directly on WhatsApp.
-              </p>
-              <a
-                href={waLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-white text-blue-700 px-6 py-3 rounded-full font-medium hover:bg-blue-50 transition-colors whitespace-nowrap"
-              >
-                <i className="ri-whatsapp-line text-xl"></i>
-                Chat on WhatsApp
-              </a>
-            </div>
+            <Link href="/order-tracking" className="self-start mt-2 inline-flex items-center gap-2 h-[46px] px-5 rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.22)] text-sm font-semibold">
+              Track an order
+              <i className="ri-arrow-right-line" aria-hidden="true" />
+            </Link>
           </div>
         </div>
-      </div>
-
-      <div className="bg-gray-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Visit Our Store</h2>
-            <p className="text-gray-600 mb-6 leading-relaxed">
-              Prefer to shop in person? Visit House of Elle at Spintex Lashibi, Shalom Spot Junction, Accra, Ghana. Come and try our perfumes, body mists and candles in person, or ask us about wholesale.
-            </p>
-            <div className="flex flex-wrap justify-center gap-4 text-gray-600">
-              <div className="flex items-center gap-2">
-                <i className="ri-map-pin-2-line text-blue-700"></i>
-                <span>{contactAddress}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <i className="ri-time-line text-blue-700"></i>
-                <span>Mon-Sat: 9am-6pm</span>
-              </div>
-            </div>
-            <div className="mt-8 rounded-2xl overflow-hidden border border-brand-gold/20 shadow-md">
-              <iframe
-                title="House of Elle Location - Spintex Lashibi, Accra"
-                src={`https://www.google.com/maps?q=${MAP_QUERY}&output=embed`}
-                width="100%"
-                height="320"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                className="w-full"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

@@ -41,7 +41,7 @@ export default async function CategoriesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#F1E8DC]">
       <PageHero
         eyebrow="Fragrance Families"
         title="Shop by Category"

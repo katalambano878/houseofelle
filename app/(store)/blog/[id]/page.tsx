@@ -154,7 +154,7 @@ export default function BlogPostPage() {
     .filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#F1E8DC]">
       <div className="relative h-80 sm:h-96 bg-gray-900">
         {post.featured_image && (
           <img src={post.featured_image} alt={post.title} className="w-full h-full object-cover opacity-50" />

@@ -108,7 +108,7 @@ export default function SalePage() {
   const live = Boolean(promo?.live && products.length);
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-[#F1E8DC]">
       <section className="relative overflow-hidden bg-blue-800 text-white">
         <svg
           className="pointer-events-none absolute -right-24 -top-24 w-[28rem] h-[28rem] text-blue-500/20"

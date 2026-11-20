@@ -9,16 +9,16 @@ module.exports = {
       white: '#ffffff',
       // Map existing blue-* utility usage to the new brand system.
       blue: {
-        50: '#F5EDE4',   // warm ivory
-        100: '#F1E2D2',
-        200: '#E8CFAA',
-        300: '#D8A48F',  // soft nude
-        400: '#CFA772',
-        500: '#C89B3C',  // royal gold
-        600: '#A47B30',
-        700: '#6B4F3A',  // muted brown
-        800: '#2A2623',
-        900: '#0A0A0A',  // deep black
+        50: '#F1E8DC',   // sand
+        100: '#F6EDE3',  // cream
+        200: '#EED6CF',
+        300: '#E8C5BE',  // rose
+        400: '#E5B65A',
+        500: '#D9A441',  // saffron
+        600: '#B8862C',
+        700: '#7A1F2E',  // wine accent
+        800: '#4A1520',  // oxblood
+        900: '#2B0B12',  // wine
       },
       gray: {
         50: '#f9fafb',
@@ -83,24 +83,33 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        sans: ['Montserrat', 'sans-serif'],
-        serif: ['"Playfair Display"', 'serif'],
+        sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
+        serif: ['"Bodoni Moda"', 'Didot', 'Georgia', 'serif'],
         handwriting: ['Pacifico', 'cursive'],
         accent: ['"Great Vibes"', 'cursive'],
       },
       colors: {
         brand: {
-          gold: '#C89B3C',
-          black: '#0A0A0A',
-          ivory: '#F5EDE4',
-          champagne: '#F8CFA4',
-          nude: '#D8A48F',
-          brown: '#6B4F3A',
-          DEFAULT: '#C89B3C',
-          light: '#F8CFA4',
-          dark: '#6B4F3A',
-          accent: '#D8A48F',
-          muted: '#F5EDE4',
+          gold: '#D9A441',
+          black: '#2B0B12',
+          ivory: '#F1E8DC',
+          champagne: '#E8C5BE',
+          nude: '#E8C5BE',
+          brown: '#4A1520',
+          DEFAULT: '#D9A441',
+          light: '#E8C5BE',
+          dark: '#4A1520',
+          accent: '#E8C5BE',
+          muted: '#F1E8DC',
+          wine: '#2B0B12',
+          oxblood: '#4A1520',
+          sand: '#F1E8DC',
+          paper: '#FBF6EF',
+          cream: '#F6EDE3',
+          saffron: '#D9A441',
+          rose: '#E8C5BE',
+          ink: '#1F1115',
+          muted2: '#6B565B',
         },
       },
     },

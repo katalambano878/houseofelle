@@ -9,7 +9,7 @@ function ConfirmationContent() {
   const orderNumber = (searchParams.get('order') || '').slice(0, 40);
 
   return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center py-12">
+    <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center py-12">
       <div className="max-w-2xl mx-auto px-4">
         <div className="bg-white rounded-xl shadow-lg p-8 text-center">
           <div className="w-20 h-20 flex items-center justify-center bg-blue-100 rounded-full mx-auto mb-6">
@@ -85,7 +85,7 @@ export default function ReturnConfirmationPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center">
           <i className="ri-loader-4-line animate-spin text-4xl text-blue-700"></i>
         </main>
       }

@@ -8,13 +8,13 @@ function FooterSection({ title, children }: { title: string, children: React.Rea
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="border-b border-[#F5EDE4]/10 lg:border-none last:border-0">
+    <div className="border-b border-[#F6EDE3]/10 lg:border-none last:border-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between py-4 text-left lg:py-0 lg:cursor-default lg:mb-6"
       >
         <h4 className="font-bold text-lg text-white">{title}</h4>
-        <i className={`ri-arrow-down-s-line text-[#E2BE72] text-xl transition-transform duration-300 lg:hidden ${isOpen ? 'rotate-180' : ''}`}></i>
+        <i className={`ri-arrow-down-s-line text-[#E5B65A] text-xl transition-transform duration-300 lg:hidden ${isOpen ? 'rotate-180' : ''}`}></i>
       </button>
       <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-96 pb-6' : 'max-h-0 lg:max-h-full lg:overflow-visible'}`}>
         {children}
@@ -40,105 +40,80 @@ export default function Footer() {
   const socialSnapchat = getSetting('social_snapchat') || '';
   const socialYoutube = getSetting('social_youtube') || '';
 
+  const [first, ...rest] = siteTagline.replace(/\.$/, '').split(' ');
+  const socials = [
+    { link: socialInstagram, icon: 'ri-instagram-line', label: 'Instagram' },
+    { link: socialTiktok, icon: 'ri-tiktok-fill', label: 'TikTok' },
+    { link: socialSnapchat, icon: 'ri-snapchat-fill', label: 'Snapchat' },
+    { link: socialYoutube, icon: 'ri-youtube-fill', label: 'YouTube' },
+    { link: socialTwitter, icon: 'ri-twitter-x-fill', label: 'X' },
+    { link: socialFacebook, icon: 'ri-facebook-fill', label: 'Facebook' },
+  ].filter((x) => x.link);
+  const col = 'flex flex-col gap-3.5 text-[15px] text-[#E3CFC7]';
+  const head = 'font-serif italic text-lg text-[#E5B65A] mb-1';
+  const lnk = 'hover:text-[#F6EDE3] transition-colors';
+
   return (
-    <footer className="relative z-0">
-
-      <div className="absolute inset-0 bg-[#14100D] -z-10" aria-hidden="true" />
-
-      <div className="text-white pt-16 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
-
-            {/* Brand Column */}
-            <div className="lg:col-span-1 space-y-6">
-              <Link href="/" className="inline-block group">
-                <img src={siteLogo} alt={siteName} className="h-24 w-auto object-contain drop-shadow-lg group-hover:scale-105 transition-transform duration-300" />
-              </Link>
-              <p className="text-brand-ivory/80 leading-relaxed text-sm">
-                {(() => {
-                  // The tagline's first word quietly opens the admin sign-in for the owner.
-                  const [first, ...rest] = siteTagline.split(' ');
-                  return (
-                    <>
-                      <Link href="/admin/login" className="text-inherit no-underline hover:text-inherit focus-visible:outline-none" aria-label="Staff sign in" prefetch={false}>{first}</Link>
-                      {rest.length ? ` ${rest.join(' ')}` : ''}
-                    </>
-                  );
-                })()} {contactAddress}. Call {contactPhone} · WhatsApp {contactWhatsapp}
-              </p>
-
-              <div className="flex gap-3 pt-2">
-                {[
-                  { link: socialInstagram, icon: 'ri-instagram-line' },
-                  { link: socialTiktok, icon: 'ri-tiktok-fill' },
-                  { link: socialSnapchat, icon: 'ri-snapchat-fill' },
-                  { link: socialYoutube, icon: 'ri-youtube-fill' },
-                  { link: socialTwitter, icon: 'ri-twitter-x-fill' },
-                  { link: socialFacebook, icon: 'ri-facebook-fill' }
-                ].map((social, i) => social.link && (
-                  <a
-                    key={i}
-                    href={social.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-black/20 border border-brand-gold/50 rounded-full flex items-center justify-center text-brand-gold hover:bg-brand-gold hover:text-brand-black hover:border-brand-gold transition-all hover:-translate-y-1"
-                  >
-                    <i className={social.icon}></i>
+    <footer className="relative z-0 bg-[#2B0B12] text-[#F6EDE3] overflow-hidden">
+      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-16 md:pt-24">
+        <div className="grid grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr] gap-x-8 gap-y-12">
+          <div className="col-span-2 lg:col-span-1 flex flex-col gap-6">
+            <p className="font-serif text-[28px] leading-[1.1] max-w-[440px]">
+              {/* The tagline's first word quietly opens the admin sign-in for the owner. */}
+              <Link href="/admin/login" className="text-inherit no-underline hover:text-inherit" aria-label="Staff sign in" prefetch={false}>{first}</Link>
+              {rest.length > 1 ? (
+                <>
+                  {' '}{rest.slice(0, -1).join(' ')} <em className="text-[#E5B65A]">{rest[rest.length - 1]}.</em>
+                </>
+              ) : rest.length ? ` ${rest.join(' ')}.` : ''}
+            </p>
+            {socials.length > 0 && (
+              <div className="flex gap-2.5">
+                {socials.map((s2) => (
+                  <a key={s2.icon} href={s2.link} target="_blank" rel="noopener noreferrer" aria-label={s2.label} className="w-11 h-11 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(246,237,227,0.25)] hover:bg-[#D9A441] hover:text-[#2B0B12] hover:shadow-none transition-colors">
+                    <i className={`${s2.icon} text-lg`} aria-hidden="true"></i>
                   </a>
                 ))}
               </div>
-            </div>
-
-            {/* Links Sections */}
-            <div className="lg:col-span-3 grid md:grid-cols-3 gap-8 lg:gap-12 pl-0 lg:pl-12">
-
-              <div className="space-y-6">
-                <h4 className="font-serif text-xl font-bold text-brand-ivory">Shop</h4>
-                <ul className="space-y-3 text-brand-ivory/75 text-sm">
-                  <li><Link href="/shop" className="hover:text-brand-gold transition-colors">All Products</Link></li>
-                  <li><Link href="/categories" className="hover:text-brand-gold transition-colors">Collections</Link></li>
-                  <li><Link href="/shop?sort=new" className="hover:text-brand-gold transition-colors">New Arrivals</Link></li>
-                  <li><Link href="/shop?sort=popular" className="hover:text-brand-gold transition-colors">Most Popular</Link></li>
-                </ul>
-              </div>
-
-              <div className="space-y-6">
-                <h4 className="font-serif text-xl font-bold text-brand-ivory">Support</h4>
-                <ul className="space-y-3 text-brand-ivory/75 text-sm">
-                  <li><Link href="/contact" className="hover:text-brand-gold transition-colors">Contact Us</Link></li>
-                  <li><Link href="/order-tracking" className="hover:text-brand-gold transition-colors">Track Order</Link></li>
-                  <li><Link href="/shipping" className="hover:text-brand-gold transition-colors">Shipping & Delivery</Link></li>
-                  <li><Link href="/returns" className="hover:text-brand-gold transition-colors">Returns & Exchange</Link></li>
-                </ul>
-              </div>
-
-              <div className="space-y-6">
-                <h4 className="font-serif text-xl font-bold text-brand-ivory">Company</h4>
-                <ul className="space-y-3 text-brand-ivory/75 text-sm">
-                  <li><Link href="/about" className="hover:text-brand-gold transition-colors">Our Story</Link></li>
-                  <li><Link href="/privacy" className="hover:text-brand-gold transition-colors">Privacy Policy</Link></li>
-                  <li><Link href="/terms" className="hover:text-brand-gold transition-colors">Terms of Service</Link></li>
-                </ul>
-              </div>
-
-            </div>
+            )}
           </div>
-
-          <div className="border-t border-brand-gold/30 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-brand-ivory/60">
-            <p>&copy; {new Date().getFullYear()} {siteName}. All rights reserved.</p>
-            <p>
-              Powered by{" "}
-              <a href="https://doctorbarns.com" target="_blank" rel="noopener" className="text-brand-ivory/60 hover:underline">
-                Doctor Barns Tech
-              </a>
-            </p>
-            <p className="flex items-center gap-2 text-brand-gold/80">
-              <i className="ri-smartphone-line text-lg" aria-hidden="true"></i>
-              Secure Mobile Money payments
-            </p>
+          <div className={col}>
+            <span className={head}>Shop</span>
+            <Link href="/shop" className={lnk}>All fragrances</Link>
+            <Link href="/categories" className={lnk}>Collections</Link>
+            <Link href="/shop?sort=new" className={lnk}>New in</Link>
+            <Link href="/sale" className={lnk}>Sale</Link>
+          </div>
+          <div className={col}>
+            <span className={head}>Help</span>
+            <Link href="/order-tracking" className={lnk}>Track an order</Link>
+            <Link href="/shipping" className={lnk}>Delivery</Link>
+            <Link href="/returns" className={lnk}>Returns</Link>
+            <Link href="/faqs" className={lnk}>FAQs</Link>
+            <Link href="/contact" className={lnk}>Contact us</Link>
+          </div>
+          <div className={`${col} col-span-2 sm:col-span-1 leading-relaxed`}>
+            <span className={head}>Visit</span>
+            <span>{contactAddress}</span>
+            <a href={`tel:${contactPhone.replace(/\s/g, '')}`} className={`${lnk} tabular-nums`}>{contactPhone}</a>
+            <a href={`mailto:${contactEmail}`} className={lnk}>{contactEmail}</a>
+            <Link href="/about" className={lnk}>Our story</Link>
           </div>
         </div>
+
+        <div className="mt-14 md:mt-20 py-5 border-t border-[#F6EDE3]/15 flex flex-col md:flex-row justify-between gap-3 text-[13px] text-[#CDB5AD]">
+          <p>
+            &copy; {new Date().getFullYear()} {siteName} · <Link href="/privacy" className={lnk}>Privacy</Link> · <Link href="/terms" className={lnk}>Terms</Link>
+          </p>
+          <p>
+            Pay with MTN, Telecel or AT Mobile Money · Site by{' '}
+            <a href="https://doctorbarns.com" target="_blank" rel="noopener" className={`${lnk} underline underline-offset-2`}>Doctor Barns Tech</a>
+          </p>
+        </div>
       </div>
+      <p aria-hidden="true" className="font-serif text-center whitespace-nowrap leading-[0.78] tracking-[-0.04em] text-[#4A1520] text-[19vw] lg:text-[130px] translate-y-[14%] px-4 select-none">
+        {siteName.replace(/ Elle$/, '')} <em>Elle</em>
+      </p>
     </footer>
   );
 }

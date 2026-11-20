@@ -81,7 +81,7 @@ export default function CartPage() {
   const total = subtotal - couponDiscount + shipping;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F1E8DC]">
       <PageHero title="Shopping Cart" backgroundImage="/Whisk_a4071984faa45f6b45b4ac8f2119754ddr.jpeg" />
       <div className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 

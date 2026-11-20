@@ -100,7 +100,7 @@ function InvoiceContent() {
   const tax = asNumber(order.tax_total);
 
   return (
-    <main className="min-h-screen bg-white text-gray-900 py-8 px-4 print:py-0">
+    <main className="min-h-screen bg-[#F1E8DC] text-gray-900 py-8 px-4 print:py-0">
       <style>{PRINT_CSS}</style>
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-8 print:hidden">

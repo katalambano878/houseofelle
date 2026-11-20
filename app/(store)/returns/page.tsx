@@ -175,7 +175,7 @@ export default function ReturnsPortalPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12">
+    <main className="min-h-screen bg-[#F1E8DC] py-12">
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Returns</h1>
         <p className="text-gray-600 mb-8">Report a problem with an item from your order</p>

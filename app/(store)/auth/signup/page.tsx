@@ -162,7 +162,7 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6">
+      <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center py-12 px-4 sm:px-6">
         <div className="max-w-md w-full text-center">
           <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <i className="ri-mail-send-line text-4xl text-blue-600"></i>
@@ -181,7 +181,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6">
+    <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center py-12 px-4 sm:px-6">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Create Account</h1>

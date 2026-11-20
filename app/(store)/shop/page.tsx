@@ -51,6 +51,9 @@ function ShopContent() {
     const sortAliases: Record<string, string> = { newest: 'new', bestsellers: 'popular' };
     setSortBy(sort ? sortAliases[sort] || sort : 'popular');
     setSearchInput(search || '');
+    // ?max= caps the price (used by the home page scent finder).
+    const max = Number(searchParams.get('max'));
+    setPriceRange([0, max > 0 && max < 5000 ? max : 5000]);
     setPage(1);
     // Search is handled in the fetch function via searchParams directly or we could add a state for it
   }, [searchParams]);
@@ -240,11 +243,11 @@ function ShopContent() {
 
   const chip = (on: boolean) =>
     `flex-none inline-flex items-center gap-2 h-10 px-4 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors ${
-      on ? 'bg-[#14100D] text-[#F5EDE4]' : 'shadow-[inset_0_0_0_1px_rgba(34,27,22,0.16)] hover:bg-white/70'
+      on ? 'bg-[#2B0B12] text-[#F6EDE3]' : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] hover:bg-white/70'
     }`;
   const rowBtn = (on: boolean) =>
     `w-full flex items-center justify-between gap-3 min-h-11 px-4 rounded-2xl text-left text-[15px] transition-colors ${
-      on ? 'bg-[#14100D] text-[#F5EDE4] font-semibold' : 'hover:bg-white/70'
+      on ? 'bg-[#2B0B12] text-[#F6EDE3] font-semibold' : 'hover:bg-white/70'
     }`;
 
   const filters = (
@@ -263,7 +266,7 @@ function ShopContent() {
                   {subs.length > 0 && <i className={`ri-arrow-down-s-line transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />}
                 </button>
                 {open && subs.length > 0 && (
-                  <div className="ml-4 pl-3 border-l border-[#221B16]/15 flex flex-col gap-1">
+                  <div className="ml-4 pl-3 border-l border-[#1F1115]/15 flex flex-col gap-1">
                     {subs.map((child) => (
                       <button key={child.id} type="button" onClick={() => { pickCategory(child.slug); setIsFilterOpen(false); }} className={`${rowBtn(selectedCategory === child.slug)} text-sm min-h-10`}>
                         {child.name}
@@ -277,9 +280,9 @@ function ShopContent() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 pt-7 border-t border-[#221B16]/12">
+      <div className="flex flex-col gap-3 pt-7 border-t border-[#1F1115]/12">
         <h3 className="font-serif text-[22px]">Price</h3>
-        <p className="text-sm text-[#5E5148]">Up to <span className="font-semibold text-[#221B16] tabular-nums">{priceRange[1] >= 5000 ? 'any price' : `GH₵${priceRange[1].toLocaleString()}`}</span></p>
+        <p className="text-sm text-[#6B565B]">Up to <span className="font-semibold text-[#1F1115] tabular-nums">{priceRange[1] >= 5000 ? 'any price' : `GH₵${priceRange[1].toLocaleString()}`}</span></p>
         <input
           type="range"
           min="0"
@@ -291,12 +294,12 @@ function ShopContent() {
             setPriceRange([0, parseInt(e.target.value)]);
             setPage(1);
           }}
-          className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#221B16]/15 accent-[#14100D]"
+          className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#1F1115]/15 accent-[#2B0B12]"
         />
-        <div className="flex justify-between text-xs text-[#5E5148] tabular-nums"><span>GH₵0</span><span>GH₵5,000+</span></div>
+        <div className="flex justify-between text-xs text-[#6B565B] tabular-nums"><span>GH₵0</span><span>GH₵5,000+</span></div>
       </div>
 
-      <div className="flex flex-col gap-3 pt-7 border-t border-[#221B16]/12">
+      <div className="flex flex-col gap-3 pt-7 border-t border-[#1F1115]/12">
         <h3 className="font-serif text-[22px]">Rating</h3>
         <div className="flex flex-col gap-1">
           {[4, 3].map((rating) => (
@@ -312,7 +315,7 @@ function ShopContent() {
             >
               <span className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((star) => (
-                  <i key={star} className={`${star <= rating ? 'ri-star-fill text-[#C89B3C]' : 'ri-star-line opacity-40'} text-sm`} aria-hidden="true" />
+                  <i key={star} className={`${star <= rating ? 'ri-star-fill text-[#D9A441]' : 'ri-star-line opacity-40'} text-sm`} aria-hidden="true" />
                 ))}
                 <span className="ml-1.5 text-sm">{rating} and up</span>
               </span>
@@ -324,29 +327,29 @@ function ShopContent() {
   );
 
   return (
-    <main className="min-h-screen bg-[#F5EDE4] text-[#221B16]">
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
       <section className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-8 md:pt-14 flex flex-col gap-6 md:gap-8">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
           <div className="flex flex-col gap-2">
-            <h1 className="font-serif text-[44px] md:text-[80px] leading-none tracking-[-0.02em] break-words">
+            <h1 className="font-serif text-[38px] md:text-[56px] leading-[0.95] tracking-[-0.02em] break-words">
               {search || current ? title : <>All <em>fragrances</em></>}
             </h1>
-            <p className="text-sm text-[#5E5148] tabular-nums" aria-live="polite">
+            <p className="text-sm text-[#6B565B] tabular-nums" aria-live="polite">
               {loading ? 'Finding scents…' : `${totalProducts} ${totalProducts === 1 ? 'product' : 'products'}`}
             </p>
           </div>
           <form onSubmit={submitSearch} role="search" className="w-full lg:w-[420px]">
-            <label className="flex items-center gap-3 h-[52px] pl-5 pr-2 rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(34,27,22,0.14)] focus-within:shadow-[inset_0_0_0_1.5px_#14100D]">
-              <i className="ri-search-line text-lg text-[#5E5148]" aria-hidden="true" />
+            <label className="flex items-center gap-3 h-[52px] pl-5 pr-2 rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(31,17,21,0.14)] focus-within:shadow-[inset_0_0_0_1.5px_#2B0B12]">
+              <i className="ri-search-line text-lg text-[#6B565B]" aria-hidden="true" />
               <input
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search scents, brands, notes"
                 aria-label="Search products"
-                className="flex-1 min-w-0 bg-transparent text-base outline-none placeholder:text-[#7A6B5F]"
+                className="flex-1 min-w-0 bg-transparent text-base outline-none placeholder:text-[#6B565B]"
               />
-              <button type="submit" className="h-10 px-4 rounded-full bg-[#14100D] text-[#F5EDE4] text-sm font-semibold">Search</button>
+              <button type="submit" className="h-10 px-4 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-sm font-semibold">Search</button>
             </label>
           </form>
         </div>
@@ -355,19 +358,19 @@ function ShopContent() {
           <Link href="/shop" className={chip(!search)}>All scents</Link>
           {SCENT_FAMILIES.map((f) => (
             <Link key={f.name} href={`/shop?search=${encodeURIComponent(f.keyword)}`} className={chip(search.toLowerCase() === f.keyword)}>
-              <span className="w-4 h-4 rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.15)]" style={{ backgroundColor: f.swatch }} aria-hidden="true" />
+              <span className="w-4 h-4 rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.15)]" style={{ backgroundColor: f.swatch }} aria-hidden="true" />
               {f.name}
             </Link>
           ))}
         </div>
       </section>
 
-      <div className="lg:hidden sticky top-[72px] z-20 bg-[#F5EDE4]/95 backdrop-blur-md mt-4">
+      <div className="lg:hidden sticky top-[72px] z-20 bg-[#F1E8DC]/95 backdrop-blur-md mt-4">
         <div className="flex gap-2.5 px-5 py-3">
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-[#FBF7F2] shadow-[inset_0_0_0_1px_rgba(34,27,22,0.14)] text-sm font-semibold"
+            className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.14)] text-sm font-semibold"
           >
             <i className="ri-equalizer-line text-base" aria-hidden="true" />
             Filters{selectedCategory !== 'all' || filtersOn ? ` · ${filtersOn + (selectedCategory !== 'all' ? 1 : 0)}` : ''}
@@ -380,7 +383,7 @@ function ShopContent() {
                 setSortBy(e.target.value);
                 setPage(1);
               }}
-              className="w-full h-12 pl-4 pr-9 rounded-2xl appearance-none bg-[#FBF7F2] shadow-[inset_0_0_0_1px_rgba(34,27,22,0.14)] text-sm font-semibold text-center"
+              className="w-full h-12 pl-4 pr-9 rounded-2xl appearance-none bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.14)] text-sm font-semibold text-center"
             >
               {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
@@ -391,18 +394,18 @@ function ShopContent() {
 
       {isFilterOpen && (
         <div className="lg:hidden fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Filters">
-          <div className="absolute inset-0 bg-[#14100D]/50" onClick={() => setIsFilterOpen(false)} aria-hidden="true" />
-          <div className="absolute inset-x-0 bottom-0 max-h-[88dvh] flex flex-col rounded-t-[28px] bg-[#F5EDE4] animate-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between px-5 h-16 border-b border-[#221B16]/10">
+          <div className="absolute inset-0 bg-[#2B0B12]/50" onClick={() => setIsFilterOpen(false)} aria-hidden="true" />
+          <div className="absolute inset-x-0 bottom-0 max-h-[88dvh] flex flex-col rounded-t-[28px] bg-[#F1E8DC] animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between px-5 h-16 border-b border-[#1F1115]/10">
               <h2 className="font-serif text-2xl">Filters</h2>
               <button type="button" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" className="w-11 h-11 -mr-2 inline-flex items-center justify-center rounded-full">
                 <i className="ri-close-line text-2xl" aria-hidden="true" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-6">{filters}</div>
-            <div className="flex gap-3 px-5 pt-3 pb-[max(16px,env(safe-area-inset-bottom))] border-t border-[#221B16]/10">
-              <button type="button" onClick={clearAll} className="h-14 px-6 rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.25)] font-semibold">Clear</button>
-              <button type="button" onClick={() => setIsFilterOpen(false)} className="flex-1 h-14 rounded-full bg-[#14100D] text-[#F5EDE4] font-semibold tabular-nums">
+            <div className="flex gap-3 px-5 pt-3 pb-[max(16px,env(safe-area-inset-bottom))] border-t border-[#1F1115]/10">
+              <button type="button" onClick={clearAll} className="h-14 px-6 rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.25)] font-semibold">Clear</button>
+              <button type="button" onClick={() => setIsFilterOpen(false)} className="flex-1 h-14 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold tabular-nums">
                 Show {totalProducts} {totalProducts === 1 ? 'product' : 'products'}
               </button>
             </div>
@@ -417,12 +420,12 @@ function ShopContent() {
           </aside>
 
           <div className="flex-1 min-w-0">
-            <div className="hidden lg:flex items-center justify-between gap-4 mb-8 pb-5 border-b border-[#221B16]/12">
-              <p className="text-sm text-[#5E5148] tabular-nums">
-                Showing <span className="font-semibold text-[#221B16]">{products.length}</span> of <span className="font-semibold text-[#221B16]">{totalProducts}</span>
+            <div className="hidden lg:flex items-center justify-between gap-4 mb-8 pb-5 border-b border-[#1F1115]/12">
+              <p className="text-sm text-[#6B565B] tabular-nums">
+                Showing <span className="font-semibold text-[#1F1115]">{products.length}</span> of <span className="font-semibold text-[#1F1115]">{totalProducts}</span>
               </p>
               <label className="flex items-center gap-3 text-sm">
-                <span className="text-[#5E5148]">Sort by</span>
+                <span className="text-[#6B565B]">Sort by</span>
                 <span className="relative">
                   <select
                     value={sortBy}
@@ -430,7 +433,7 @@ function ShopContent() {
                       setSortBy(e.target.value);
                       setPage(1);
                     }}
-                    className="h-11 pl-4 pr-10 rounded-full appearance-none bg-white shadow-[inset_0_0_0_1px_rgba(34,27,22,0.16)] font-semibold cursor-pointer"
+                    className="h-11 pl-4 pr-10 rounded-full appearance-none bg-white shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] font-semibold cursor-pointer"
                   >
                     {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
@@ -448,10 +451,10 @@ function ShopContent() {
                 {products.map((product) => <ProductCard key={product.id} {...product} />)}
               </div>
             ) : (
-              <div className="flex flex-col items-center text-center gap-4 py-20 md:py-28 rounded-[28px] bg-[#FBF7F2]">
+              <div className="flex flex-col items-center text-center gap-4 py-20 md:py-28 rounded-[28px] bg-[#FBF6EF]">
                 <p className="font-serif text-3xl md:text-4xl">Nothing matches yet</p>
-                <p className="max-w-sm text-[#5E5148]">Try another scent family, widen the price, or ask us on WhatsApp. We may have it in store.</p>
-                <button type="button" onClick={clearAll} className="mt-2 inline-flex items-center min-h-[52px] px-7 rounded-full bg-[#14100D] text-[#F5EDE4] font-semibold">
+                <p className="max-w-sm text-[#6B565B]">Try another scent family, widen the price, or ask us on WhatsApp. We may have it in store.</p>
+                <button type="button" onClick={clearAll} className="mt-2 inline-flex items-center min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold">
                   Clear all filters
                 </button>
               </div>
@@ -464,7 +467,7 @@ function ShopContent() {
                   onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   disabled={page === 1}
                   aria-label="Previous page"
-                  className="w-12 h-12 inline-flex items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.2)] disabled:opacity-35"
+                  className="w-12 h-12 inline-flex items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] disabled:opacity-35"
                 >
                   <i className="ri-arrow-left-line text-lg" aria-hidden="true" />
                 </button>
@@ -474,7 +477,7 @@ function ShopContent() {
                   onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   disabled={page === totalPages}
                   aria-label="Next page"
-                  className="w-12 h-12 inline-flex items-center justify-center rounded-full bg-[#14100D] text-[#F5EDE4] disabled:opacity-35"
+                  className="w-12 h-12 inline-flex items-center justify-center rounded-full bg-[#2B0B12] text-[#F6EDE3] disabled:opacity-35"
                 >
                   <i className="ri-arrow-right-line text-lg" aria-hidden="true" />
                 </button>
@@ -489,7 +492,7 @@ function ShopContent() {
 
 export default function ShopPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F5EDE4]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#F1E8DC]" />}>
       <ShopContent />
     </Suspense>
   );

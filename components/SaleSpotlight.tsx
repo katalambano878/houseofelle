@@ -62,17 +62,17 @@ export default function SaleSpotlight() {
     : null;
 
   return (
-    <section aria-labelledby="sale-spotlight-title" className="bg-[#C89B3C] text-[#14100D]">
-      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 py-14 md:py-24 grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:items-end">
+    <section aria-labelledby="sale-spotlight-title" className="bg-[#E8C5BE] text-[#2B0B12]">
+      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 py-14 md:py-20 grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:items-end">
         <div className="flex flex-col gap-2">
-          <h2 id="sale-spotlight-title" className="font-serif italic text-[28px] md:text-[44px] leading-none">
+          <h2 id="sale-spotlight-title" className="font-serif italic text-[24px] md:text-[32px] leading-none">
             {title}
             <span className="sr-only">{promo.live ? ', on now' : ', coming soon'}</span>
           </h2>
           {range ? (
             <p className="flex items-start gap-3 md:gap-5">
-              <span className="font-serif text-[132px] sm:text-[180px] lg:text-[240px] leading-[0.82] tracking-[-0.05em] tabular-nums">{range.max}%</span>
-              <span className="pt-3 md:pt-6 text-sm md:text-lg font-semibold leading-snug">
+              <span className="font-serif text-[104px] sm:text-[130px] lg:text-[150px] leading-[0.82] tracking-[-0.05em] tabular-nums">{range.max}%</span>
+              <span className="pt-2 md:pt-4 text-sm md:text-base font-semibold leading-snug">
                 off
                 {range.min !== range.max && (
                   <>
@@ -83,7 +83,7 @@ export default function SaleSpotlight() {
               </span>
             </p>
           ) : (
-            <p className="font-serif text-6xl md:text-8xl leading-none">{promo.live ? 'On now' : 'Coming soon'}</p>
+            <p className="font-serif text-5xl md:text-6xl leading-none">{promo.live ? 'On now' : 'Coming soon'}</p>
           )}
         </div>
 
@@ -98,9 +98,9 @@ export default function SaleSpotlight() {
               <p className="text-xs font-semibold mb-2">{timing.label}</p>
               <div className="grid grid-cols-4 gap-2 max-w-sm">
                 {tiles.map(([label, v]) => (
-                  <span key={label as string} className="flex flex-col items-center gap-1 rounded-2xl bg-[#14100D] text-[#F5EDE4] pt-3.5 pb-2.5">
-                    <span className="text-2xl md:text-[34px] font-semibold leading-none tabular-nums">{String(v).padStart(2, '0')}</span>
-                    <span className="text-[10px] md:text-[11px] font-semibold text-[#BFAF9F]">{label}</span>
+                  <span key={label as string} className="flex flex-col items-center gap-1 rounded-2xl bg-[#2B0B12] text-[#F6EDE3] pt-3.5 pb-2.5">
+                    <span className="font-serif text-2xl md:text-[30px] leading-none tabular-nums">{String(v).padStart(2, '0')}</span>
+                    <span className="text-[10px] md:text-[11px] font-semibold text-[#CDB5AD]">{label}</span>
                   </span>
                 ))}
               </div>
@@ -116,12 +116,12 @@ export default function SaleSpotlight() {
                 return (
                   <li key={p.id}>
                     <Link href={`/product/${p.slug}`} className="group block" aria-label={`${p.name}, ${cedi(p.price)}, ${p.percent_off}% off`}>
-                      <span className="relative block aspect-square rounded-2xl bg-[#F5EDE4] overflow-hidden">
+                      <span className="relative block aspect-square rounded-2xl bg-[#F1E8DC] overflow-hidden">
                         {img && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={img} alt="" loading="lazy" className="absolute inset-[8%] h-[84%] w-[84%] object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-105" />
                         )}
-                        <span className="absolute top-1.5 left-1.5 rounded-full bg-[#14100D] px-1.5 py-0.5 text-[10px] font-bold text-[#F5EDE4] tabular-nums">-{p.percent_off}%</span>
+                        <span className="absolute top-1.5 left-1.5 rounded-full bg-[#2B0B12] px-1.5 py-0.5 text-[10px] font-bold text-[#F6EDE3] tabular-nums">-{p.percent_off}%</span>
                       </span>
                     </Link>
                   </li>
@@ -133,7 +133,7 @@ export default function SaleSpotlight() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href={promoHref(promo)}
-              className="inline-flex whitespace-nowrap items-center justify-center gap-2 min-h-[54px] px-8 rounded-full bg-[#14100D] text-[#F5EDE4] font-semibold active:scale-[0.98] transition-transform motion-reduce:active:scale-100"
+              className="inline-flex whitespace-nowrap items-center justify-center gap-2 min-h-[54px] px-8 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold active:scale-[0.98] transition-transform motion-reduce:active:scale-100"
             >
               {promo.live ? promo.popup?.cta_label || 'Shop the sale' : 'Browse the collection'}
             </Link>
@@ -141,7 +141,7 @@ export default function SaleSpotlight() {
               href={whatsappLink(whatsapp, `Hello House of Elle, I'd like to know more about the ${promo.name} sale.`)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex whitespace-nowrap items-center justify-center gap-2 min-h-[54px] px-8 rounded-full shadow-[inset_0_0_0_1.5px_#14100D] font-semibold hover:bg-[#14100D]/5 transition-colors"
+              className="inline-flex whitespace-nowrap items-center justify-center gap-2 min-h-[54px] px-8 rounded-full shadow-[inset_0_0_0_1.5px_#2B0B12] font-semibold hover:bg-[#2B0B12]/5 transition-colors"
             >
               <i className="ri-whatsapp-line text-lg" aria-hidden="true" />
               {promo.live ? 'Order on WhatsApp' : 'Reserve on WhatsApp'}

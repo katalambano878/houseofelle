@@ -149,7 +149,7 @@ export default function WishlistPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-[#F1E8DC]">
       <PageHero title="My Wishlist" backgroundImage="/Whisk_a23750058b309cf9155424b5e8ea85dcdr.jpeg" />
 
       <section className="py-8 bg-white border-b border-gray-200">

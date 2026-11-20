@@ -25,7 +25,7 @@ export default function ShippingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#F1E8DC]">
       <div className="bg-gradient-to-br from-blue-50 via-white to-amber-50 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
