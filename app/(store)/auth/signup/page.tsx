@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 import { supabase } from '@/lib/supabase';
@@ -32,6 +33,14 @@ function safeRedirect(value: string | null): string {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return '/account';
   return value;
 }
+
+const fieldBase =
+  'w-full h-[54px] px-[18px] rounded-[16px] bg-[#FBF6EF] text-[16px] text-[#1F1115] placeholder:text-[#8A7479] outline-none transition-shadow motion-reduce:transition-none';
+const field = `${fieldBase} shadow-[inset_0_0_0_1px_rgba(31,17,21,0.18)] focus:shadow-[inset_0_0_0_1.5px_#2B0B12]`;
+const fieldBad = `${fieldBase} shadow-[inset_0_0_0_1.5px_#7A1F2E]`;
+const label = 'text-[14px] font-semibold';
+const errText = 'text-[13px] text-[#7A1F2E]';
+const eyeBtn = 'absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full inline-flex items-center justify-center text-[#6B565B] hover:text-[#1F1115]';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -160,243 +169,225 @@ export default function SignupPage() {
     }
   };
 
+  const loginHref = redirectTo === '/account' ? '/auth/login' : `/auth/login?redirect=${encodeURIComponent(redirectTo)}`;
+
+  const photoPanel = (
+    <div className="relative overflow-hidden bg-[#2B0B12] min-h-[260px] sm:min-h-[320px] lg:min-h-0">
+      <Image
+        src="/Whisk_a23750058b309cf9155424b5e8ea85dcdr.jpeg"
+        alt="Amber perfume bottles lit from behind"
+        fill
+        priority
+        sizes="(max-width: 1024px) 100vw, 50vw"
+        className="object-cover opacity-85"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#2B0B12]/80 via-transparent to-[#2B0B12]/30" aria-hidden="true" />
+      <Link href="/" aria-label="House of Elle home" className="absolute top-6 left-5 sm:top-10 sm:left-12 inline-flex min-h-[44px] items-center">
+        <Image src="/house-of-elle-logo.png" alt="House of Elle" width={368} height={137} className="h-9 sm:h-[46px] w-auto brightness-0 invert-[.94] sepia-[.2]" />
+      </Link>
+      <p className="absolute left-5 right-5 bottom-8 sm:left-12 sm:right-12 sm:bottom-14 font-serif text-[30px] sm:text-[40px] leading-none text-[#F6EDE3] text-balance">
+        Luxury fragrances for <em className="text-[#E5B65A]">everyone.</em>
+      </p>
+    </div>
+  );
+
   if (success) {
     return (
-      <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center py-12 px-4 sm:px-6">
-        <div className="max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <i className="ri-mail-send-line text-4xl text-blue-600"></i>
+      <main className="grid lg:grid-cols-2 min-h-[calc(100vh-80px)] bg-[#F1E8DC] text-[#1F1115]">
+        {photoPanel}
+        <div className="flex items-center justify-center px-5 sm:px-8 lg:px-12 py-12 md:py-16">
+          <div className="w-full max-w-[420px] flex flex-col items-start gap-5" role="status">
+            <span className="w-14 h-14 rounded-full bg-[#2B0B12] text-[#D9A441] inline-flex items-center justify-center">
+              <i className="ri-mail-send-line text-2xl" aria-hidden="true"></i>
+            </span>
+            <h1 className="font-serif text-[40px] md:text-[48px] leading-none tracking-[-0.02em]">Check your <em>email</em></h1>
+            <p className="text-[15px] leading-relaxed text-[#6B565B]">
+              We've sent a confirmation link to <strong className="text-[#1F1115]">{formData.email}</strong>. Open it to activate your account.
+            </p>
+            <Link href={loginHref} className="inline-flex items-center min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none">
+              Back to sign in
+            </Link>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Check Your Email</h1>
-          <p className="text-gray-600 mb-8">
-            We've sent a confirmation link to <strong>{formData.email}</strong>.<br />
-            Please check your inbox to activate your account.
-          </p>
-          <Link href={redirectTo === '/account' ? '/auth/login' : `/auth/login?redirect=${encodeURIComponent(redirectTo)}`} className="inline-block bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors">
-            Back to Login
-          </Link>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center py-12 px-4 sm:px-6">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Create Account</h1>
-          <p className="text-gray-600">Join us and start shopping today</p>
-        </div>
+    <main className="grid lg:grid-cols-2 min-h-[calc(100vh-80px)] bg-[#F1E8DC] text-[#1F1115]">
+      {photoPanel}
 
-        <div className="bg-white rounded-xl shadow-sm p-8">
+      <div className="flex items-center justify-center px-5 sm:px-8 lg:px-12 py-12 md:py-16">
+        <div className="w-full max-w-[460px] flex flex-col gap-[22px]">
+          <div className="flex flex-col gap-2">
+            <h1 className="font-serif text-[40px] md:text-[48px] leading-none tracking-[-0.02em]">Create an <em>account</em></h1>
+            <p className="text-[15px] text-[#6B565B]">Track your orders and keep the scents you love in one place.</p>
+          </div>
+
           {authError && (
-            <div ref={errorRef} className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-3">
-              <i className="ri-error-warning-line text-red-500 text-lg flex-shrink-0 mt-0.5"></i>
+            <div ref={errorRef} role="alert" className="rounded-2xl bg-[#F6DCD7] text-[#7A1F2E] px-4 py-3 text-sm flex items-start gap-3">
+              <i className="ri-error-warning-line text-lg flex-shrink-0 leading-none mt-0.5" aria-hidden="true"></i>
               <span>{authError}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  First Name
-                </label>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="su-first" className={label}>First name</label>
                 <input
+                  id="su-first"
                   type="text"
+                  autoComplete="given-name"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.firstName ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  placeholder="John"
+                  aria-invalid={!!errors.firstName}
+                  className={`${errors.firstName ? fieldBad : field}`}
                 />
-                {errors.firstName && (
-                  <p className="text-sm text-red-600 mt-1">{errors.firstName}</p>
-                )}
+                {errors.firstName && <p className={errText}>{errors.firstName}</p>}
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Last Name
-                </label>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="su-last" className={label}>Last name</label>
                 <input
+                  id="su-last"
                   type="text"
+                  autoComplete="family-name"
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.lastName ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  placeholder="Doe"
+                  aria-invalid={!!errors.lastName}
+                  className={`${errors.lastName ? fieldBad : field}`}
                 />
-                {errors.lastName && (
-                  <p className="text-sm text-red-600 mt-1">{errors.lastName}</p>
-                )}
+                {errors.lastName && <p className={errText}>{errors.lastName}</p>}
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Email Address
-              </label>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="su-email" className={label}>Email</label>
               <input
+                id="su-email"
                 type="email"
+                autoComplete="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                aria-invalid={!!errors.email}
+                className={`${errors.email ? fieldBad : field}`}
                 placeholder="you@example.com"
               />
-              {errors.email && (
-                <p className="text-sm text-red-600 mt-2">{errors.email}</p>
-              )}
+              {errors.email && <p className={errText}>{errors.email}</p>}
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Phone Number
-              </label>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="su-phone" className={label}>Phone number</label>
               <input
+                id="su-phone"
                 type="tel"
+                autoComplete="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                aria-invalid={!!errors.phone}
+                className={`${errors.phone ? fieldBad : field}`}
                 placeholder="+233 XX XXX XXXX"
               />
-              {errors.phone && (
-                <p className="text-sm text-red-600 mt-2">{errors.phone}</p>
-              )}
+              {errors.phone && <p className={errText}>{errors.phone}</p>}
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Password
-              </label>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="su-password" className={label}>Password</label>
               <div className="relative">
                 <input
+                  id="su-password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className={`w-full px-4 py-3 pr-12 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                  aria-invalid={!!errors.password}
+                  className={`${errors.password ? fieldBad : field} pr-14`}
                   placeholder="At least 8 characters"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className={eyeBtn}
                 >
-                  <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-xl`}></i>
+                  <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-xl`} aria-hidden="true"></i>
                 </button>
               </div>
               <PasswordStrengthMeter password={formData.password} />
-              {errors.password && (
-                <p className="text-sm text-red-600 mt-2">{errors.password}</p>
-              )}
+              {errors.password && <p className={errText}>{errors.password}</p>}
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Confirm Password
-              </label>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="su-confirm" className={label}>Confirm password</label>
               <div className="relative">
                 <input
+                  id="su-confirm"
                   type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className={`w-full px-4 py-3 pr-12 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  placeholder="Re-enter password"
+                  aria-invalid={!!errors.confirmPassword}
+                  className={`${errors.confirmPassword ? fieldBad : field} pr-14`}
+                  placeholder="Type it again"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showConfirmPassword}
+                  className={eyeBtn}
                 >
-                  <i className={`${showConfirmPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-xl`}></i>
+                  <i className={`${showConfirmPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-xl`} aria-hidden="true"></i>
                 </button>
               </div>
-              {errors.confirmPassword && (
-                <p className="text-sm text-red-600 mt-2">{errors.confirmPassword}</p>
-              )}
+              {errors.confirmPassword && <p className={errText}>{errors.confirmPassword}</p>}
             </div>
 
-            <div>
-              <label className="flex items-start space-x-3 cursor-pointer">
+            <div className="flex flex-col gap-1">
+              <label className="flex items-start gap-3 min-h-[44px] py-1 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.acceptTerms}
                   onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
-                  className="w-4 h-4 mt-1 text-blue-600 rounded focus:ring-blue-500"
+                  aria-invalid={!!errors.acceptTerms}
+                  className="w-5 h-5 mt-0.5 flex-none rounded accent-[#2B0B12]"
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-[14px] leading-relaxed text-[#4D3A3F]">
                   I agree to the{' '}
-                  <Link href="/terms" className="text-blue-700 hover:text-blue-900 font-medium whitespace-nowrap">
-                    Terms & Conditions
-                  </Link>
+                  <Link href="/terms" className="font-semibold text-[#1F1115] underline underline-offset-[3px]">Terms and Conditions</Link>
                   {' '}and{' '}
-                  <Link href="/privacy" className="text-blue-700 hover:text-blue-900 font-medium whitespace-nowrap">
-                    Privacy Policy
-                  </Link>
+                  <Link href="/privacy" className="font-semibold text-[#1F1115] underline underline-offset-[3px]">Privacy Policy</Link>
                 </span>
               </label>
-              {errors.acceptTerms && (
-                <p className="text-sm text-red-600 mt-2">{errors.acceptTerms}</p>
-              )}
+              {errors.acceptTerms && <p className={errText}>{errors.acceptTerms}</p>}
             </div>
 
             <button
               type="submit"
               disabled={isLoading || verifying}
-              className="w-full bg-blue-700 hover:bg-blue-800 text-white py-4 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
+              className="min-h-[56px] rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[16px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading || verifying ? (
-                <span className="flex items-center justify-center">
-                  <i className="ri-loader-4-line animate-spin mr-2"></i> {verifying ? 'Verifying...' : 'Creating account...'}
+                <span className="flex items-center justify-center gap-2">
+                  <i className="ri-loader-4-line animate-spin motion-reduce:animate-none" aria-hidden="true"></i> {verifying ? 'Verifying…' : 'Creating account…'}
                 </span>
-              ) : 'Create Account'}
+              ) : 'Create account'}
             </button>
           </form>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">Or sign up with</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <button
-                disabled
-                className="flex items-center justify-center space-x-2 border-2 border-gray-200 bg-gray-50 py-3 rounded-lg cursor-not-allowed opacity-60"
-              >
-                <i className="ri-google-fill text-xl text-red-600 grayscale opacity-50"></i>
-                <span className="font-medium text-gray-400">Google</span>
-              </button>
-              <button
-                disabled
-                className="flex items-center justify-center space-x-2 border-2 border-gray-200 bg-gray-50 py-3 rounded-lg cursor-not-allowed opacity-60"
-              >
-                <i className="ri-facebook-fill text-xl text-blue-600 grayscale opacity-50"></i>
-                <span className="font-medium text-gray-400">Facebook</span>
-              </button>
-            </div>
-          </div>
-
-          <p className="mt-8 text-center text-gray-600">
+          <p className="text-center text-[14px] text-[#6B565B]">
             Already have an account?{' '}
-            <Link href={redirectTo === '/account' ? '/auth/login' : `/auth/login?redirect=${encodeURIComponent(redirectTo)}`} className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
-              Sign in
-            </Link>
+            <Link href={loginHref} className="font-bold text-[#1F1115] underline underline-offset-[3px]">Sign in</Link>
           </p>
-        </div>
 
-        <div className="mt-8 text-center">
-          <Link href="/" className="text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap">
-            <i className="ri-arrow-left-line mr-2"></i>
-            Back to Home
-          </Link>
+          <div className="mt-3 flex flex-col gap-2.5 p-5 rounded-[18px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+            <span className="font-serif text-[20px]">No account needed</span>
+            <span className="text-[14px] leading-[1.55] text-[#4D3A3F]">You can check out as a guest, and track any order with the number we send by SMS.</span>
+            <Link href="/order-tracking" className="self-start inline-flex items-center min-h-[44px] text-[14px] font-bold">
+              <span className="shadow-[inset_0_-1px_0_currentColor] pb-0.5">Track an order</span>
+            </Link>
+          </div>
         </div>
       </div>
     </main>

@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import AdvancedCouponSystem, { checkCoupon, type AppliedCoupon } from '@/components/AdvancedCouponSystem';
 import { useCart } from '@/context/CartContext';
-import PageHero from '@/components/PageHero';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function CartPage() {
@@ -80,218 +79,222 @@ export default function CartPage() {
   const shipping = 0;
   const total = subtotal - couponDiscount + shipping;
 
-  return (
-    <div className="min-h-screen bg-[#F1E8DC]">
-      <PageHero title="Shopping Cart" backgroundImage="/Whisk_a4071984faa45f6b45b4ac8f2119754ddr.jpeg" />
-      <div className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  const thumbClass = 'relative flex items-center justify-center aspect-[4/5] rounded-[18px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] overflow-hidden';
+  const textLink = 'inline-flex items-center min-h-[44px] text-sm text-[#6B565B] underline underline-offset-4 decoration-[#6B565B]/40 hover:text-[#7A1F2E] hover:decoration-[#7A1F2E] transition-colors motion-reduce:transition-none';
 
+  return (
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <section className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-8 md:pt-16 pb-20 md:pb-32 flex flex-col gap-8 md:gap-12">
+        <div className="flex items-baseline gap-4 sm:gap-5">
+          <h1 className="font-serif text-[40px] md:text-[56px] leading-[0.95] tracking-[-0.02em]">Your <em>bag</em></h1>
+          {cartItems.length > 0 && (
+            <span className="text-[15px] text-[#6B565B] tabular-nums">
+              {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
+            </span>
+          )}
+        </div>
 
         {cartItems.length === 0 && savedItems.length === 0 ? (
-          <section className="py-20">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
-              <div className="w-24 h-24 flex items-center justify-center mx-auto mb-6 bg-gray-200 rounded-full">
-                <i className="ri-shopping-cart-line text-5xl text-gray-400"></i>
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
-              <p className="text-gray-600 mb-8 text-lg">Looks like you haven&#39;t added anything to your cart yet</p>
-              <Link href="/shop" className="inline-block bg-gray-900 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-semibold transition-colors whitespace-nowrap">
-                Continue Shopping
-              </Link>
-            </div>
-          </section>
+          <div className="flex flex-col items-center text-center gap-5 py-12 md:py-20">
+            <span className="w-20 h-20 rounded-full bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.12)] inline-flex items-center justify-center">
+              <i className="ri-shopping-bag-line text-3xl text-[#7A1F2E]" aria-hidden="true"></i>
+            </span>
+            <h2 className="font-serif text-[28px] md:text-[32px] leading-none">Your bag is empty</h2>
+            <p className="text-[15px] leading-relaxed text-[#6B565B] max-w-[420px]">Looks like you haven&#39;t added anything to your bag yet.</p>
+            <Link
+              href="/shop"
+              className="mt-2 inline-flex items-center justify-center min-h-[54px] px-8 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold whitespace-nowrap hover:bg-[#4A1520] active:scale-[0.98] transition-[background-color,transform] motion-reduce:transition-none motion-reduce:active:scale-100"
+            >
+              Continue shopping
+            </Link>
+          </div>
         ) : (
-          <section className="py-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
-                  <div className="bg-white rounded-xl shadow-sm p-6 overflow-hidden">
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-2xl font-bold text-gray-900">Cart Items ({cartItems.length})</h2>
-                    </div>
-
-                    <div className="space-y-6">
-                      {cartItems.map((item) => (
-                        <div key={`${item.id}-${item.variant || ''}`} className="flex flex-col sm:flex-row gap-4 sm:gap-6 pb-6 border-b border-gray-200 last:border-0 last:pb-0">
-                          <Link href={`/product/${item.slug || item.id}`} className="relative w-full sm:w-32 h-48 sm:h-32 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                            <Image src={item.image} alt={item.name} fill className="object-cover object-top" sizes="(max-width: 640px) 100vw, 128px" quality={70} />
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-10 lg:gap-16 items-start">
+            <div className="flex flex-col gap-12 min-w-0">
+              <div>
+                {cartItems.length > 0 ? (
+                  <ul className="list-none m-0 p-0 border-t border-[#1F1115]/14" aria-label="Items in your bag">
+                    {cartItems.map((item) => {
+                      const minQty = item.moq || 1;
+                      const atMin = item.quantity <= minQty;
+                      return (
+                        <li
+                          key={`${item.id}-${item.variant || ''}`}
+                          className="grid grid-cols-[96px_minmax(0,1fr)] sm:grid-cols-[150px_minmax(0,1fr)_auto] gap-4 sm:gap-7 items-center py-6 sm:py-7 border-b border-[#1F1115]/14"
+                        >
+                          <Link href={`/product/${item.slug || item.id}`} className={thumbClass} aria-label={item.name}>
+                            <span aria-hidden="true" className="absolute inset-[6px] sm:inset-[7px] rounded-[12px] shadow-[inset_0_0_0_1px_rgba(74,21,32,0.22)] pointer-events-none z-10"></span>
+                            <Image src={item.image} alt="" fill className="object-contain p-[13%] mix-blend-multiply" sizes="(max-width: 640px) 96px, 150px" quality={70} />
                           </Link>
 
-                          <div className="flex-1">
-                            <div className="flex justify-between mb-2">
-                              <Link href={`/product/${item.slug || item.id}`} className="text-lg font-semibold text-gray-900 hover:text-blue-700 transition-colors line-clamp-2">
+                          <div className="flex flex-col gap-1.5 sm:gap-2 min-w-0">
+                            <div className="flex items-start justify-between gap-3">
+                              <Link href={`/product/${item.slug || item.id}`} className="font-serif text-[19px] sm:text-[24px] leading-[1.1] line-clamp-2 hover:text-[#7A1F2E] transition-colors motion-reduce:transition-none">
                                 {item.name}
                               </Link>
-                              <button
-                                onClick={() => removeFromCart(item.id, item.variant)}
-                                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 transition-colors"
-                              >
-                                <i className="ri-close-line text-xl"></i>
-                              </button>
+                              <span className="sm:hidden font-semibold tabular-nums whitespace-nowrap">GH₵{money(item.price * item.quantity)}</span>
                             </div>
 
-                            <div className="text-sm text-gray-600 mb-3 space-y-1">
-                              {item.variant && <p>Variant: {item.variant}</p>}
-                              {item.moq && item.moq > 1 && <p>Minimum order: {item.moq}</p>}
+                            <div className="text-[13px] sm:text-sm text-[#6B565B] flex flex-col gap-0.5">
+                              {item.variant && <span>{item.variant}</span>}
+                              <span className="tabular-nums">GH₵{money(item.price)} each</span>
+                              {minQty > 1 && <span className="text-[#7A1F2E]">Minimum order: {minQty} units</span>}
                             </div>
 
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                              <div className="flex items-baseline space-x-3">
-                                <span className="text-xl font-bold text-gray-900">GH₵{money(item.price)}</span>
-                              </div>
-
-                              <div className="flex items-center space-x-4">
-                                <div className="flex flex-col">
-                                  <div className="flex items-center border-2 border-gray-300 rounded-lg">
-                                    <button
-                                      onClick={() => updateQuantity(item.id, item.quantity - 1, item.variant)}
-                                      className="w-10 h-10 flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-                                      title={item.quantity <= (item.moq || 1) ? 'Remove item' : 'Decrease quantity'}
-                                    >
-                                      {item.quantity <= (item.moq || 1) ? (
-                                        <i className="ri-delete-bin-line text-red-500"></i>
-                                      ) : (
-                                        <i className="ri-subtract-line"></i>
-                                      )}
-                                    </button>
-                                    <input
-                                      type="number"
-                                      value={item.quantity}
-                                      onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || (item.moq || 1), item.variant)}
-                                      className="w-12 h-10 text-center border-x-2 border-gray-300 focus:outline-none font-semibold"
-                                      min={item.moq || 1}
-                                      max={item.maxStock > 0 ? item.maxStock : undefined}
-                                    />
-                                    <button
-                                      onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant)}
-                                      className="w-10 h-10 flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-                                    >
-                                      <i className="ri-add-line"></i>
-                                    </button>
-                                  </div>
-                                  {(item.moq || 1) > 1 && (
-                                    <span className="text-xs text-amber-600 mt-1">
-                                      Min. order: {item.moq} units
-                                    </span>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+                              <div role="group" aria-label={`Quantity for ${item.name}`} className="inline-flex items-center h-[46px] rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.22)]">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.id, item.quantity - 1, item.variant)}
+                                  className="w-11 h-[46px] inline-flex items-center justify-center rounded-l-full text-[#1F1115] hover:bg-[#1F1115]/5 transition-colors motion-reduce:transition-none cursor-pointer"
+                                  title={atMin ? 'Remove item' : 'Decrease quantity'}
+                                  aria-label={atMin ? 'Remove item' : 'Decrease quantity'}
+                                >
+                                  {atMin ? (
+                                    <i className="ri-delete-bin-line text-[#7A1F2E]" aria-hidden="true"></i>
+                                  ) : (
+                                    <i className="ri-subtract-line" aria-hidden="true"></i>
                                   )}
-                                </div>
+                                </button>
+                                <input
+                                  type="number"
+                                  aria-label="Quantity"
+                                  value={item.quantity}
+                                  onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || (item.moq || 1), item.variant)}
+                                  className="w-10 h-[46px] bg-transparent text-center text-[16px] font-semibold tabular-nums outline-none focus-visible:underline [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  min={item.moq || 1}
+                                  max={item.maxStock > 0 ? item.maxStock : undefined}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant)}
+                                  aria-label="Increase quantity"
+                                  className="w-11 h-[46px] inline-flex items-center justify-center rounded-r-full text-[#1F1115] hover:bg-[#1F1115]/5 transition-colors motion-reduce:transition-none cursor-pointer"
+                                >
+                                  <i className="ri-add-line" aria-hidden="true"></i>
+                                </button>
                               </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => saveForLater(item.id, item.variant)}
-                              className="mt-3 text-sm text-blue-700 hover:text-blue-900 font-medium whitespace-nowrap"
-                            >
-                              Save for Later
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {savedItems.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-sm p-6">
-                      <h3 className="text-xl font-bold text-gray-900 mb-4">Saved for Later ({savedItems.length})</h3>
-                      <div className="space-y-4">
-                        {savedItems.map((item) => (
-                          <div key={`${item.id}-${item.variant || ''}`} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0 last:pb-0">
-                            <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                              <Image src={item.image} alt={item.name} fill className="object-cover object-top" sizes="80px" quality={60} />
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-semibold text-gray-900 mb-1">{item.name}</p>
-                              {item.variant && <p className="text-sm text-gray-500 mb-1">{item.variant}</p>}
-                              <p className="text-lg font-bold text-gray-900 mb-2">GH₵{money(item.price)}</p>
                               <button
                                 type="button"
-                                onClick={() => moveToCart(item.id, item.variant)}
-                                className="text-sm text-blue-700 hover:text-blue-900 font-medium"
+                                onClick={() => removeFromCart(item.id, item.variant)}
+                                className={textLink}
+                                aria-label={`Remove ${item.name}`}
                               >
-                                Move to Cart
+                                Remove
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => saveForLater(item.id, item.variant)}
+                                className={`${textLink} whitespace-nowrap`}
+                              >
+                                Save for later
                               </button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
 
-                <div className="space-y-6">
-                  <div className="bg-white rounded-xl shadow-sm p-6 sticky top-24">
-                    <h3 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h3>
+                          <span className="hidden sm:block self-start pt-1 text-[18px] font-semibold tabular-nums whitespace-nowrap">GH₵{money(item.price * item.quantity)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="m-0 py-6 border-y border-[#1F1115]/14 text-[15px] text-[#6B565B]">Your bag is empty. Items you saved for later are below.</p>
+                )}
 
-                    <div className="space-y-4 mb-6">
-                      <div className="flex justify-between text-gray-700">
-                        <span>Subtotal</span>
-                        <span className="font-semibold">GH₵{money(subtotal)}</span>
-                      </div>
-
-                      {appliedCoupon && (
-                        <div className="flex justify-between text-blue-700">
-                          <div className="flex items-center space-x-2">
-                            <span>Coupon ({appliedCoupon.code})</span>
-                          </div>
-                          <span className="font-semibold">-GH₵{money(couponDiscount)}</span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between text-gray-700">
-                        <span>Delivery</span>
-                        <span className="text-sm text-gray-600">Arranged after your order</span>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-gray-200 pt-4 mb-6">
-                      <div className="flex justify-between text-xl font-bold text-gray-900">
-                        <span>Total</span>
-                        <span>GH₵{money(total)}</span>
-                      </div>
-                    </div>
-
-                    <AdvancedCouponSystem
-                      subtotal={subtotal}
-                      onApply={applyCoupon}
-                      onRemove={removeCoupon}
-                      appliedCoupon={appliedCoupon}
-                    />
-
-                    <Link
-                      href="/checkout"
-                      className="block w-full bg-blue-700 hover:bg-blue-800 text-white py-4 rounded-lg font-semibold text-center transition-colors mt-6 mb-3 whitespace-nowrap"
-                    >
-                      Proceed to Checkout
-                    </Link>
-
-                    <Link
-                      href="/shop"
-                      className="block w-full text-center text-blue-700 hover:text-blue-900 font-semibold py-2 whitespace-nowrap"
-                    >
-                      Continue Shopping
-                    </Link>
-
-                    <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <i className="ri-shield-check-line text-blue-700 mr-2"></i>
-                        <span>Secure checkout</span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <i className="ri-smartphone-line text-blue-700 mr-2"></i>
-                        <span>Pay with Mobile Money</span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <i className="ri-customer-service-line text-blue-700 mr-2"></i>
-                        <span>Help from our Accra team</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <Link href="/shop" className="inline-flex items-center gap-2.5 min-h-[44px] mt-5 text-[15px] font-semibold hover:text-[#7A1F2E] transition-colors motion-reduce:transition-none">
+                  <i className="ri-arrow-left-line text-lg" aria-hidden="true"></i>
+                  Keep shopping
+                </Link>
               </div>
+
+              {savedItems.length > 0 && (
+                <section aria-labelledby="saved-heading" className="flex flex-col gap-5">
+                  <h2 id="saved-heading" className="font-serif text-[26px] md:text-[28px] leading-none">
+                    Saved for later <span className="font-sans text-[15px] text-[#6B565B] tabular-nums">({savedItems.length})</span>
+                  </h2>
+                  <ul className="list-none m-0 p-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {savedItems.map((item) => (
+                      <li key={`${item.id}-${item.variant || ''}`} className="grid grid-cols-[72px_minmax(0,1fr)] gap-4 items-center p-3 pr-4 rounded-[20px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+                        <span className="relative flex items-center justify-center w-[72px] h-[88px] rounded-[14px] bg-white overflow-hidden">
+                          <Image src={item.image} alt={item.name} fill className="object-contain p-[12%]" sizes="72px" quality={60} />
+                        </span>
+                        <span className="flex flex-col gap-0.5 min-w-0">
+                          <span className="font-serif text-[18px] leading-tight line-clamp-2">{item.name}</span>
+                          {item.variant && <span className="text-[13px] text-[#6B565B]">{item.variant}</span>}
+                          <span className="font-semibold tabular-nums">GH₵{money(item.price)}</span>
+                          <button
+                            type="button"
+                            onClick={() => moveToCart(item.id, item.variant)}
+                            className="self-start inline-flex items-center min-h-[44px] text-sm font-semibold text-[#7A1F2E] underline underline-offset-4 decoration-[#7A1F2E]/40 hover:decoration-[#7A1F2E] transition-colors motion-reduce:transition-none"
+                          >
+                            Move to bag
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
             </div>
-          </section>
+
+            <aside aria-label="Order summary" className="lg:sticky lg:top-[112px] flex flex-col gap-6 p-6 sm:p-9 rounded-[28px] bg-[#2B0B12] text-[#F6EDE3]">
+              <h2 className="font-serif text-[28px] md:text-[29px] leading-none">Summary</h2>
+
+              {/* The coupon form keeps its own light styling, so it sits on a cream panel. */}
+              <div className="rounded-[18px] bg-[#F6EDE3] text-[#1F1115] p-4">
+                <AdvancedCouponSystem
+                  subtotal={subtotal}
+                  onApply={applyCoupon}
+                  onRemove={removeCoupon}
+                  appliedCoupon={appliedCoupon}
+                />
+              </div>
+
+              <dl className="m-0 flex flex-col gap-3 text-[15px]">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#E3CFC7]">Subtotal</dt>
+                  <dd className="m-0 tabular-nums">GH₵{money(subtotal)}</dd>
+                </div>
+                {appliedCoupon && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-[#E5B65A]">Coupon ({appliedCoupon.code})</dt>
+                    <dd className="m-0 text-[#E5B65A] tabular-nums">-GH₵{money(couponDiscount)}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#E3CFC7]">Delivery</dt>
+                  <dd className="m-0 text-right text-[#E3CFC7]">Arranged after your order</dd>
+                </div>
+                <div className="flex justify-between items-baseline gap-4 pt-3.5 border-t border-[#F6EDE3]/14">
+                  <dt className="font-serif text-[20px]">Total</dt>
+                  <dd className="m-0 text-[22px] font-semibold tabular-nums">GH₵{money(total)}</dd>
+                </div>
+              </dl>
+
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/checkout"
+                  className="flex items-center justify-center min-h-[58px] rounded-full bg-[#D9A441] text-[#2B0B12] text-[15px] font-bold whitespace-nowrap hover:bg-[#E5B65A] active:scale-[0.99] transition-[background-color,transform] motion-reduce:transition-none motion-reduce:active:scale-100"
+                >
+                  Check out
+                </Link>
+                <Link
+                  href="/shop"
+                  className="flex items-center justify-center min-h-[48px] text-sm font-semibold text-[#F6EDE3] underline underline-offset-4 decoration-[#F6EDE3]/40 hover:decoration-[#F6EDE3] whitespace-nowrap"
+                >
+                  Continue shopping
+                </Link>
+              </div>
+
+              <ul className="list-none m-0 p-0 pt-5 border-t border-[#F6EDE3]/14 flex flex-col gap-2.5 text-[13px] text-[#CDB5AD]">
+                <li className="flex items-center gap-2.5"><i className="ri-shield-check-line text-base text-[#E5B65A]" aria-hidden="true"></i>Secure checkout</li>
+                <li className="flex items-center gap-2.5"><i className="ri-smartphone-line text-base text-[#E5B65A]" aria-hidden="true"></i>Pay with Mobile Money</li>
+                <li className="flex items-center gap-2.5"><i className="ri-customer-service-line text-base text-[#E5B65A]" aria-hidden="true"></i>Help from our Accra team</li>
+              </ul>
+            </aside>
+          </div>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

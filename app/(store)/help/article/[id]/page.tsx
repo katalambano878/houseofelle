@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import PageHero from '@/components/PageHero';
 
 type Block =
   | { type: 'h'; text: string }
@@ -184,28 +185,24 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     .map((rid) => ({ id: rid, ...articles[rid] }));
 
   return (
-    <main className="min-h-screen bg-[#F1E8DC] py-12">
-      <div className="max-w-4xl mx-auto px-4">
-        <Link
-          href="/help"
-          className="inline-flex items-center text-blue-700 hover:text-blue-900 font-semibold mb-6 whitespace-nowrap"
-        >
-          <i className="ri-arrow-left-line mr-2"></i>
-          Back to Help Center
-        </Link>
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <PageHero title={article.title} subtitle={article.category.replace(' & ', ' and ')} />
 
-        <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
-          <div className="mb-6 pb-6 border-b border-gray-200">
-            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold whitespace-nowrap mb-4">
-              {article.category}
-            </span>
-            <h1 className="text-3xl font-bold text-gray-900">{article.title}</h1>
-          </div>
+      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 py-10 md:py-16">
+        <div className="max-w-[720px] mx-auto flex flex-col gap-12 md:gap-14">
+          <Link href="/help" className="self-start inline-flex items-center gap-2 min-h-[44px] text-sm font-semibold text-[#7A1F2E] whitespace-nowrap">
+            <i className="ri-arrow-left-line" aria-hidden="true" />
+            Back to the help centre
+          </Link>
 
-          <article className="space-y-4 text-gray-700 leading-relaxed">
+          <article className="-mt-6 flex flex-col gap-5 text-[15px] md:text-base leading-[1.75] text-[#4D3A3F]">
             {article.blocks.map((block, i) => {
               if (block.type === 'h') {
-                return <h2 key={i} className="text-xl font-bold text-gray-900 pt-2">{block.text}</h2>;
+                return (
+                  <h2 key={i} className={`font-serif text-[26px] md:text-[28px] leading-[1.1] text-[#1F1115] ${i > 0 ? 'mt-5 pt-8 border-t border-[#1F1115]/14' : ''}`}>
+                    {block.text}
+                  </h2>
+                );
               }
               if (block.type === 'p') {
                 return (
@@ -214,7 +211,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
                     {block.link && (
                       <>
                         {' '}
-                        <Link href={block.link.href} className="text-blue-700 font-semibold hover:underline">
+                        <Link href={block.link.href} className="font-semibold text-[#7A1F2E] underline underline-offset-4 decoration-[#7A1F2E]/40 hover:decoration-[#7A1F2E]">
                           {block.link.label}
                         </Link>
                       </>
@@ -224,50 +221,45 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
               }
               const ListTag = block.type;
               return (
-                <ListTag key={i} className={`${block.type === 'ol' ? 'list-decimal' : 'list-disc'} pl-6 space-y-2`}>
+                <ListTag key={i} className={`${block.type === 'ol' ? 'list-decimal' : 'list-disc'} pl-6 flex flex-col gap-2 marker:text-[#7A1F2E]`}>
                   {block.items.map((item) => (
-                    <li key={item}>{item}</li>
+                    <li key={item} className="pl-1">{item}</li>
                   ))}
                 </ListTag>
               );
             })}
           </article>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6 text-center">
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Still need help?</h3>
-          <p className="text-gray-600 mb-4">Our team is happy to help with orders, payments and fragrance questions.</p>
-          <Link
-            href="/support/ticket"
-            className="inline-block bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
-          >
-            Contact Support
-          </Link>
-        </div>
+          <section aria-labelledby="article-help" className="flex flex-col gap-4 p-6 md:p-8 rounded-[24px] bg-[#2B0B12] text-[#F6EDE3]">
+            <h2 id="article-help" className="font-serif text-[26px] md:text-[28px] leading-none">Still need <em className="text-[#E5B65A]">help?</em></h2>
+            <p className="text-[15px] leading-relaxed text-[#E3CFC7]">Our team is happy to help with orders, payments and fragrance questions.</p>
+            <Link
+              href="/support/ticket"
+              className="self-start inline-flex items-center justify-center gap-2 min-h-[52px] px-7 rounded-full bg-[#D9A441] text-[#2B0B12] font-semibold hover:bg-[#E5B65A] transition-colors motion-reduce:transition-none whitespace-nowrap"
+            >
+              Contact support
+            </Link>
+          </section>
 
-        {related.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Related Articles</h3>
-            <div className="space-y-3">
-              {related.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/help/article/${item.id}`}
-                  className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <div className="flex items-center space-x-3">
-                    <i className="ri-file-text-line text-xl text-blue-700"></i>
-                    <div>
-                      <p className="font-semibold text-gray-900">{item.title}</p>
-                      <p className="text-sm text-gray-600">{item.category}</p>
-                    </div>
-                  </div>
-                  <i className="ri-arrow-right-s-line text-2xl text-gray-400"></i>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+          {related.length > 0 && (
+            <section aria-labelledby="article-related" className="flex flex-col gap-4">
+              <h2 id="article-related" className="font-serif text-[26px] md:text-[28px] leading-none">Related <em>articles</em></h2>
+              <ul className="border-t border-[#1F1115]/14">
+                {related.map((item) => (
+                  <li key={item.id} className="border-b border-[#1F1115]/14">
+                    <Link href={`/help/article/${item.id}`} className="group flex items-center justify-between gap-4 min-h-[64px] py-4">
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-[15px] font-semibold">{item.title}</span>
+                        <span className="text-sm text-[#6B565B]">{item.category.replace(' & ', ' and ')}</span>
+                      </span>
+                      <i className="ri-arrow-right-line flex-none text-xl transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       </div>
     </main>
   );

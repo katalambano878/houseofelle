@@ -92,10 +92,10 @@ export default function PaymentPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-700 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading order details...</p>
+      <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115] flex items-center justify-center px-5">
+        <div className="text-center" role="status">
+          <div className="w-12 h-12 border-[3px] border-[#2B0B12]/15 border-t-[#2B0B12] rounded-full animate-spin motion-reduce:animate-none mx-auto mb-4" aria-hidden="true"></div>
+          <p className="text-[15px] text-[#6B565B]">Loading order details...</p>
         </div>
       </main>
     );
@@ -103,19 +103,19 @@ export default function PaymentPage() {
 
   if (error && !order) {
     return (
-      <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="w-20 h-20 mx-auto mb-6 bg-red-50 rounded-full flex items-center justify-center">
-            <i className="ri-error-warning-line text-4xl text-red-500"></i>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">Order Not Found</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
+      <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115] flex items-center justify-center px-5 py-20">
+        <div className="text-center max-w-md flex flex-col items-center gap-4">
+          <span className="w-20 h-20 rounded-full bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.12)] inline-flex items-center justify-center">
+            <i className="ri-error-warning-line text-3xl text-[#A1271F]" aria-hidden="true"></i>
+          </span>
+          <h1 className="font-serif text-[36px] md:text-[44px] leading-[0.95] tracking-[-0.02em]">Order not found</h1>
+          <p className="text-[15px] leading-relaxed text-[#6B565B]">{error}</p>
           <Link
             href="/"
-            className="inline-flex items-center px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold transition-colors"
+            className="mt-2 inline-flex items-center justify-center gap-2 min-h-[54px] px-8 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none"
           >
-            <i className="ri-home-line mr-2"></i>
-            Go to Homepage
+            <i className="ri-home-line" aria-hidden="true"></i>
+            Go to homepage
           </Link>
         </div>
       </main>
@@ -126,118 +126,95 @@ export default function PaymentPage() {
   const customerName = order?.metadata?.first_name || shippingAddress.firstName || 'Customer';
 
   return (
-    <main className="min-h-screen bg-[#F1E8DC] py-12 px-4">
-      <div className="max-w-lg mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-block mb-6">
-            <span className="text-2xl font-['Pacifico'] text-blue-700">House of Elle</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Complete Your Payment</h1>
-          <p className="text-gray-600 mt-2">Hi {customerName}, your order is waiting for payment.</p>
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <div className="max-w-[560px] mx-auto px-5 sm:px-8 pt-10 md:pt-16 pb-20 md:pb-28 flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <h1 className="font-serif text-[40px] md:text-[52px] leading-[0.95] tracking-[-0.02em]">Complete your <em>payment</em></h1>
+          <p className="text-[15px] leading-relaxed text-[#6B565B]">Hi {customerName}, your order is waiting for payment.</p>
         </div>
 
-        {/* Order Summary Card */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
-            <span className="text-sm text-gray-500">Order Number</span>
-            <span className="font-semibold text-gray-900">{order?.order_number}</span>
+        <section aria-label="Order summary" className="flex flex-col gap-5 p-6 sm:p-8 rounded-[28px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+          <div className="flex items-baseline justify-between gap-4 pb-4 border-b border-[#1F1115]/12">
+            <span className="text-sm text-[#6B565B]">Order number</span>
+            <span className="font-serif text-[20px] break-all text-right">{order?.order_number}</span>
           </div>
 
-          <div className="space-y-3 mb-6">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Subtotal</span>
-              <span className="text-gray-900">GH₵ {money(order?.subtotal)}</span>
+          <dl className="m-0 flex flex-col gap-3 text-[15px]">
+            <div className="flex justify-between gap-4">
+              <dt className="text-[#4D3A3F]">Subtotal</dt>
+              <dd className="m-0 tabular-nums">GH₵ {money(order?.subtotal)}</dd>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Shipping</span>
-              <span className="text-gray-900">GH₵ {money(order?.shipping_total)}</span>
+            <div className="flex justify-between gap-4">
+              <dt className="text-[#4D3A3F]">Shipping</dt>
+              <dd className="m-0 tabular-nums">GH₵ {money(order?.shipping_total)}</dd>
             </div>
             {order?.discount_total > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Discount</span>
-                <span className="text-green-600">-GH₵ {money(order?.discount_total)}</span>
+              <div className="flex justify-between gap-4">
+                <dt className="text-[#2F6B3A]">Discount</dt>
+                <dd className="m-0 text-[#2F6B3A] tabular-nums">-GH₵ {money(order?.discount_total)}</dd>
               </div>
             )}
-          </div>
+            <div className="flex justify-between items-baseline gap-4 pt-3.5 border-t border-[#1F1115]/12">
+              <dt className="font-serif text-[20px]">Total</dt>
+              <dd className="m-0 text-[22px] font-semibold tabular-nums">GH₵ {money(order?.total)}</dd>
+            </div>
+          </dl>
+        </section>
 
-          <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-            <span className="text-lg font-semibold text-gray-900">Total</span>
-            <span className="text-2xl font-bold text-blue-700">GH₵ {money(order?.total)}</span>
-          </div>
-        </div>
-
-        {/* Payment Status */}
         {order?.payment_status === 'pending' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start space-x-3">
-              <i className="ri-time-line text-xl text-yellow-600 mt-0.5"></i>
-              <div>
-                <p className="text-sm font-semibold text-yellow-800">Payment Pending</p>
-                <p className="text-sm text-yellow-700 mt-1">
-                  Complete your payment to confirm your order.
-                </p>
-              </div>
+          <div className="flex items-start gap-3 p-4 rounded-[18px] bg-[#D9A441]/15 shadow-[inset_0_0_0_1px_rgba(217,164,65,0.45)]">
+            <i className="ri-time-line text-xl text-[#7A4E0B] leading-none mt-0.5" aria-hidden="true"></i>
+            <div>
+              <p className="text-sm font-semibold text-[#1F1115]">Payment pending</p>
+              <p className="text-sm text-[#4D3A3F] mt-0.5">Complete your payment to confirm your order.</p>
             </div>
           </div>
         )}
 
         {order?.payment_status === 'failed' && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start space-x-3">
-              <i className="ri-error-warning-line text-xl text-red-600 mt-0.5"></i>
-              <div>
-                <p className="text-sm font-semibold text-red-800">Payment Failed</p>
-                <p className="text-sm text-red-700 mt-1">
-                  Your previous payment attempt was unsuccessful. Please try again.
-                </p>
-              </div>
+          <div className="flex items-start gap-3 p-4 rounded-[18px] bg-[#A1271F]/[0.08] shadow-[inset_0_0_0_1px_rgba(161,39,31,0.3)]">
+            <i className="ri-error-warning-line text-xl text-[#A1271F] leading-none mt-0.5" aria-hidden="true"></i>
+            <div>
+              <p className="text-sm font-semibold text-[#7F1D17]">Payment failed</p>
+              <p className="text-sm text-[#4D3A3F] mt-0.5">Your previous payment attempt was unsuccessful. Please try again.</p>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-red-700">{error}</p>
+          <div role="alert" className="p-4 rounded-[18px] bg-[#A1271F]/[0.08] shadow-[inset_0_0_0_1px_rgba(161,39,31,0.3)]">
+            <p className="text-sm text-[#7F1D17]">{error}</p>
           </div>
         )}
 
-        {/* Pay Button */}
         <button
+          type="button"
           onClick={handlePayNow}
           disabled={processing}
-          className="w-full bg-blue-700 hover:bg-blue-800 text-white py-4 rounded-xl font-semibold text-lg transition-colors disabled:opacity-70 flex items-center justify-center cursor-pointer"
+          className="w-full min-h-[60px] px-6 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-semibold tabular-nums hover:bg-[#4A1520] active:scale-[0.99] transition-[background-color,transform] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:opacity-70 inline-flex items-center justify-center cursor-pointer"
         >
           {processing ? (
             <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin motion-reduce:hidden -ml-1 mr-3 h-5 w-5 text-[#F6EDE3]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               Processing...
             </>
           ) : (
-            <>
-              <i className="ri-secure-payment-line mr-2"></i>
-              Pay GH₵ {money(order?.total)} with Mobile Money
-            </>
+            <>Pay GH₵ {money(order?.total)} with Mobile Money</>
           )}
         </button>
 
-        {/* Security Note */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500 flex items-center justify-center">
-            <i className="ri-lock-line mr-1"></i>
-            Secure payment powered by Moolre
-          </p>
-        </div>
+        <p className="flex items-center justify-center gap-2 text-[13px] text-[#6B565B]">
+          <i className="ri-lock-line text-base text-[#2F6B3A]" aria-hidden="true"></i>
+          Secure payment powered by Moolre
+        </p>
 
-        {/* Help Link */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-600">
-            Having issues? <Link href="/contact" className="text-blue-700 hover:underline">Contact Support</Link>
-          </p>
-        </div>
+        <p className="text-center text-sm text-[#6B565B]">
+          Having issues?{' '}
+          <Link href="/contact" className="inline-flex items-center min-h-[44px] font-semibold text-[#7A1F2E] underline underline-offset-4">Contact support</Link>
+        </p>
       </div>
     </main>
   );

@@ -18,7 +18,7 @@ const categories = [
 ];
 
 const inputClass =
-  'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
+  'w-full min-h-[50px] px-4 py-3 rounded-[14px] bg-white shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] text-[15px] text-[#1F1115] placeholder:text-[#6B565B] outline-none focus:shadow-[inset_0_0_0_1.5px_#2B0B12]';
 
 export default function SupportTicketPage() {
   const router = useRouter();
@@ -123,38 +123,38 @@ export default function SupportTicketPage() {
 
   if (result) {
     return (
-      <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center py-12">
-        <div className="max-w-md mx-auto px-4 text-center">
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <div className="w-20 h-20 flex items-center justify-center bg-blue-100 rounded-full mx-auto mb-6">
-              <i className="ri-check-line text-4xl text-blue-700"></i>
+      <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115] flex items-center justify-center py-12">
+        <div className="max-w-md mx-auto px-5 text-center">
+          <div className="rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] p-8">
+            <div className="w-14 h-14 flex items-center justify-center bg-[#2B0B12] rounded-full mx-auto mb-6">
+              <i className="ri-check-line text-3xl text-[#E5B65A]"></i>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="font-serif text-[26px] md:text-[30px] leading-tight mb-4">
               {result.ticketNumber ? 'Ticket Created' : 'Request Sent'}
             </h2>
-            <p className="text-gray-600 mb-2">
+            <p className="text-[15px] text-[#6B565B] mb-2">
               {result.ticketNumber
                 ? 'Your support ticket has been submitted.'
                 : 'We have received your message.'}
             </p>
             {result.ticketNumber && (
-              <p className="text-sm text-gray-500 mb-6">Ticket #{result.ticketNumber}</p>
+              <p className="text-sm text-[#6B565B] mb-6">Ticket #{result.ticketNumber}</p>
             )}
             <div className="space-y-3 mt-6">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-[#6B565B]">
                 We&apos;ll reply to {formData.email} as soon as we can.
               </p>
               {userId && (
                 <Link
                   href="/support/tickets"
-                  className="block bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
+                  className="flex w-full inline-flex items-center justify-center min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none whitespace-nowrap"
                 >
                   View My Tickets
                 </Link>
               )}
               <Link
                 href="/help"
-                className="block text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap"
+                className="flex items-center justify-center min-h-[44px] text-[#7A1F2E] font-semibold underline underline-offset-4 whitespace-nowrap"
               >
                 Back to Help Center
               </Link>
@@ -166,25 +166,25 @@ export default function SupportTicketPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F1E8DC] py-12">
-      <div className="max-w-4xl mx-auto px-4">
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115] py-12 md:py-16">
+      <div className="max-w-[720px] mx-auto px-5 sm:px-8">
         <Link
           href="/help"
-          className="inline-flex items-center text-blue-700 hover:text-blue-900 font-semibold mb-6 whitespace-nowrap"
+          className="inline-flex items-center min-h-[44px] text-sm text-[#7A1F2E] font-semibold mb-4 whitespace-nowrap"
         >
           <i className="ri-arrow-left-line mr-2"></i>
           Back to Help Center
         </Link>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8">
+        <div className="rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] p-5 sm:p-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Support Ticket</h1>
-            <p className="text-gray-600">
+            <h1 className="font-serif text-[36px] md:text-[48px] leading-[0.95] tracking-[-0.02em] mb-2">Create Support Ticket</h1>
+            <p className="text-[15px] text-[#6B565B]">
               Tell us what you need and our team will get back to you by email.
             </p>
             {!userId && (
-              <p className="text-sm text-gray-500 mt-2">
-                <Link href="/auth/login?redirect=/support/ticket" className="text-blue-700 font-semibold hover:underline">
+              <p className="text-sm text-[#6B565B] mt-2">
+                <Link href="/auth/login?redirect=/support/ticket" className="text-[#7A1F2E] font-semibold underline underline-offset-4">
                   Sign in
                 </Link>{' '}
                 to keep track of your tickets in your account.
@@ -195,7 +195,7 @@ export default function SupportTicketPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="ticket-name" className="block text-sm font-semibold text-gray-900 mb-2">
+                <label htmlFor="ticket-name" className="block text-[13px] font-semibold mb-1.5">
                   Your Name *
                 </label>
                 <input
@@ -211,7 +211,7 @@ export default function SupportTicketPage() {
               </div>
 
               <div>
-                <label htmlFor="ticket-email" className="block text-sm font-semibold text-gray-900 mb-2">
+                <label htmlFor="ticket-email" className="block text-[13px] font-semibold mb-1.5">
                   Email Address *
                 </label>
                 <input
@@ -227,7 +227,7 @@ export default function SupportTicketPage() {
             </div>
 
             <div>
-              <label htmlFor="ticket-order" className="block text-sm font-semibold text-gray-900 mb-2">
+              <label htmlFor="ticket-order" className="block text-[13px] font-semibold mb-1.5">
                 Order Number (if applicable)
               </label>
               <input
@@ -241,7 +241,7 @@ export default function SupportTicketPage() {
             </div>
 
             <div>
-              <p className="block text-sm font-semibold text-gray-900 mb-3">
+              <p className="block text-[13px] font-semibold mb-2">
                 What can we help you with? *
               </p>
               <div className="grid md:grid-cols-2 gap-3">
@@ -251,17 +251,17 @@ export default function SupportTicketPage() {
                     type="button"
                     onClick={() => setFormData({ ...formData, category: cat.value })}
                     aria-pressed={formData.category === cat.value}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    className={`min-h-[56px] p-4 rounded-[18px] text-left transition-[background-color,box-shadow] motion-reduce:transition-none ${
                       formData.category === cat.value
-                        ? 'border-blue-700 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'bg-white shadow-[inset_0_0_0_1.5px_#2B0B12]'
+                        : 'bg-white/60 shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] hover:bg-white'
                     }`}
                   >
                     <div className="flex items-center space-x-3">
                       <i className={`${cat.icon} text-2xl ${
-                        formData.category === cat.value ? 'text-blue-700' : 'text-gray-400'
+                        formData.category === cat.value ? 'text-[#7A1F2E]' : 'text-[#6B565B]'
                       }`}></i>
-                      <span className="font-semibold text-gray-900">{cat.label}</span>
+                      <span className="font-semibold">{cat.label}</span>
                     </div>
                   </button>
                 ))}
@@ -269,7 +269,7 @@ export default function SupportTicketPage() {
             </div>
 
             <div>
-              <label htmlFor="ticket-subject" className="block text-sm font-semibold text-gray-900 mb-2">
+              <label htmlFor="ticket-subject" className="block text-[13px] font-semibold mb-1.5">
                 Subject *
               </label>
               <input
@@ -285,7 +285,7 @@ export default function SupportTicketPage() {
             </div>
 
             <div>
-              <label htmlFor="ticket-description" className="block text-sm font-semibold text-gray-900 mb-2">
+              <label htmlFor="ticket-description" className="block text-[13px] font-semibold mb-1.5">
                 Description *
               </label>
               <textarea
@@ -297,30 +297,30 @@ export default function SupportTicketPage() {
                 required
                 maxLength={2000}
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-[#6B565B] mt-1">
                 {formData.description.length}/2000 characters
               </p>
             </div>
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+              <div className="rounded-2xl bg-[#F6DCD7] text-[#7A1F2E] px-4 py-3 text-sm flex items-start gap-2">
                 <i className="ri-error-warning-line mt-0.5"></i>
                 <span>{error}</span>
               </div>
             )}
 
-            <div className="flex space-x-4 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => router.push('/help')}
-                className="flex-1 py-4 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap"
+                className="flex-1 inline-flex items-center justify-center min-h-[52px] px-7 rounded-full shadow-[inset_0_0_0_1.5px_rgba(31,17,21,0.3)] font-semibold hover:bg-white transition-colors motion-reduce:transition-none whitespace-nowrap"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="flex-1 inline-flex items-center justify-center min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 {isSubmitting ? (
                   <>
@@ -335,13 +335,13 @@ export default function SupportTicketPage() {
           </form>
         </div>
 
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="mt-8 rounded-[22px] bg-[#2B0B12] text-[#F6EDE3] p-6">
           <div className="flex items-start space-x-3">
-            <i className="ri-information-line text-2xl text-blue-700 mt-0.5"></i>
+            <i className="ri-information-line text-2xl text-[#E5B65A] mt-0.5"></i>
             <div>
-              <p className="font-semibold text-blue-900 mb-2">Before submitting a ticket</p>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Check our <Link href="/help" className="underline hover:text-blue-900">Help Center</Link> for quick answers</li>
+              <p className="font-serif text-[20px] leading-tight mb-2">Before submitting a ticket</p>
+              <ul className="text-sm text-[#E3CFC7] space-y-1">
+                <li>• Check our <Link href="/help" className="underline underline-offset-2 text-[#F6EDE3]">Help Center</Link> for quick answers</li>
                 <li>• Include your order number for faster assistance</li>
                 <li>• For damaged or leaking items, keep the packaging and mention it in your description</li>
               </ul>

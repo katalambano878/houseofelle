@@ -141,236 +141,190 @@ export default function PrivacySettingsPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <i className="ri-loader-4-line animate-spin text-4xl text-blue-700"></i>
-      </div>
+      <main className="min-h-screen flex items-center justify-center bg-[#F1E8DC]" aria-busy="true">
+        <i className="ri-loader-4-line animate-spin motion-reduce:animate-none text-3xl text-[#2B0B12]" aria-label="Loading"></i>
+      </main>
     );
   }
 
+  const card = 'flex flex-col gap-5 p-6 md:p-8 rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]';
+  const outlineBtn =
+    'inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.22)] text-[14px] font-semibold hover:bg-white transition-colors motion-reduce:transition-none disabled:opacity-50';
+  const included = [
+    'Personal information (name, email, phone)',
+    'Order history and transaction details',
+    'Saved addresses',
+    'Account preferences',
+  ];
+  const rights = [
+    { icon: 'ri-eye-line', title: 'Right to access', text: 'You can download your profile, addresses and orders at any time.' },
+    { icon: 'ri-edit-line', title: 'Right to rectification', text: 'You can update your name and phone number in your account settings.' },
+    { icon: 'ri-delete-bin-line', title: 'Right to erasure', text: 'You can ask us to delete your account.' },
+    { icon: 'ri-file-shield-line', title: 'Right to data portability', text: 'Export your data in a structured, machine-readable format.' },
+  ];
+
   return (
-    <div className="min-h-screen bg-[#F1E8DC]">
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <Link href="/account" className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors">
-              <i className="ri-arrow-left-line text-xl"></i>
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold">Privacy & Data</h1>
-              <p className="text-sm text-gray-600">Manage your personal information</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div className="flex gap-3">
-            <i className="ri-shield-check-line text-xl text-blue-600 flex-shrink-0 mt-0.5"></i>
-            <div>
-              <h3 className="font-semibold text-blue-900 mb-1">Your Privacy Matters</h3>
-              <p className="text-sm text-blue-800">
-                We only use your details to process your orders and look after your account. You can download a copy or ask us to delete your account below.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border p-6 space-y-6">
-          <div>
-            <h2 className="text-lg font-bold mb-4">Data Export</h2>
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold mb-2 flex items-center gap-2">
-                <i className="ri-download-cloud-line text-lg"></i>
-                Download Your Data
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Download a copy of your profile, saved addresses and orders in JSON format.
-              </p>
-              <button
-                onClick={handleExportData}
-                disabled={exporting}
-                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-medium whitespace-nowrap"
-              >
-                {exporting ? (
-                  <>
-                    <i className="ri-loader-4-line animate-spin mr-2"></i>
-                    Preparing Export...
-                  </>
-                ) : (
-                  <>
-                    <i className="ri-download-line mr-2"></i>
-                    Export My Data
-                  </>
-                )}
-              </button>
-              {exportMessage && (
-                <p className={`mt-3 text-sm ${exportMessage.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
-                  {exportMessage.text}
-                </p>
-              )}
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">What&apos;s Included?</h3>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="flex items-start gap-2">
-                  <i className="ri-check-line text-green-600 mt-0.5 flex-shrink-0"></i>
-                  <span>Personal information (name, email, phone)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <i className="ri-check-line text-green-600 mt-0.5 flex-shrink-0"></i>
-                  <span>Order history and transaction details</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <i className="ri-check-line text-green-600 mt-0.5 flex-shrink-0"></i>
-                  <span>Saved addresses</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <i className="ri-check-line text-green-600 mt-0.5 flex-shrink-0"></i>
-                  <span>Account preferences</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t pt-6">
-            <h2 className="text-lg font-bold mb-4 text-red-600">Danger Zone</h2>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h3 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
-                <i className="ri-delete-bin-line text-lg"></i>
-                Delete Account
-              </h3>
-              <p className="text-sm text-red-800 mb-4">
-                Ask us to delete your account. We&apos;ll review your request and confirm by email.
-              </p>
-
-              {deleteRequested ? (
-                <div className="bg-white rounded-lg p-4 border border-green-200 text-sm text-green-800 flex items-start gap-2">
-                  <i className="ri-checkbox-circle-line text-lg flex-shrink-0"></i>
-                  <span>We&apos;ve received your request and will confirm by email.</span>
-                </div>
-              ) : !showDeleteConfirm ? (
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium whitespace-nowrap"
-                >
-                  Request Account Deletion
-                </button>
-              ) : (
-                <div className="space-y-4">
-                  <div className="bg-white rounded-lg p-4 border border-red-300">
-                    <h4 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
-                      <i className="ri-alert-line text-red-600"></i>
-                      Before you continue
-                    </h4>
-                    <ul className="space-y-2 text-sm text-gray-700 mb-4">
-                      <li className="flex items-start gap-2">
-                        <i className="ri-information-line text-red-600 mt-0.5 flex-shrink-0"></i>
-                        <span>Download your data first if you want to keep a copy of your orders.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <i className="ri-information-line text-red-600 mt-0.5 flex-shrink-0"></i>
-                        <span>Once your account is deleted you won&apos;t be able to sign in with it again.</span>
-                      </li>
-                    </ul>
-
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium mb-2 text-gray-900">
-                        Type <span className="font-bold">DELETE</span> to confirm:
-                      </label>
-                      <input
-                        type="text"
-                        value={deleteConfirmText}
-                        onChange={(e) => setDeleteConfirmText(e.target.value)}
-                        placeholder="DELETE"
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    {deleteError && (
-                      <p className="mb-4 text-sm text-red-600">{deleteError}</p>
-                    )}
-
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => {
-                          setShowDeleteConfirm(false);
-                          setDeleteConfirmText('');
-                        }}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium whitespace-nowrap"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleDeleteAccount}
-                        disabled={deleteConfirmText !== 'DELETE' || deleting}
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-medium whitespace-nowrap"
-                      >
-                        {deleting ? (
-                          <>
-                            <i className="ri-loader-4-line animate-spin mr-2"></i>
-                            Sending...
-                          </>
-                        ) : (
-                          'Send Deletion Request'
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border p-6">
-          <h2 className="text-lg font-bold mb-4">Your Privacy Rights</h2>
-          <div className="space-y-4 text-sm text-gray-700">
-            <div className="flex gap-3">
-              <i className="ri-eye-line text-lg text-gray-400 flex-shrink-0"></i>
-              <div>
-                <h3 className="font-semibold mb-1">Right to Access</h3>
-                <p className="text-gray-600">You can download your profile, addresses and orders at any time.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <i className="ri-edit-line text-lg text-gray-400 flex-shrink-0"></i>
-              <div>
-                <h3 className="font-semibold mb-1">Right to Rectification</h3>
-                <p className="text-gray-600">You can update your name and phone number in your account settings.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <i className="ri-delete-bin-line text-lg text-gray-400 flex-shrink-0"></i>
-              <div>
-                <h3 className="font-semibold mb-1">Right to Erasure</h3>
-                <p className="text-gray-600">You can ask us to delete your account.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <i className="ri-file-shield-line text-lg text-gray-400 flex-shrink-0"></i>
-              <div>
-                <h3 className="font-semibold mb-1">Right to Data Portability</h3>
-                <p className="text-gray-600">Export your data in a structured, machine-readable format.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gray-100 rounded-xl p-4">
-          <p className="text-sm text-gray-600 text-center">
-            Questions about privacy? Read our{' '}
-            <Link href="/privacy" className="text-black font-medium hover:underline">
-              Privacy Policy
-            </Link>
-            {' '}or{' '}
-            <Link href="/contact" className="text-black font-medium hover:underline">
-              contact support
-            </Link>
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pt-8 md:pt-12 pb-7 md:pb-10 flex flex-col gap-4">
+        <Link href="/account?tab=security" className="self-start inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-[#4D3A3F] hover:text-[#1F1115]">
+          <i className="ri-arrow-left-line" aria-hidden="true"></i>
+          Back to your account
+        </Link>
+        <div className="flex flex-col gap-2.5">
+          <h1 className="font-serif text-[40px] md:text-[56px] leading-[0.95] tracking-[-0.02em]">Privacy and <em>data</em></h1>
+          <p className="text-[15px] leading-relaxed text-[#6B565B] max-w-[560px]">
+            We only use your details to process your orders and look after your account. You can download a copy or ask us to delete your account below.
           </p>
         </div>
-      </div>
-    </div>
+      </section>
+
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pb-24 md:pb-28 grid lg:grid-cols-[1.4fr_1fr] gap-4 items-start">
+        <div className="flex flex-col gap-4">
+          <div className={card}>
+            <div className="flex flex-col gap-1.5">
+              <h2 className="font-serif text-[28px] md:text-[30px] leading-none">Download your data</h2>
+              <p className="text-[15px] text-[#6B565B]">Download a copy of your profile, saved addresses and orders in JSON format.</p>
+            </div>
+            <ul className="flex flex-col gap-2 text-[14px] text-[#4D3A3F]">
+              {included.map((line) => (
+                <li key={line} className="flex items-start gap-2">
+                  <i className="ri-check-line text-[#2F6B3A] leading-5" aria-hidden="true"></i>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={handleExportData}
+              disabled={exporting}
+              className="self-start inline-flex items-center gap-2 min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exporting ? (
+                <>
+                  <i className="ri-loader-4-line animate-spin motion-reduce:animate-none" aria-hidden="true"></i>
+                  Preparing export…
+                </>
+              ) : (
+                <>
+                  <i className="ri-download-line" aria-hidden="true"></i>
+                  Export my data
+                </>
+              )}
+            </button>
+            {exportMessage && (
+              <p
+                role={exportMessage.type === 'success' ? 'status' : 'alert'}
+                className={`rounded-2xl px-4 py-3 text-sm ${exportMessage.type === 'success' ? 'bg-[#DDE7D6] text-[#244A2C]' : 'bg-[#F6DCD7] text-[#7A1F2E]'}`}
+              >
+                {exportMessage.text}
+              </p>
+            )}
+          </div>
+
+          <div className={card}>
+            <div className="flex flex-col gap-1.5">
+              <h2 className="font-serif text-[28px] md:text-[30px] leading-none">Delete your account</h2>
+              <p className="text-[15px] text-[#6B565B]">Ask us to delete your account. We&apos;ll review your request and confirm by email.</p>
+            </div>
+
+            {deleteRequested ? (
+              <p role="status" className="flex items-start gap-2 rounded-2xl bg-[#DDE7D6] text-[#244A2C] px-4 py-3 text-sm">
+                <i className="ri-checkbox-circle-line text-base leading-5" aria-hidden="true"></i>
+                <span>We&apos;ve received your request and will confirm by email.</span>
+              </p>
+            ) : !showDeleteConfirm ? (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="self-start inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full text-[#7A1F2E] text-[14px] font-semibold shadow-[inset_0_0_0_1px_rgba(122,31,46,0.4)] hover:bg-[#F6DCD7] transition-colors motion-reduce:transition-none"
+              >
+                <i className="ri-delete-bin-line" aria-hidden="true"></i>
+                Request account deletion
+              </button>
+            ) : (
+              <div className="flex flex-col gap-4 p-5 rounded-[18px] bg-white shadow-[inset_0_0_0_1px_rgba(122,31,46,0.3)]">
+                <h3 className="text-[15px] font-bold text-[#7A1F2E]">Before you continue</h3>
+                <ul className="flex flex-col gap-2 text-[14px] text-[#4D3A3F]">
+                  <li className="flex items-start gap-2">
+                    <i className="ri-information-line text-[#7A1F2E] leading-5" aria-hidden="true"></i>
+                    <span>Download your data first if you want to keep a copy of your orders.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <i className="ri-information-line text-[#7A1F2E] leading-5" aria-hidden="true"></i>
+                    <span>Once your account is deleted you won&apos;t be able to sign in with it again.</span>
+                  </li>
+                </ul>
+
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="delete-confirm" className="text-[14px] font-semibold">
+                    Type <span className="font-bold">DELETE</span> to confirm
+                  </label>
+                  <input
+                    id="delete-confirm"
+                    type="text"
+                    autoComplete="off"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    className="w-full h-[52px] px-4 rounded-[14px] bg-white text-[16px] outline-none shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] focus:shadow-[inset_0_0_0_1.5px_#7A1F2E] transition-shadow motion-reduce:transition-none"
+                  />
+                </div>
+
+                {deleteError && <p role="alert" className="text-[13px] text-[#7A1F2E]">{deleteError}</p>}
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setDeleteConfirmText('');
+                    }}
+                    className={outlineBtn}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={deleteConfirmText !== 'DELETE' || deleting}
+                    className="inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-full bg-[#7A1F2E] text-[#F6EDE3] text-[14px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deleting ? (
+                      <>
+                        <i className="ri-loader-4-line animate-spin motion-reduce:animate-none" aria-hidden="true"></i>
+                        Sending…
+                      </>
+                    ) : (
+                      'Send deletion request'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <aside className="flex flex-col gap-5 p-6 md:p-8 rounded-[24px] bg-[#2B0B12] text-[#F6EDE3]">
+          <h2 className="font-serif text-[26px] md:text-[28px] leading-none">Your privacy rights</h2>
+          <ul className="flex flex-col gap-4">
+            {rights.map((r) => (
+              <li key={r.title} className="flex gap-3">
+                <i className={`${r.icon} text-lg leading-6 text-[#D9A441]`} aria-hidden="true"></i>
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[15px] font-semibold">{r.title}</span>
+                  <span className="text-[14px] leading-relaxed text-[#E3CFC7]">{r.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="pt-4 border-t border-[#F6EDE3]/15 text-[14px] text-[#E3CFC7]">
+            Questions about privacy? Read our{' '}
+            <Link href="/privacy" className="font-semibold text-[#F6EDE3] underline underline-offset-[3px]">Privacy Policy</Link>
+            {' '}or{' '}
+            <Link href="/contact" className="font-semibold text-[#F6EDE3] underline underline-offset-[3px]">contact us</Link>.
+          </p>
+        </aside>
+      </section>
+    </main>
   );
 }

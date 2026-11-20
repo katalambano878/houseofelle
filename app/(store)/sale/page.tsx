@@ -5,6 +5,8 @@ import Link from 'next/link';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/skeletons/ProductCardSkeleton';
 import type { StorefrontPromo } from '@/hooks/usePromo';
+import { useCMS } from '@/context/CMSContext';
+import { whatsappLink } from '@/components/sale/SaleBits';
 
 type SaleProduct = {
   id: string;
@@ -30,6 +32,14 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'price-asc', label: 'Price: low to high' },
   { key: 'price-desc', label: 'Price: high to low' },
   { key: 'name', label: 'A to Z' },
+];
+
+/** Card colours for the savings-by-collection tiles, in turn. */
+const TIER_TONES = [
+  'bg-[#2B0B12] text-[#F6EDE3]',
+  'bg-[#4A1520] text-[#F6EDE3]',
+  'bg-[#FBF6EF] text-[#1F1115] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]',
+  'bg-[#D9A441] text-[#2B0B12]',
 ];
 
 function useCountdown(endsAt: string | null | undefined) {
@@ -58,7 +68,10 @@ export default function SalePage() {
   const [category, setCategory] = useState('all');
   const [minPercent, setMinPercent] = useState(0);
   const [sort, setSort] = useState<SortKey>('discount');
-  const countdown = useCountdown(promo?.live ? promo.ends_at : null);
+  const { getSetting } = useCMS();
+  // While live, count down to the end; while announced, to the start.
+  const countdown = useCountdown(promo ? (promo.live ? promo.ends_at : promo.starts_at) : null);
+  const countdownLabel = promo?.live ? 'Sale ends in' : 'Starts in';
 
   useEffect(() => {
     document.title = 'Sale | House of Elle';
@@ -107,135 +120,198 @@ export default function SalePage() {
 
   const live = Boolean(promo?.live && products.length);
 
+  // Best real saving in each collection, from the sale items themselves.
+  const collections = useMemo(() => {
+    const map = new Map<string, number>();
+    products.forEach((p) => p.category && map.set(p.category, Math.max(map.get(p.category) || 0, p.percent_off)));
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [products]);
+
+  const whatsapp = getSetting('contact_whatsapp') || '0570551050';
+  const heading = promo ? promo.popup?.title || promo.name : 'No sale on right now';
+  const intro = live
+    ? `${products.length} hand-picked ${products.length === 1 ? 'product is' : 'products are'} on sale${range ? `, ${range} off` : ''}. Prices are already reduced; no code needed.`
+    : promo
+      ? promo.popup?.message || 'Our next sale is on its way. Check back soon.'
+      : 'Browse the full collection, or come back soon for our next sale.';
+
+  const btn = 'inline-flex whitespace-nowrap items-center justify-center gap-2 min-h-[56px] px-7 rounded-full text-[15px] font-semibold';
+
   return (
-    <main className="min-h-screen bg-[#F1E8DC]">
-      <section className="relative overflow-hidden bg-blue-800 text-white">
-        <svg
-          className="pointer-events-none absolute -right-24 -top-24 w-[28rem] h-[28rem] text-blue-500/20"
-          viewBox="0 0 200 200"
-          fill="none"
-          aria-hidden="true"
-        >
-          <circle cx="100" cy="100" r="99" stroke="currentColor" />
-          <circle cx="100" cy="100" r="80" stroke="currentColor" />
-          <circle cx="100" cy="100" r="61" stroke="currentColor" />
-          <circle cx="100" cy="100" r="42" stroke="currentColor" />
-        </svg>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
-          <nav className="text-sm text-white/60 mb-6" aria-label="Breadcrumb">
-            <Link href="/" className="hover:text-white">Home</Link>
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <section aria-labelledby="sale-title" className="bg-[#E8C5BE] text-[#2B0B12]">
+        <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 md:pt-[88px] pb-14 md:pb-24">
+          <nav className="text-sm text-[#4A1520] mb-8 md:mb-10" aria-label="Breadcrumb">
+            <Link href="/" className="underline-offset-2 hover:underline">Home</Link>
             <span className="mx-2" aria-hidden="true">/</span>
-            <span className="text-white/90">Sale</span>
+            <span aria-current="page">Sale</span>
           </nav>
           {loading ? (
-            <div className="space-y-4 animate-pulse" aria-hidden="true">
-              <div className="h-4 w-40 bg-white/15 rounded" />
-              <div className="h-12 w-3/4 max-w-xl bg-white/15 rounded" />
-              <div className="h-5 w-2/3 max-w-md bg-white/10 rounded" />
+            <div className="flex flex-col gap-5 animate-pulse motion-reduce:animate-none" aria-hidden="true">
+              <div className="h-9 w-2/3 max-w-md rounded-full bg-[#2B0B12]/10" />
+              <div className="h-28 w-1/2 max-w-sm rounded-[22px] bg-[#2B0B12]/10" />
             </div>
           ) : (
-            <div className="grid lg:grid-cols-[1.3fr_1fr] gap-10 items-end">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-500">
-                  {promo ? (live ? `${promo.name} · On now` : `${promo.name} · Coming soon`) : 'House of Elle'}
-                </p>
-                <h1 className="mt-4 font-serif text-4xl sm:text-6xl leading-[1.05] text-balance">
-                  {live && range ? (
-                    <>
-                      Up to <span className="text-blue-500">{promo!.max_percent}%</span> off
-                      <span className="block text-white/90 text-3xl sm:text-4xl mt-2">perfumes, mists &amp; candles</span>
-                    </>
-                  ) : promo ? (
-                    promo.popup?.title || promo.name
-                  ) : (
-                    'No sale on right now'
-                  )}
+            <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:gap-14 lg:items-end">
+              <div className="flex flex-col gap-2">
+                <h1 id="sale-title" className="font-serif italic text-[30px] md:text-[39px] leading-none text-balance">
+                  {heading}
+                  {promo && <span className="sr-only">{live ? ', on now' : ', coming soon'}</span>}
                 </h1>
-                <p className="mt-5 max-w-xl text-white/75 leading-relaxed text-pretty">
-                  {live
-                    ? `${products.length} hand-picked ${products.length === 1 ? 'product is' : 'products are'} on sale${range ? `, ${range} off` : ''}. Prices are already reduced; no code needed.`
-                    : promo
-                      ? promo.popup?.message || 'Our next sale is on its way. Check back soon.'
-                      : 'Browse the full collection, or come back soon for our next sale.'}
-                </p>
+                {promo && promo.max_percent > 0 ? (
+                  <p className="flex items-start gap-3 md:gap-5">
+                    <span className="sr-only">Up to</span>
+                    <span className="font-serif text-[96px] sm:text-[130px] lg:text-[150px] leading-[0.82] tracking-[-0.05em] tabular-nums">{promo.max_percent}%</span>
+                    <span className="pt-2 md:pt-6 text-base md:text-lg font-bold leading-snug">
+                      off
+                      {promo.min_percent !== promo.max_percent && (
+                        <>
+                          <br />
+                          at most
+                        </>
+                      )}
+                    </span>
+                  </p>
+                ) : (
+                  promo && <p className="font-serif text-[40px] md:text-[56px] leading-none">{live ? 'On now' : 'Coming soon'}</p>
+                )}
               </div>
-              {countdown && (
-                <div aria-label="Time left in the sale">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-white/60 mb-3">Sale ends in</p>
-                  <div className="grid grid-cols-4 gap-2 sm:gap-3 max-w-md">
-                    {countdown.map(([label, value]) => (
-                      <div key={label} className="rounded-2xl bg-white/[0.07] ring-1 ring-white/10 py-3 sm:py-4 text-center">
-                        <span className="block text-2xl sm:text-4xl font-bold tabular-nums">{String(value).padStart(2, '0')}</span>
-                        <span className="block mt-1 text-[10px] sm:text-xs uppercase tracking-wider text-white/60">{label}</span>
-                      </div>
-                    ))}
+
+              <div className="flex flex-col gap-6 md:gap-7">
+                <p className="text-[15px] md:text-base leading-relaxed max-w-[460px] text-pretty">{intro}</p>
+
+                {countdown && (
+                  <div role="timer" aria-label={`${countdownLabel} ${countdown.map(([l, v]) => `${v} ${l}`).join(' ')}`} className="flex flex-col gap-2.5">
+                    <span className="text-[13px] font-bold">{countdownLabel}</span>
+                    <div className="grid grid-cols-4 gap-2 max-w-[392px]">
+                      {countdown.map(([label, value]) => (
+                        <span key={label} className="flex flex-col items-center gap-1 rounded-[20px] bg-[#2B0B12] text-[#F6EDE3] pt-4 pb-3">
+                          <span className="font-serif text-[24px] md:text-[29px] leading-none tabular-nums">{String(value).padStart(2, '0')}</span>
+                          <span className="text-[11px] font-semibold text-[#E3CFC7]">{label}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+                  <a
+                    href={whatsappLink(whatsapp, promo ? `Hello House of Elle, I'd like to know more about the ${promo.name} sale.` : "Hello House of Elle, I'd like some help choosing a scent.")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${btn} bg-[#2B0B12] text-[#F6EDE3] hover:bg-[#4A1520] transition-colors motion-reduce:transition-none`}
+                  >
+                    <i className="ri-whatsapp-line text-lg" aria-hidden="true" />
+                    {live ? 'Order on WhatsApp' : promo ? 'Reserve on WhatsApp' : 'Ask us on WhatsApp'}
+                  </a>
+                  {live ? (
+                    <a href="#deals" className={`${btn} shadow-[inset_0_0_0_1.5px_#2B0B12] hover:bg-[#2B0B12]/5 transition-colors motion-reduce:transition-none`}>
+                      See the deals
+                    </a>
+                  ) : (
+                    <Link href="/shop" className={`${btn} shadow-[inset_0_0_0_1.5px_#2B0B12] hover:bg-[#2B0B12]/5 transition-colors motion-reduce:transition-none`}>
+                      Browse the collection
+                    </Link>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+      {live && collections.length > 1 && (
+        <section aria-labelledby="sale-collections" className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-16 md:pt-24 pb-4 md:pb-8 flex flex-col gap-6 md:gap-8">
+          <h2 id="sale-collections" className="font-serif text-[30px] md:text-[39px] leading-none">
+            Savings by <em>collection</em>
+          </h2>
+          <ul className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {collections.map(([name, best], i) => {
+              const tone = TIER_TONES[i % TIER_TONES.length];
+              return (
+                <li key={name}>
+                  <a
+                    href="#deals"
+                    onClick={() => {
+                      setCategory(name);
+                      setMinPercent(0);
+                    }}
+                    className={`flex h-full flex-col justify-between gap-8 md:gap-10 min-h-[170px] md:min-h-[230px] p-5 md:p-[26px] rounded-[24px] ${tone} transition-transform duration-300 hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0`}
+                  >
+                    <span className="font-serif text-[19px] md:text-[21px] leading-[1.1]">{name}</span>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-[13px] font-semibold">up to</span>
+                      <span className="font-serif text-[36px] md:text-[43px] leading-[0.85] tracking-[-0.03em] tabular-nums">{best}%</span>
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      <section id="deals" aria-label={live ? 'The deals' : undefined} className="scroll-mt-24 max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-14 md:pt-[72px] pb-20 md:pb-32">
         {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12">
             {Array.from({ length: 8 }).map((_, i) => (
               <ProductCardSkeleton key={i} />
             ))}
           </div>
         ) : failed ? (
-          <div className="text-center py-20">
-            <p className="text-gray-700 font-semibold">We couldn&apos;t load the sale just now.</p>
+          <div className="flex flex-col items-center gap-4 text-center py-16">
+            <p className="font-serif text-[26px] leading-tight">We couldn&apos;t load the sale just now.</p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-4 px-5 py-2.5 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
+              className="min-h-[52px] px-7 rounded-full shadow-[inset_0_0_0_1.5px_#2B0B12] font-semibold hover:bg-[#2B0B12]/5 transition-colors motion-reduce:transition-none"
             >
               Try again
             </button>
           </div>
         ) : !live ? (
-          <div className="text-center py-16 max-w-md mx-auto">
-            <div className="w-16 h-16 mx-auto rounded-full bg-blue-50 flex items-center justify-center">
-              <i className="ri-price-tag-3-line text-3xl text-blue-700" aria-hidden="true" />
-            </div>
-            <h2 className="mt-5 text-2xl font-serif text-gray-900">
+          <div className="flex flex-col items-center gap-3 text-center py-8 md:py-12 max-w-md mx-auto">
+            <h2 className="font-serif text-[28px] md:text-[34px] leading-tight">
               {promo ? 'The sale prices go live soon' : 'Nothing on sale today'}
             </h2>
-            <p className="mt-2 text-gray-600">Our full collection is still here for you.</p>
+            <p className="text-[15px] text-[#6B565B]">Our full collection is still here for you.</p>
             <Link
               href="/shop"
-              className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold transition-colors"
+              className="mt-3 inline-flex items-center gap-2 min-h-[54px] px-8 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none"
             >
               Browse the collection <i className="ri-arrow-right-line" aria-hidden="true" />
             </Link>
           </div>
         ) : (
-          <>
-            <div className="flex flex-col gap-4 mb-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <p className="text-sm text-gray-600">
-                  Showing <span className="font-semibold text-gray-900 tabular-nums">{shown.length}</span> of{' '}
-                  <span className="tabular-nums">{products.length}</span> sale items
-                </p>
-                <label className="flex items-center gap-2 text-sm text-gray-600">
-                  Sort by
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value as SortKey)}
-                    className="px-3 py-2 pr-8 border-2 border-gray-200 rounded-lg text-gray-900 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    {SORTS.map((s) => (
-                      <option key={s.key} value={s.key}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+          <div className="flex flex-col gap-8 md:gap-10">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <h2 className="font-serif text-[30px] md:text-[39px] leading-none">
+                  The <em>deals</em>
+                </h2>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+                  <p className="text-sm text-[#6B565B]" aria-live="polite">
+                    Showing <span className="font-semibold text-[#1F1115] tabular-nums">{shown.length}</span> of{' '}
+                    <span className="tabular-nums">{products.length}</span> sale items
+                  </p>
+                  <label className="flex items-center gap-2 text-sm text-[#6B565B]">
+                    Sort by
+                    <select
+                      value={sort}
+                      onChange={(e) => setSort(e.target.value as SortKey)}
+                      className="h-11 pl-4 pr-9 rounded-full bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.18)] text-[#1F1115] font-semibold outline-none focus-visible:shadow-[inset_0_0_0_1.5px_#2B0B12]"
+                    >
+                      {SORTS.map((s) => (
+                        <option key={s.key} value={s.key}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
 
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap" role="group" aria-label="Filter sale items">
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 sm:flex-wrap" role="group" aria-label="Filter sale items">
                 <Chip active={category === 'all' && minPercent === 0} onClick={() => { setCategory('all'); setMinPercent(0); }}>
                   All
                 </Chip>
@@ -247,28 +323,28 @@ export default function SalePage() {
                 {categories.length > 1 &&
                   categories.map(([name, count]) => (
                     <Chip key={name} active={category === name} onClick={() => setCategory(category === name ? 'all' : name)}>
-                      {name} <span className="opacity-60 tabular-nums">{count}</span>
+                      {name} <span className="opacity-70 tabular-nums">{count}</span>
                     </Chip>
                   ))}
               </div>
             </div>
 
             {shown.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-gray-700 font-semibold">No sale items match these filters.</p>
+              <div className="flex flex-col items-center gap-3 text-center py-14">
+                <p className="font-serif text-[24px] leading-tight">No sale items match these filters.</p>
                 <button
                   type="button"
                   onClick={() => {
                     setCategory('all');
                     setMinPercent(0);
                   }}
-                  className="mt-3 text-blue-700 font-semibold hover:text-blue-800"
+                  className="min-h-[44px] px-4 font-semibold text-[#7A1F2E] underline underline-offset-4"
                 >
                   Clear filters
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12">
                 {shown.map((p) => {
                   const images = [...(p.product_images || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
                   const variants = p.product_variants || [];
@@ -296,7 +372,7 @@ export default function SalePage() {
                 })}
               </div>
             )}
-          </>
+          </div>
         )}
       </section>
     </main>
@@ -309,8 +385,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border-2 transition-colors cursor-pointer ${
-        active ? 'bg-blue-800 border-blue-800 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+      className={`shrink-0 inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full text-sm font-semibold transition-colors motion-reduce:transition-none ${
+        active ? 'bg-[#2B0B12] text-[#F6EDE3]' : 'bg-[#FBF6EF] text-[#1F1115] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] hover:bg-white'
       }`}
     >
       {children}

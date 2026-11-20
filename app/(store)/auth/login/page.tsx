@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +12,11 @@ function safeRedirect(value: string | null): string {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return '/account';
   return value;
 }
+
+const fieldBase =
+  'w-full h-[54px] px-[18px] rounded-[16px] bg-[#FBF6EF] text-[16px] text-[#1F1115] placeholder:text-[#8A7479] outline-none transition-shadow motion-reduce:transition-none';
+const field = `${fieldBase} shadow-[inset_0_0_0_1px_rgba(31,17,21,0.18)] focus:shadow-[inset_0_0_0_1.5px_#2B0B12]`;
+const fieldBad = `${fieldBase} shadow-[inset_0_0_0_1.5px_#7A1F2E]`;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -84,96 +90,113 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center py-12 px-4 sm:px-6">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your account to continue</p>
-        </div>
+    <main className="grid lg:grid-cols-2 min-h-[calc(100vh-80px)] bg-[#F1E8DC] text-[#1F1115]">
+      <div className="relative overflow-hidden bg-[#2B0B12] min-h-[260px] sm:min-h-[320px] lg:min-h-0">
+        <Image
+          src="/Whisk_a23750058b309cf9155424b5e8ea85dcdr.jpeg"
+          alt="Amber perfume bottles lit from behind"
+          fill
+          priority
+          sizes="(max-width: 1024px) 100vw, 50vw"
+          className="object-cover opacity-85"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#2B0B12]/80 via-transparent to-[#2B0B12]/30" aria-hidden="true" />
+        <Link href="/" aria-label="House of Elle home" className="absolute top-6 left-5 sm:top-10 sm:left-12 inline-flex min-h-[44px] items-center">
+          <Image src="/house-of-elle-logo.png" alt="House of Elle" width={368} height={137} className="h-9 sm:h-[46px] w-auto brightness-0 invert-[.94] sepia-[.2]" />
+        </Link>
+        <p className="absolute left-5 right-5 bottom-8 sm:left-12 sm:right-12 sm:bottom-14 font-serif text-[30px] sm:text-[40px] leading-none text-[#F6EDE3] text-balance">
+          Luxury fragrances for <em className="text-[#E5B65A]">everyone.</em>
+        </p>
+      </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-8">
+      <div className="flex items-center justify-center px-5 sm:px-8 lg:px-12 py-12 md:py-16">
+        <div className="w-full max-w-[420px] flex flex-col gap-[22px]">
+          <div className="flex flex-col gap-2">
+            <h1 className="font-serif text-[40px] md:text-[48px] leading-none tracking-[-0.02em]">Welcome <em>back</em></h1>
+            <p className="text-[15px] text-[#6B565B]">Sign in to track orders and see saved scents.</p>
+          </div>
+
           {authError && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <p role="alert" className="rounded-2xl bg-[#F6DCD7] text-[#7A1F2E] px-4 py-3 text-sm">
               {authError}
-            </div>
+            </p>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Email Address
-              </label>
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-[22px]">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="login-email" className="text-[14px] font-semibold">Email</label>
               <input
+                id="login-email"
                 type="email"
+                autoComplete="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? 'login-email-error' : undefined}
+                className={`${errors.email ? fieldBad : field}`}
                 placeholder="you@example.com"
               />
-              {errors.email && (
-                <p className="text-sm text-red-600 mt-2">{errors.email}</p>
-              )}
+              {errors.email && <p id="login-email-error" className="text-[13px] text-[#7A1F2E]">{errors.email}</p>}
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Password
-              </label>
+            <div className="flex flex-col gap-2">
+              <span className="flex items-baseline justify-between gap-4">
+                <label htmlFor="login-password" className="text-[14px] font-semibold">Password</label>
+                <Link href="/auth/forgot-password" className="inline-flex items-center min-h-[44px] -my-3 text-[13px] text-[#6B565B] underline underline-offset-[3px] hover:text-[#1F1115]">
+                  Forgot it?
+                </Link>
+              </span>
               <div className="relative">
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className={`w-full px-4 py-3 pr-12 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  placeholder="Enter your password"
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? 'login-password-error' : undefined}
+                  className={`${errors.password ? fieldBad : field} pr-14`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full inline-flex items-center justify-center text-[#6B565B] hover:text-[#1F1115]"
                 >
-                  <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-xl`}></i>
+                  <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-xl`} aria-hidden="true"></i>
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-sm text-red-600 mt-2">{errors.password}</p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end">
-              <Link href="/auth/forgot-password" className="text-sm text-blue-700 hover:text-blue-900 font-medium whitespace-nowrap">
-                Forgot password?
-              </Link>
+              {errors.password && <p id="login-password-error" className="text-[13px] text-[#7A1F2E]">{errors.password}</p>}
             </div>
 
             <button
               type="submit"
               disabled={isLoading || verifying}
-              className="w-full bg-blue-700 hover:bg-blue-800 text-white py-4 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
+              className="min-h-[56px] rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[16px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading || verifying ? (
-                <span className="flex items-center justify-center">
-                  <i className="ri-loader-4-line animate-spin mr-2"></i> {verifying ? 'Verifying...' : 'Signing in...'}
+                <span className="flex items-center justify-center gap-2">
+                  <i className="ri-loader-4-line animate-spin motion-reduce:animate-none" aria-hidden="true"></i> {verifying ? 'Verifying…' : 'Signing in…'}
                 </span>
-              ) : 'Sign In'}
+              ) : 'Sign in'}
             </button>
           </form>
 
-          <p className="mt-8 text-center text-gray-600">
-            Don&apos;t have an account?{' '}
-            <Link href={redirectTo === '/account' ? '/auth/signup' : `/auth/signup?redirect=${encodeURIComponent(redirectTo)}`} className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
-              Create one now
+          <p className="text-center text-[14px] text-[#6B565B]">
+            New here?{' '}
+            <Link href={redirectTo === '/account' ? '/auth/signup' : `/auth/signup?redirect=${encodeURIComponent(redirectTo)}`} className="font-bold text-[#1F1115] underline underline-offset-[3px]">
+              Create an account
             </Link>
           </p>
-        </div>
 
-        <div className="mt-8 text-center">
-          <Link href="/" className="text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap">
-            <i className="ri-arrow-left-line mr-2"></i>
-            Back to Home
-          </Link>
+          <div className="mt-3 flex flex-col gap-2.5 p-5 rounded-[18px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+            <span className="font-serif text-[20px]">No account needed</span>
+            <span className="text-[14px] leading-[1.55] text-[#4D3A3F]">You can check out as a guest, and track any order with the number we send by SMS.</span>
+            <Link href="/order-tracking" className="self-start inline-flex items-center min-h-[44px] text-[14px] font-bold">
+              <span className="shadow-[inset_0_-1px_0_currentColor] pb-0.5">Track an order</span>
+            </Link>
+          </div>
         </div>
       </div>
     </main>

@@ -47,7 +47,11 @@ const EMPTY_FORM: AddressForm = {
 type FormErrors = Partial<Record<keyof AddressForm, string>>;
 
 const inputClass =
-  'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent';
+  'w-full h-[52px] px-4 rounded-[14px] bg-white text-[16px] text-[#1F1115] placeholder:text-[#8A7479] outline-none shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] focus:shadow-[inset_0_0_0_1.5px_#2B0B12] transition-shadow motion-reduce:transition-none';
+const labelClass = 'block text-[14px] font-semibold mb-2';
+const optional = <span className="font-normal text-[#6B565B]">(optional)</span>;
+const outlineBtn =
+  'inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-full shadow-[inset_0_0_0_1px_rgba(31,17,21,0.22)] text-[14px] font-semibold hover:bg-white transition-colors motion-reduce:transition-none disabled:opacity-50';
 
 function validate(form: AddressForm): FormErrors {
   const errors: FormErrors = {};
@@ -236,8 +240,8 @@ export default function AddressBook() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-gray-500">
-        <i className="ri-loader-4-line animate-spin text-2xl mr-2"></i>
+      <div className="flex items-center justify-center gap-2 py-16 text-[15px] text-[#6B565B]" role="status">
+        <i className="ri-loader-4-line animate-spin motion-reduce:animate-none text-2xl text-[#2B0B12]" aria-hidden="true"></i>
         Loading addresses…
       </div>
     );
@@ -245,51 +249,52 @@ export default function AddressBook() {
 
   if (!userId) {
     return (
-      <div className="text-center py-16">
-        <p className="text-gray-600 mb-4">Sign in to manage your saved addresses.</p>
+      <div className="flex flex-col items-center gap-4 text-center py-16">
+        <p className="text-[15px] text-[#6B565B]">Sign in to manage your saved addresses.</p>
         <a
           href="/auth/login?redirect=/account"
-          className="inline-block px-6 py-3 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 transition-colors"
+          className="inline-flex items-center min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none"
         >
-          Sign In
+          Sign in
         </a>
       </div>
     );
   }
 
   const fieldError = (key: keyof AddressForm) =>
-    formErrors[key] ? <p className="mt-1 text-sm text-red-600">{formErrors[key]}</p> : null;
+    formErrors[key] ? <p className="mt-1.5 text-[13px] text-[#7A1F2E]">{formErrors[key]}</p> : null;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6 gap-4">
-        <h2 className="text-2xl font-bold text-gray-900">Address Book</h2>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="font-serif text-[28px] md:text-[30px] leading-none">Addresses</h2>
         {!showForm && (
           <button
+            type="button"
             onClick={openNew}
-            className="px-4 py-2 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-2 min-h-[48px] px-5 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[14px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none"
           >
-            <i className="ri-add-line mr-2"></i>
-            Add New Address
+            <i className="ri-add-line text-lg" aria-hidden="true"></i>
+            Add an address
           </button>
         )}
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start">
-          <i className="ri-error-warning-line mr-2 mt-0.5"></i>
+        <div role="alert" className="flex items-start gap-2 rounded-2xl bg-[#F6DCD7] text-[#7A1F2E] px-4 py-3 text-sm">
+          <i className="ri-error-warning-line text-base leading-5" aria-hidden="true"></i>
           <span>{error}</span>
         </div>
       )}
 
       {showForm && (
-        <div className="bg-white border-2 border-blue-700 rounded-lg p-6 mb-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">
-            {editingId ? 'Edit Address' : 'New Address'}
+        <div className="p-6 md:p-8 rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+          <h3 className="font-serif text-[24px] leading-none mb-5">
+            {editingId ? 'Edit address' : 'New address'}
           </h3>
           <form onSubmit={handleSubmit} noValidate className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="addr-name" className="block text-sm font-semibold text-gray-900 mb-2">Full Name</label>
+              <label htmlFor="addr-name" className={labelClass}>Full name</label>
               <input
                 id="addr-name"
                 type="text"
@@ -302,7 +307,7 @@ export default function AddressBook() {
               {fieldError('full_name')}
             </div>
             <div>
-              <label htmlFor="addr-phone" className="block text-sm font-semibold text-gray-900 mb-2">Phone Number</label>
+              <label htmlFor="addr-phone" className={labelClass}>Phone number</label>
               <input
                 id="addr-phone"
                 type="tel"
@@ -315,7 +320,7 @@ export default function AddressBook() {
               {fieldError('phone')}
             </div>
             <div className="md:col-span-2">
-              <label htmlFor="addr-line1" className="block text-sm font-semibold text-gray-900 mb-2">Street Address / Landmark</label>
+              <label htmlFor="addr-line1" className={labelClass}>Street address or landmark</label>
               <input
                 id="addr-line1"
                 type="text"
@@ -328,8 +333,8 @@ export default function AddressBook() {
               {fieldError('address_line1')}
             </div>
             <div className="md:col-span-2">
-              <label htmlFor="addr-line2" className="block text-sm font-semibold text-gray-900 mb-2">
-                Address Line 2 <span className="font-normal text-gray-500">(optional)</span>
+              <label htmlFor="addr-line2" className={labelClass}>
+                Address line 2 {optional}
               </label>
               <input
                 id="addr-line2"
@@ -342,7 +347,7 @@ export default function AddressBook() {
               />
             </div>
             <div>
-              <label htmlFor="addr-city" className="block text-sm font-semibold text-gray-900 mb-2">City / Town</label>
+              <label htmlFor="addr-city" className={labelClass}>City or town</label>
               <input
                 id="addr-city"
                 type="text"
@@ -355,7 +360,7 @@ export default function AddressBook() {
               {fieldError('city')}
             </div>
             <div>
-              <label htmlFor="addr-region" className="block text-sm font-semibold text-gray-900 mb-2">Region</label>
+              <label htmlFor="addr-region" className={labelClass}>Region</label>
               <input
                 id="addr-region"
                 type="text"
@@ -368,8 +373,8 @@ export default function AddressBook() {
               {fieldError('state')}
             </div>
             <div>
-              <label htmlFor="addr-postal" className="block text-sm font-semibold text-gray-900 mb-2">
-                Postal Code <span className="font-normal text-gray-500">(optional)</span>
+              <label htmlFor="addr-postal" className={labelClass}>
+                Postal code {optional}
               </label>
               <input
                 id="addr-postal"
@@ -381,7 +386,7 @@ export default function AddressBook() {
               />
             </div>
             <div>
-              <label htmlFor="addr-country" className="block text-sm font-semibold text-gray-900 mb-2">Country</label>
+              <label htmlFor="addr-country" className={labelClass}>Country</label>
               <input
                 id="addr-country"
                 type="text"
@@ -394,8 +399,8 @@ export default function AddressBook() {
               {fieldError('country')}
             </div>
             <div>
-              <label htmlFor="addr-label" className="block text-sm font-semibold text-gray-900 mb-2">
-                Label <span className="font-normal text-gray-500">(optional)</span>
+              <label htmlFor="addr-label" className={labelClass}>
+                Label {optional}
               </label>
               <input
                 id="addr-label"
@@ -407,29 +412,29 @@ export default function AddressBook() {
               />
             </div>
             <div className="md:col-span-2">
-              <label className="flex items-center">
+              <label className="inline-flex items-center gap-3 min-h-[44px] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={form.is_default}
                   onChange={(e) => update('is_default', e.target.checked)}
-                  className="w-4 h-4 text-blue-700 border-gray-300 rounded focus:ring-blue-700"
+                  className="w-5 h-5 rounded accent-[#2B0B12]"
                 />
-                <span className="ml-2 text-sm text-gray-700">Set as default address</span>
+                <span className="text-[14px] text-[#4D3A3F]">Make this my default address</span>
               </label>
             </div>
-            <div className="md:col-span-2 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+            <div className="md:col-span-2 flex flex-wrap gap-3 pt-1">
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-3 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? 'Saving…' : 'Save Address'}
+                {saving ? 'Saving…' : 'Save address'}
               </button>
               <button
                 type="button"
                 onClick={closeForm}
                 disabled={saving}
-                className="flex-1 py-3 border-2 border-gray-300 text-gray-900 rounded-lg font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap"
+                className={`${outlineBtn} min-h-[52px] px-7`}
               >
                 Cancel
               </button>
@@ -439,73 +444,75 @@ export default function AddressBook() {
       )}
 
       {addresses.length === 0 && !showForm ? (
-        <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-lg">
-          <i className="ri-map-pin-line text-4xl text-gray-300"></i>
-          <p className="mt-3 text-gray-600">You have no saved addresses yet.</p>
-          <p className="text-sm text-gray-500">Save a delivery address to check out faster.</p>
+        <div className="flex flex-col items-center text-center gap-2 px-6 py-14 rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+          <span className="w-14 h-14 mb-2 rounded-full bg-[#F1E8DC] text-[#7A1F2E] inline-flex items-center justify-center">
+            <i className="ri-map-pin-line text-2xl" aria-hidden="true"></i>
+          </span>
+          <p className="text-[15px] font-semibold">You have no saved addresses yet.</p>
+          <p className="text-[14px] text-[#6B565B]">Save a delivery address to check out faster.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {addresses.map((address) => (
-            <div
+            <li
               key={address.id}
-              className={`bg-white border-2 rounded-lg p-6 relative ${address.is_default ? 'border-blue-700' : 'border-gray-200'}`}
+              className={`flex flex-col gap-5 p-6 rounded-[22px] bg-[#FBF6EF] ${address.is_default ? 'shadow-[inset_0_0_0_1.5px_#2B0B12]' : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]'}`}
             >
-              {address.is_default && (
-                <div className="absolute top-4 right-4">
-                  <span className="px-3 py-1 bg-blue-700 text-white text-xs font-semibold rounded-full whitespace-nowrap">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  {address.label && <span className="text-[13px] font-semibold text-[#7A1F2E]">{address.label}</span>}
+                  <h3 className="font-serif text-[22px] leading-tight">{address.full_name}</h3>
+                  <span className="text-[14px] text-[#6B565B] tabular-nums">{address.phone}</span>
+                </div>
+                {address.is_default && (
+                  <span className="flex-none inline-flex items-center h-7 px-3 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[13px] font-semibold">
                     Default
                   </span>
-                </div>
-              )}
-
-              <div className="mb-4 pr-20">
-                {address.label && (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">{address.label}</p>
                 )}
-                <h3 className="text-lg font-bold text-gray-900">{address.full_name}</h3>
-                <p className="text-gray-600">{address.phone}</p>
               </div>
 
-              <div className="text-gray-700 space-y-1 mb-6">
-                <p>{address.address_line1}</p>
-                {address.address_line2 && <p>{address.address_line2}</p>}
-                <p>
-                  {address.city}, {address.state}
-                  {address.postal_code ? ` ${address.postal_code}` : ''}
-                </p>
-                <p>{address.country}</p>
-              </div>
+              <address className="not-italic text-[15px] leading-relaxed text-[#4D3A3F]">
+                {address.address_line1}
+                {address.address_line2 && <><br />{address.address_line2}</>}
+                <br />
+                {address.city}, {address.state}
+                {address.postal_code ? ` ${address.postal_code}` : ''}
+                <br />
+                {address.country}
+              </address>
 
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              <div className="flex flex-wrap gap-2 mt-auto">
                 <button
+                  type="button"
                   onClick={() => openEdit(address)}
                   disabled={busyId === address.id}
-                  className="flex-1 py-2 border border-gray-300 text-gray-900 rounded-lg font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap"
+                  className={outlineBtn}
                 >
                   Edit
                 </button>
                 {!address.is_default && (
                   <button
+                    type="button"
                     onClick={() => setDefault(address)}
                     disabled={busyId === address.id}
-                    className="flex-1 py-2 border border-blue-700 text-blue-700 rounded-lg font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap disabled:opacity-60"
+                    className={outlineBtn}
                   >
-                    Set Default
+                    Make default
                   </button>
                 )}
                 <button
+                  type="button"
                   onClick={() => deleteAddress(address)}
                   disabled={busyId === address.id}
                   aria-label={`Delete address for ${address.full_name}`}
-                  className="px-4 py-2 border border-red-600 text-red-600 rounded-lg font-semibold hover:bg-red-50 transition-colors whitespace-nowrap disabled:opacity-60"
+                  className="inline-flex items-center justify-center w-11 h-11 rounded-full text-[#7A1F2E] shadow-[inset_0_0_0_1px_rgba(122,31,46,0.35)] hover:bg-[#F6DCD7] transition-colors motion-reduce:transition-none disabled:opacity-50"
                 >
-                  <i className="ri-delete-bin-line"></i>
+                  <i className="ri-delete-bin-line text-lg" aria-hidden="true"></i>
                 </button>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

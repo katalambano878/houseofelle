@@ -6,6 +6,8 @@ import Link from 'next/link';
 import OrderHistory from './OrderHistory';
 import AddressBook from './AddressBook';
 import { supabase } from '@/lib/supabase';
+import { useWishlist } from '@/context/WishlistContext';
+import { money } from '@/lib/format-money';
 
 const TABS = ['profile', 'orders', 'addresses', 'security'];
 
@@ -13,11 +15,12 @@ function AccountContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab');
-  const initialTab = requestedTab && TABS.includes(requestedTab) ? requestedTab : 'profile';
+  const initialTab = requestedTab && TABS.includes(requestedTab) ? requestedTab : 'orders';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { wishlist, wishlistCount } = useWishlist();
 
   // Update active tab when URL param changes
   useEffect(() => {
@@ -71,7 +74,7 @@ function AccountContent() {
 
   const selectTab = (tab: string) => {
     setActiveTab(tab);
-    router.replace(tab === 'profile' ? '/account' : `/account?tab=${tab}`, { scroll: false });
+    router.replace(tab === 'orders' ? '/account' : `/account?tab=${tab}`, { scroll: false });
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -133,282 +136,306 @@ function AccountContent() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <i className="ri-loader-4-line animate-spin text-4xl text-blue-700"></i>
-      </div>
-    );
+    return <AccountLoading />;
   }
 
+  const field =
+    'w-full h-[52px] px-4 rounded-[14px] bg-white text-[16px] text-[#1F1115] placeholder:text-[#8A7479] outline-none shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] focus:shadow-[inset_0_0_0_1.5px_#2B0B12] transition-shadow motion-reduce:transition-none';
+  const label = 'text-[14px] font-semibold';
+  const card = 'flex flex-col gap-6 p-6 md:p-8 rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]';
+  const primary =
+    'self-start inline-flex items-center justify-center min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none disabled:opacity-50';
+
+  const message = (m: { type: string; text: string }) =>
+    m.text ? (
+      <p
+        role={m.type === 'success' ? 'status' : 'alert'}
+        className={`flex items-start gap-2.5 rounded-2xl px-4 py-3 text-sm ${m.type === 'success' ? 'bg-[#DDE7D6] text-[#244A2C]' : 'bg-[#F6DCD7] text-[#7A1F2E]'}`}
+      >
+        <i className={`text-base leading-5 ${m.type === 'success' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'}`} aria-hidden="true"></i>
+        <span>{m.text}</span>
+      </p>
+    ) : null;
+
+  const menu: { id: string; label: string; count?: number; href?: string }[] = [
+    { id: 'orders', label: 'Orders' },
+    { id: 'saved', label: 'Saved items', count: wishlistCount, href: '/wishlist' },
+    { id: 'addresses', label: 'Addresses' },
+    { id: 'profile', label: 'Details and password' },
+    { id: 'security', label: 'Privacy and security' },
+    { id: 'help', label: 'Help', href: '/contact' },
+  ];
+  const menuItem = (on: boolean) =>
+    `flex items-center justify-between gap-3 min-h-[48px] px-4 rounded-[14px] text-[15px] text-left transition-colors motion-reduce:transition-none ${
+      on ? 'bg-[#2B0B12] text-[#F6EDE3] font-bold' : 'font-medium hover:bg-[#FBF6EF]'
+    }`;
+
+  const saved = wishlist.slice(0, 3);
+
   return (
-    <>
-      <div className="min-h-screen bg-[#F1E8DC] py-8 lg:py-12 pb-24 lg:pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
-            <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto">
-              <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xl md:text-2xl font-bold shadow-inner border-2 border-white">
-                {profileData.firstName?.[0] || user?.email?.[0]?.toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate pr-2">{profileData.firstName ? `Hello, ${profileData.firstName}!` : 'Welcome Back'}</h1>
-                <p className="text-gray-500 text-sm font-medium truncate">{user?.email}</p>
-              </div>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:text-red-600 hover:border-red-200 transition-all font-medium shadow-sm w-full md:w-auto justify-center md:justify-start"
-            >
-              <i className="ri-logout-box-r-line"></i>
-              Sign Out
-            </button>
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 md:pt-14 pb-24 md:pb-28 flex flex-col gap-8 md:gap-10">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <span className="text-[14px] text-[#6B565B] break-all">{user?.email}</span>
+            <h1 className="font-serif text-[40px] md:text-[56px] leading-[0.95] tracking-[-0.02em]">
+              {profileData.firstName ? <>Welcome back, <em>{profileData.firstName}</em></> : <>Welcome <em>back</em></>}
+            </h1>
           </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold"
+          >
+            <i className="ri-logout-box-r-line" aria-hidden="true"></i>
+            <span className="shadow-[inset_0_-1px_0_currentColor] pb-0.5">Sign out</span>
+          </button>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Desktop Sidebar Navigation */}
-            <div className="hidden lg:block lg:col-span-1">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden sticky top-24">
-                <nav className="p-2 space-y-1">
-                  {[
-                    { id: 'profile', icon: 'ri-user-settings-line', label: 'Profile Settings' },
-                    { id: 'orders', icon: 'ri-shopping-bag-3-line', label: 'Order History' },
-                    { id: 'addresses', icon: 'ri-map-pin-2-line', label: 'Addresses' },
-                    { id: 'security', icon: 'ri-shield-keyhole-line', label: 'Security' }
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => selectTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-left group ${activeTab === tab.id
-                        ? 'bg-blue-50 text-blue-700 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        }`}
-                    >
-                      <i className={`${tab.icon} text-xl transition-colors ${activeTab === tab.id ? 'text-blue-700' : 'text-gray-400 group-hover:text-gray-600'}`}></i>
-                      <span>{tab.label}</span>
-                    </button>
-                  ))}
-                </nav>
-              </div>
-            </div>
-
-            {/* Mobile Horizontal Navigation */}
-            <div className="lg:hidden col-span-1 pb-2 -mx-4 px-4">
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {[
-                  { id: 'profile', icon: 'ri-user-settings-line', label: 'Profile' },
-                  { id: 'orders', icon: 'ri-shopping-bag-3-line', label: 'Orders' },
-                  { id: 'addresses', icon: 'ri-map-pin-2-line', label: 'Address' },
-                  { id: 'security', icon: 'ri-shield-keyhole-line', label: 'Security' }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => selectTab(tab.id)}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium whitespace-nowrap transition-all border shadow-sm ${activeTab === tab.id
-                      ? 'bg-blue-700 text-white border-blue-700 ring-2 ring-blue-100'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                      }`}
-                  >
-                    <i className={tab.icon}></i>
-                    <span>{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="lg:col-span-3">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-8 min-h-[500px]">
-                {activeTab === 'profile' && (
-                  <div className="max-w-2xl">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Profile Information</h2>
-                    <p className="text-gray-500 mb-8">Update your personal details and contact info.</p>
-
-                    {profileMessage.text && (
-                      <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 ${profileMessage.type === 'success' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                        <i className={`text-xl mt-0.5 ${profileMessage.type === 'success' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'}`}></i>
-                        <div>{profileMessage.text}</div>
-                      </div>
-                    )}
-
-                    <form onSubmit={handleUpdateProfile} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-gray-900">First Name</label>
-                          <input
-                            type="text"
-                            value={profileData.firstName}
-                            onChange={e => setProfileData({ ...profileData, firstName: e.target.value })}
-                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-gray-900">Last Name</label>
-                          <input
-                            type="text"
-                            value={profileData.lastName}
-                            onChange={e => setProfileData({ ...profileData, lastName: e.target.value })}
-                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-900">Email Address</label>
-                        <div className="relative">
-                          <i className="ri-mail-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                          <input
-                            type="email"
-                            value={profileData.email}
-                            disabled
-                            className="w-full pl-11 pr-4 py-3 border-2 border-gray-100 bg-gray-50/50 rounded-xl text-gray-500 cursor-not-allowed"
-                          />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold bg-gray-200 text-gray-600 px-2 py-1 rounded">Read Only</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-900">Phone Number</label>
-                        <div className="relative">
-                          <i className="ri-phone-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                          <input
-                            type="tel"
-                            value={profileData.phone}
-                            onChange={e => setProfileData({ ...profileData, phone: e.target.value })}
-                            placeholder="+233 XX XXX XXXX"
-                            className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="pt-4">
-                        <button
-                          type="submit"
-                          disabled={profileLoading}
-                          className="px-8 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-semibold transition-all shadow-lg shadow-blue-700/20 active:scale-95 disabled:opacity-50 disabled:shadow-none"
-                        >
-                          {profileLoading ? 'Saving Info...' : 'Save Profile Information'}
-                        </button>
-                      </div>
-                    </form>
-
-                    <div className="mt-12 pt-12 border-t border-gray-100">
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">Change Password</h3>
-                      <p className="text-gray-500 mb-6">Ensure your account uses a strong, unique password.</p>
-
-                      {passwordMessage.text && (
-                        <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 ${passwordMessage.type === 'success' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                          <i className={`text-xl mt-0.5 ${passwordMessage.type === 'success' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'}`}></i>
-                          <div>{passwordMessage.text}</div>
-                        </div>
-                      )}
-
-                      <form onSubmit={handleChangePassword} className="space-y-5">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-gray-900">New Password</label>
-                            <div className="relative">
-                              <i className="ri-lock-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                              <input
-                                type="password"
-                                value={passwordData.password}
-                                onChange={e => setPasswordData({ ...passwordData, password: e.target.value })}
-                                className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-gray-900">Confirm Password</label>
-                            <div className="relative">
-                              <i className="ri-lock-check-line absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                              <input
-                                type="password"
-                                value={passwordData.confirmPassword}
-                                onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                                className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={passwordLoading}
-                          className="px-8 py-3 bg-gray-900 hover:bg-black text-white rounded-xl font-semibold transition-all shadow-lg shadow-gray-900/10 active:scale-95 disabled:opacity-50 disabled:shadow-none"
-                        >
-                          {passwordLoading ? 'Updating...' : 'Update Password'}
-                        </button>
-                      </form>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'orders' && <OrderHistory />}
-
-                {activeTab === 'addresses' && <AddressBook />}
-
-                {activeTab === 'security' && (
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Security Settings</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="flex items-center gap-3 p-5 border border-gray-200 rounded-2xl bg-white min-w-0">
-                        <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center flex-shrink-0">
-                          <i className="ri-mail-line text-xl"></i>
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-gray-900">Sign-in email</h3>
-                          <p className="text-sm text-gray-500 truncate">{user?.email}</p>
-                        </div>
-                      </div>
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
+          <nav aria-label="Account" className="w-full lg:w-[240px] lg:flex-none lg:sticky lg:top-28">
+            <ul className="grid grid-cols-2 lg:grid-cols-1 gap-1">
+              {menu.map((item) => {
+                const on = activeTab === item.id;
+                const inner = (
+                  <>
+                    <span>{item.label}</span>
+                    {item.count ? <span className="text-[13px] opacity-75 tabular-nums">{item.count}</span> : null}
+                  </>
+                );
+                return (
+                  <li key={item.id}>
+                    {item.href ? (
+                      <Link href={item.href} className={`${menuItem(false)} w-full`}>{inner}</Link>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => selectTab('profile')}
-                        className="flex items-center justify-between p-5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:shadow-md transition-all group bg-white text-left"
+                        onClick={() => selectTab(item.id)}
+                        aria-current={on ? 'page' : undefined}
+                        className={`${menuItem(on)} w-full`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors flex-shrink-0">
-                            <i className="ri-lock-password-line text-xl"></i>
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="font-bold text-gray-900">Password</h3>
-                            <p className="text-sm text-gray-500">Change your password</p>
-                          </div>
-                        </div>
-                        <i className="ri-arrow-right-line text-gray-300 group-hover:text-blue-500 transition-colors"></i>
+                        {inner}
                       </button>
-                      <Link
-                        href="/account/privacy"
-                        className="flex items-center justify-between p-5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:shadow-md transition-all group bg-white"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors flex-shrink-0">
-                            <i className="ri-shield-user-line text-xl"></i>
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="font-bold text-gray-900">Privacy &amp; data</h3>
-                            <p className="text-sm text-gray-500 truncate">Download your data or request account deletion</p>
-                          </div>
-                        </div>
-                        <i className="ri-arrow-right-line text-gray-300 group-hover:text-blue-500 transition-colors"></i>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <div className="flex-1 min-w-0 w-full flex flex-col gap-10">
+            {activeTab === 'orders' && (
+              <>
+                <OrderHistory />
+
+                {saved.length > 0 && (
+                  <section className="flex flex-col gap-4" aria-labelledby="saved-title">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <h2 id="saved-title" className="font-serif text-[28px] md:text-[30px] leading-none">Saved for later</h2>
+                      <Link href="/wishlist" className="inline-flex items-center min-h-[44px] text-[14px] font-semibold">
+                        <span className="shadow-[inset_0_-1px_0_currentColor] pb-0.5">See all</span>
                       </Link>
                     </div>
-                  </div>
+                    <ul className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-6 sm:gap-x-5">
+                      {saved.map((item) => (
+                        <li key={item.id}>
+                          <Link href={`/product/${item.slug || item.id}`} className="group flex flex-col gap-3">
+                            <span className="flex items-center justify-center aspect-[4/5] rounded-[18px] sm:rounded-[22px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] overflow-hidden">
+                              <img
+                                src={item.image || '/placeholder-product.svg'}
+                                alt=""
+                                className="w-[84%] h-[84%] object-contain mix-blend-multiply transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 motion-reduce:transition-none"
+                              />
+                            </span>
+                            <span className="flex flex-col gap-0.5">
+                              <span className="font-serif text-[18px] leading-tight line-clamp-2">{item.name}</span>
+                              <span className="text-[15px] font-semibold tabular-nums">GH₵{money(item.price)}</span>
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
                 )}
-              </div>
-            </div>
+              </>
+            )}
+
+            {activeTab === 'addresses' && <AddressBook />}
+
+            {activeTab === 'profile' && (
+              <>
+                <section className={card} aria-labelledby="details-title">
+                  <div className="flex flex-col gap-1.5">
+                    <h2 id="details-title" className="font-serif text-[28px] md:text-[30px] leading-none">Your details</h2>
+                    <p className="text-[15px] text-[#6B565B]">Update your name and phone number.</p>
+                  </div>
+
+                  {message(profileMessage)}
+
+                  <form onSubmit={handleUpdateProfile} className="flex flex-col gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label htmlFor="acc-first" className={label}>First name</label>
+                        <input
+                          id="acc-first"
+                          type="text"
+                          autoComplete="given-name"
+                          value={profileData.firstName}
+                          onChange={e => setProfileData({ ...profileData, firstName: e.target.value })}
+                          className={field}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label htmlFor="acc-last" className={label}>Last name</label>
+                        <input
+                          id="acc-last"
+                          type="text"
+                          autoComplete="family-name"
+                          value={profileData.lastName}
+                          onChange={e => setProfileData({ ...profileData, lastName: e.target.value })}
+                          className={field}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="acc-email" className={label}>Email</label>
+                      <input
+                        id="acc-email"
+                        type="email"
+                        value={profileData.email}
+                        disabled
+                        aria-describedby="acc-email-note"
+                        className="w-full h-[52px] px-4 rounded-[14px] bg-[#F1E8DC] text-[16px] text-[#6B565B] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] cursor-not-allowed"
+                      />
+                      <p id="acc-email-note" className="text-[13px] text-[#6B565B]">Your sign-in email can&apos;t be changed here.</p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="acc-phone" className={label}>Phone number</label>
+                      <input
+                        id="acc-phone"
+                        type="tel"
+                        autoComplete="tel"
+                        value={profileData.phone}
+                        onChange={e => setProfileData({ ...profileData, phone: e.target.value })}
+                        placeholder="+233 XX XXX XXXX"
+                        className={field}
+                      />
+                    </div>
+
+                    <button type="submit" disabled={profileLoading} className={primary}>
+                      {profileLoading ? 'Saving…' : 'Save details'}
+                    </button>
+                  </form>
+                </section>
+
+                <section className={card} aria-labelledby="password-title">
+                  <div className="flex flex-col gap-1.5">
+                    <h2 id="password-title" className="font-serif text-[28px] md:text-[30px] leading-none">Change password</h2>
+                    <p className="text-[15px] text-[#6B565B]">Use a strong password you don&apos;t use anywhere else.</p>
+                  </div>
+
+                  {message(passwordMessage)}
+
+                  <form onSubmit={handleChangePassword} className="flex flex-col gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label htmlFor="acc-new-pass" className={label}>New password</label>
+                        <input
+                          id="acc-new-pass"
+                          type="password"
+                          autoComplete="new-password"
+                          value={passwordData.password}
+                          onChange={e => setPasswordData({ ...passwordData, password: e.target.value })}
+                          className={field}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label htmlFor="acc-confirm-pass" className={label}>Confirm password</label>
+                        <input
+                          id="acc-confirm-pass"
+                          type="password"
+                          autoComplete="new-password"
+                          value={passwordData.confirmPassword}
+                          onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                          className={field}
+                        />
+                      </div>
+                    </div>
+                    <button type="submit" disabled={passwordLoading} className={primary}>
+                      {passwordLoading ? 'Updating…' : 'Update password'}
+                    </button>
+                  </form>
+                </section>
+              </>
+            )}
+
+            {activeTab === 'security' && (
+              <section className="flex flex-col gap-4" aria-labelledby="security-title">
+                <h2 id="security-title" className="font-serif text-[28px] md:text-[30px] leading-none">Privacy and security</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-4 p-5 rounded-[20px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] min-w-0">
+                    <span className="w-12 h-12 flex-none rounded-full bg-[#F1E8DC] inline-flex items-center justify-center">
+                      <i className="ri-mail-line text-xl" aria-hidden="true"></i>
+                    </span>
+                    <span className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-[15px] font-semibold">Sign-in email</span>
+                      <span className="text-[14px] text-[#6B565B] truncate">{user?.email}</span>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => selectTab('profile')}
+                    className="group flex items-center justify-between gap-4 p-5 rounded-[20px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] hover:shadow-[inset_0_0_0_1.5px_#2B0B12] text-left transition-shadow motion-reduce:transition-none"
+                  >
+                    <span className="flex items-center gap-4 min-w-0">
+                      <span className="w-12 h-12 flex-none rounded-full bg-[#F1E8DC] inline-flex items-center justify-center">
+                        <i className="ri-lock-password-line text-xl" aria-hidden="true"></i>
+                      </span>
+                      <span className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[15px] font-semibold">Password</span>
+                        <span className="text-[14px] text-[#6B565B]">Change your password</span>
+                      </span>
+                    </span>
+                    <i className="ri-arrow-right-line text-lg text-[#7A1F2E]" aria-hidden="true"></i>
+                  </button>
+                  <Link
+                    href="/account/privacy"
+                    className="group flex items-center justify-between gap-4 p-5 rounded-[20px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] hover:shadow-[inset_0_0_0_1.5px_#2B0B12] transition-shadow motion-reduce:transition-none md:col-span-2"
+                  >
+                    <span className="flex items-center gap-4 min-w-0">
+                      <span className="w-12 h-12 flex-none rounded-full bg-[#F1E8DC] inline-flex items-center justify-center">
+                        <i className="ri-shield-user-line text-xl" aria-hidden="true"></i>
+                      </span>
+                      <span className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[15px] font-semibold">Privacy and data</span>
+                        <span className="text-[14px] text-[#6B565B]">Download your data or request account deletion</span>
+                      </span>
+                    </span>
+                    <i className="ri-arrow-right-line text-lg text-[#7A1F2E]" aria-hidden="true"></i>
+                  </Link>
+                </div>
+              </section>
+            )}
           </div>
         </div>
-      </div>
-    </>
+      </section>
+    </main>
+  );
+}
+
+function AccountLoading() {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-[#F1E8DC]" aria-busy="true">
+      <i className="ri-loader-4-line animate-spin motion-reduce:animate-none text-3xl text-[#2B0B12]" aria-label="Loading your account"></i>
+    </main>
   );
 }
 
 export default function AccountPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <i className="ri-loader-4-line animate-spin text-4xl text-blue-700"></i>
-      </div>
-    }>
+    <Suspense fallback={<AccountLoading />}>
       <AccountContent />
     </Suspense>
   );

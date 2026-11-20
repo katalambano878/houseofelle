@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { money } from '@/lib/format-money';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import CheckoutSteps from '@/components/CheckoutSteps';
@@ -244,17 +245,34 @@ export default function CheckoutPage() {
     }
   };
 
+
+  // Shared form styling (Oud & Saffron)
+  const fieldClass = (hasError: boolean, extra = '') =>
+    `w-full h-14 px-[18px] rounded-2xl bg-[#FBF6EF] text-[16px] text-[#1F1115] placeholder:text-[#8A7479] outline-none transition-shadow motion-reduce:transition-none ${
+      hasError
+        ? 'shadow-[inset_0_0_0_1.5px_#A1271F]'
+        : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.18)] focus:shadow-[inset_0_0_0_1.5px_#2B0B12]'
+    } ${extra}`;
+  const labelClass = 'text-sm font-semibold text-[#1F1115]';
+  const errorClass = 'text-[13px] text-[#A1271F]';
+  const legendClass = 'flex items-center gap-3.5 mb-5 p-0';
+  const stepNumClass = 'flex-none w-9 h-9 rounded-full bg-[#2B0B12] text-[#F6EDE3] inline-flex items-center justify-center text-[15px] font-semibold tabular-nums';
+  const itemCount = cart.reduce((n, item) => n + item.quantity, 0);
+
   if (cart.length === 0 && !isLoading) {
     return (
-      <main className="min-h-screen bg-[#F1E8DC] py-20">
-        <div className="max-w-md mx-auto text-center px-4">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-            <i className="ri-shopping-cart-line text-4xl text-gray-300"></i>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
-          <p className="text-gray-600 mb-8">Add some items to start the checkout process.</p>
-          <Link href="/shop" className="inline-block bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors">
-            Return to Shop
+      <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+        <div className="max-w-[560px] mx-auto px-5 pt-20 pb-28 md:pt-28 md:pb-36 flex flex-col items-center text-center gap-5">
+          <span className="w-20 h-20 rounded-full bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.12)] inline-flex items-center justify-center">
+            <i className="ri-shopping-bag-line text-3xl text-[#7A1F2E]" aria-hidden="true"></i>
+          </span>
+          <h1 className="font-serif text-[36px] md:text-[44px] leading-[0.95] tracking-[-0.02em]">Your bag is <em>empty</em></h1>
+          <p className="text-[15px] leading-relaxed text-[#6B565B]">Add some items to start the checkout process.</p>
+          <Link
+            href="/shop"
+            className="mt-2 inline-flex items-center justify-center min-h-[54px] px-8 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold hover:bg-[#4A1520] active:scale-[0.98] transition-[background-color,transform] motion-reduce:transition-none motion-reduce:active:scale-100"
+          >
+            Return to shop
           </Link>
         </div>
       </main>
@@ -262,264 +280,323 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F1E8DC]">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Link href="/cart" className="text-gray-600 hover:text-gray-900 font-medium inline-flex items-center whitespace-nowrap">
-            <i className="ri-arrow-left-line mr-2"></i>
-            Back to Cart
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pt-6 md:pt-12 pb-20 md:pb-32 flex flex-col gap-8 md:gap-10">
+        <div className="flex flex-col gap-5">
+          <Link href="/cart" className="self-start inline-flex items-center gap-2 min-h-[44px] text-sm font-semibold text-[#1F1115] hover:text-[#7A1F2E] transition-colors motion-reduce:transition-none">
+            <i className="ri-arrow-left-line text-lg" aria-hidden="true"></i>
+            Back to bag
           </Link>
+          <div className="flex flex-wrap items-end justify-between gap-5">
+            <h1 className="font-serif text-[40px] md:text-[52px] leading-[0.95] tracking-[-0.02em]">Check<em>out</em></h1>
+            <CheckoutSteps currentStep={currentStep} />
+          </div>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
-
-        {currentStep === 1 && (
-          <div className="mb-8 bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Checkout As</h2>
-            <div className="grid md:grid-cols-2 gap-4">
-              <button
-                onClick={() => !user && setCheckoutType('guest')}
-                className={`p-6 rounded-xl border-2 transition-all text-left cursor-pointer ${checkoutType === 'guest'
-                  ? 'border-blue-700 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-                  } ${user ? 'opacity-50 cursor-not-allowed' : ''}`}
-                disabled={!!user}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <i className="ri-user-line text-3xl text-blue-700"></i>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${checkoutType === 'guest' ? 'border-blue-700 bg-blue-700' : 'border-gray-300'
-                    }`}>
-                    {checkoutType === 'guest' && <i className="ri-check-line text-white text-sm"></i>}
-                  </div>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Guest Checkout</h3>
-                <p className="text-sm text-gray-600">Quick checkout without creating an account</p>
-                {user && <p className="text-xs text-blue-600 mt-2">You are logged in</p>}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  // Guests sign up first; the cart is kept and they come straight back here.
-                  if (!user) {
-                    router.push('/auth/signup?redirect=/checkout');
-                    return;
-                  }
-                  setCheckoutType('account');
-                }}
-                className={`p-6 rounded-xl border-2 transition-all text-left cursor-pointer ${checkoutType === 'account'
-                  ? 'border-blue-700 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-                  }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <i className="ri-account-circle-line text-3xl text-blue-700"></i>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${checkoutType === 'account' ? 'border-blue-700 bg-blue-700' : 'border-gray-300'
-                    }`}>
-                    {checkoutType === 'account' && <i className="ri-check-line text-white text-sm"></i>}
-                  </div>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{user ? 'My Account' : 'Create Account'}</h3>
-                <p className="text-sm text-gray-600">
-                  {user ? `Logged in as ${user.email}` : 'Save your details and see all your orders in one place'}
-                </p>
-              </button>
-            </div>
+        {/* On phones the order sits behind a toggle at the top; on desktop it is the sticky side card. */}
+        <details className="lg:hidden group rounded-[22px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+          <summary className="flex items-center justify-between gap-4 min-h-[58px] px-5 cursor-pointer list-none [&::-webkit-details-marker]:hidden text-sm">
+            <span className="inline-flex items-center gap-2">
+              <span className="group-open:hidden">Show order</span>
+              <span className="hidden group-open:inline">Hide order</span>
+              <span className="text-[#6B565B]">· {itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
+              <i className="ri-arrow-down-s-line text-lg transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true"></i>
+            </span>
+            <span className="font-semibold tabular-nums">GH₵ {money(total)}</span>
+          </summary>
+          <div className="px-2 pb-2">
+            <OrderSummary
+              items={cart}
+              subtotal={subtotal}
+              shipping={shippingCost}
+              tax={tax}
+              total={total}
+              discount={discount}
+              couponCode={coupon?.code}
+              deliveryMethod={deliveryMethod}
+            />
           </div>
-        )}
+        </details>
 
-        <CheckoutSteps currentStep={currentStep} />
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-10 lg:gap-16 items-start">
+          <div className="flex flex-col gap-10 md:gap-12 min-w-0">
             {currentStep === 1 && (
               <>
-                <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-6">Shipping Information</h2>
+                <section aria-labelledby="checkout-as" className="flex flex-col gap-3">
+                  <h2 id="checkout-as" className="text-[15px] font-semibold">Check out as</h2>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => !user && setCheckoutType('guest')}
+                      aria-pressed={checkoutType === 'guest'}
+                      className={`flex items-start gap-3.5 p-5 rounded-[18px] bg-[#FBF6EF] text-left transition-shadow motion-reduce:transition-none ${checkoutType === 'guest'
+                        ? 'shadow-[inset_0_0_0_2px_#2B0B12]'
+                        : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] hover:shadow-[inset_0_0_0_1px_rgba(31,17,21,0.4)]'
+                        } ${user ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                      disabled={!!user}
+                    >
+                      <span aria-hidden="true" className={`flex-none mt-0.5 w-[18px] h-[18px] rounded-full inline-flex items-center justify-center ${checkoutType === 'guest' ? 'bg-[#2B0B12]' : 'shadow-[inset_0_0_0_1.5px_rgba(31,17,21,0.35)]'}`}>
+                        {checkoutType === 'guest' && <span className="w-1.5 h-1.5 rounded-full bg-[#F6EDE3]"></span>}
+                      </span>
+                      <span className="flex flex-col gap-1">
+                        <span className="font-semibold">Guest checkout</span>
+                        <span className="text-sm text-[#6B565B]">Quick checkout without creating an account</span>
+                        {user && <span className="text-[13px] text-[#7A1F2E]">You are logged in</span>}
+                      </span>
+                    </button>
 
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-900 mb-2">
-                          First Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={shippingData.firstName}
-                          onChange={(e) => setShippingData({ ...shippingData, firstName: e.target.value })}
-                          className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.firstName ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                          placeholder="John"
-                        />
-                        {errors.firstName && <p className="text-sm text-red-600 mt-1">{errors.firstName}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-900 mb-2">
-                          Last Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={shippingData.lastName}
-                          onChange={(e) => setShippingData({ ...shippingData, lastName: e.target.value })}
-                          className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.lastName ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                          placeholder="Doe"
-                        />
-                        {errors.lastName && <p className="text-sm text-red-600 mt-1">{errors.lastName}</p>}
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Guests sign up first; the cart is kept and they come straight back here.
+                        if (!user) {
+                          router.push('/auth/signup?redirect=/checkout');
+                          return;
+                        }
+                        setCheckoutType('account');
+                      }}
+                      aria-pressed={checkoutType === 'account'}
+                      className={`flex items-start gap-3.5 p-5 rounded-[18px] bg-[#FBF6EF] text-left cursor-pointer transition-shadow motion-reduce:transition-none ${checkoutType === 'account'
+                        ? 'shadow-[inset_0_0_0_2px_#2B0B12]'
+                        : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] hover:shadow-[inset_0_0_0_1px_rgba(31,17,21,0.4)]'
+                        }`}
+                    >
+                      <span aria-hidden="true" className={`flex-none mt-0.5 w-[18px] h-[18px] rounded-full inline-flex items-center justify-center ${checkoutType === 'account' ? 'bg-[#2B0B12]' : 'shadow-[inset_0_0_0_1.5px_rgba(31,17,21,0.35)]'}`}>
+                        {checkoutType === 'account' && <span className="w-1.5 h-1.5 rounded-full bg-[#F6EDE3]"></span>}
+                      </span>
+                      <span className="flex flex-col gap-1 min-w-0">
+                        <span className="font-semibold">{user ? 'My account' : 'Create an account'}</span>
+                        <span className="text-sm text-[#6B565B] break-words">
+                          {user ? `Logged in as ${user.email}` : 'Save your details and see all your orders in one place'}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                </section>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Email Address *
-                      </label>
+                <fieldset className="border-0 m-0 p-0 min-w-0 flex flex-col gap-4">
+                  <legend className={legendClass}>
+                    <span className={stepNumClass}>1</span>
+                    <span className="font-serif text-[24px] md:text-[26px] leading-none">Your details</span>
+                  </legend>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="co-first" className={labelClass}>First name</label>
                       <input
+                        id="co-first"
+                        type="text"
+                        autoComplete="given-name"
+                        value={shippingData.firstName}
+                        onChange={(e) => setShippingData({ ...shippingData, firstName: e.target.value })}
+                        aria-invalid={!!errors.firstName}
+                        aria-describedby={errors.firstName ? 'co-first-err' : undefined}
+                        className={fieldClass(!!errors.firstName)}
+                        placeholder="Ama"
+                      />
+                      {errors.firstName && <p id="co-first-err" className={errorClass}>{errors.firstName}</p>}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="co-last" className={labelClass}>Last name</label>
+                      <input
+                        id="co-last"
+                        type="text"
+                        autoComplete="family-name"
+                        value={shippingData.lastName}
+                        onChange={(e) => setShippingData({ ...shippingData, lastName: e.target.value })}
+                        aria-invalid={!!errors.lastName}
+                        aria-describedby={errors.lastName ? 'co-last-err' : undefined}
+                        className={fieldClass(!!errors.lastName)}
+                        placeholder="Mensah"
+                      />
+                      {errors.lastName && <p id="co-last-err" className={errorClass}>{errors.lastName}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="co-email" className={labelClass}>Email address</label>
+                      <input
+                        id="co-email"
                         type="email"
+                        autoComplete="email"
                         value={shippingData.email}
                         readOnly={!!user} // Make read-only if logged in (optional, but safer)
                         onChange={(e) => setShippingData({ ...shippingData, email: e.target.value })}
-                        className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'
-                          } ${user ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        aria-invalid={!!errors.email}
+                        aria-describedby={errors.email ? 'co-email-err' : undefined}
+                        className={fieldClass(!!errors.email, user ? '!bg-[#F1E8DC] text-[#4D3A3F] cursor-not-allowed' : '')}
                         placeholder="you@example.com"
                       />
-                      {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
+                      {errors.email && <p id="co-email-err" className={errorClass}>{errors.email}</p>}
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Phone Number *
-                      </label>
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="co-phone" className={labelClass}>Phone number</label>
                       <input
+                        id="co-phone"
                         type="tel"
+                        autoComplete="tel"
                         value={shippingData.phone}
                         onChange={(e) => setShippingData({ ...shippingData, phone: e.target.value })}
-                        className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-gray-300'
-                          }`}
+                        aria-invalid={!!errors.phone}
+                        aria-describedby={errors.phone ? 'co-phone-err' : undefined}
+                        className={fieldClass(!!errors.phone)}
                         placeholder="+233 XX XXX XXXX"
                       />
-                      {errors.phone && <p className="text-sm text-red-600 mt-1">{errors.phone}</p>}
+                      {errors.phone && <p id="co-phone-err" className={errorClass}>{errors.phone}</p>}
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Street Address *
-                      </label>
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="co-address" className={labelClass}>Street address</label>
+                    <input
+                      id="co-address"
+                      type="text"
+                      autoComplete="street-address"
+                      value={shippingData.address}
+                      onChange={(e) => setShippingData({ ...shippingData, address: e.target.value })}
+                      aria-invalid={!!errors.address}
+                      aria-describedby={errors.address ? 'co-address-err' : undefined}
+                      className={fieldClass(!!errors.address)}
+                      placeholder="House number and street name"
+                    />
+                    {errors.address && <p id="co-address-err" className={errorClass}>{errors.address}</p>}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="co-city" className={labelClass}>City</label>
                       <input
+                        id="co-city"
                         type="text"
-                        value={shippingData.address}
-                        onChange={(e) => setShippingData({ ...shippingData, address: e.target.value })}
-                        className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.address ? 'border-red-500' : 'border-gray-300'
-                          }`}
-                        placeholder="House number and street name"
+                        autoComplete="address-level2"
+                        value={shippingData.city}
+                        onChange={(e) => setShippingData({ ...shippingData, city: e.target.value })}
+                        aria-invalid={!!errors.city}
+                        aria-describedby={errors.city ? 'co-city-err' : undefined}
+                        className={fieldClass(!!errors.city)}
+                        placeholder="Accra"
                       />
-                      {errors.address && <p className="text-sm text-red-600 mt-1">{errors.address}</p>}
+                      {errors.city && <p id="co-city-err" className={errorClass}>{errors.city}</p>}
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-900 mb-2">
-                          City *
-                        </label>
-                        <input
-                          type="text"
-                          value={shippingData.city}
-                          onChange={(e) => setShippingData({ ...shippingData, city: e.target.value })}
-                          className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.city ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                          placeholder="Accra"
-                        />
-                        {errors.city && <p className="text-sm text-red-600 mt-1">{errors.city}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-900 mb-2">
-                          Region *
-                        </label>
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="co-region" className={labelClass}>Region</label>
+                      <div className="relative">
                         <select
+                          id="co-region"
+                          autoComplete="address-level1"
                           value={shippingData.region}
                           onChange={(e) => setShippingData({ ...shippingData, region: e.target.value })}
-                          className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${errors.region ? 'border-red-500' : 'border-gray-300'
-                            }`}
+                          aria-invalid={!!errors.region}
+                          aria-describedby={errors.region ? 'co-region-err' : undefined}
+                          className={fieldClass(!!errors.region, 'appearance-none pr-11 cursor-pointer')}
                         >
-                          <option value="">Select Region</option>
+                          <option value="">Select region</option>
                           {ghanaRegions.map((region) => (
                             <option key={region} value={region}>{region}</option>
                           ))}
                         </select>
-                        {errors.region && <p className="text-sm text-red-600 mt-1">{errors.region}</p>}
+                        <i className="ri-arrow-down-s-line absolute right-4 top-1/2 -translate-y-1/2 text-lg text-[#6B565B] pointer-events-none" aria-hidden="true"></i>
                       </div>
+                      {errors.region && <p id="co-region-err" className={errorClass}>{errors.region}</p>}
                     </div>
-
-                    {user && checkoutType === 'account' && (
-                      <label className="flex items-center space-x-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={saveAddress}
-                          onChange={(e) => setSaveAddress(e.target.checked)}
-                          className="w-5 h-5 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">Save this address for future orders</span>
-                      </label>
-                    )}
                   </div>
 
+                  {user && checkoutType === 'account' && (
+                    <label className="flex items-center gap-3 min-h-[44px] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveAddress}
+                        onChange={(e) => setSaveAddress(e.target.checked)}
+                        className="w-5 h-5 rounded accent-[#2B0B12]"
+                      />
+                      <span className="text-sm text-[#4D3A3F]">Save this address for future orders</span>
+                    </label>
+                  )}
+
                   <button
+                    type="button"
                     onClick={handleContinueToDelivery}
-                    className="w-full mt-6 bg-blue-700 hover:bg-blue-800 text-white py-4 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer"
+                    className="mt-2 w-full min-h-[58px] rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-semibold hover:bg-[#4A1520] active:scale-[0.99] transition-[background-color,transform] motion-reduce:transition-none motion-reduce:active:scale-100 cursor-pointer"
                   >
-                    Continue to Delivery
+                    Continue to delivery
                   </button>
-                </div>
-
-
+                </fieldset>
               </>
             )}
 
             {currentStep === 2 && (
               <>
-                <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-6">Delivery Method</h2>
-                  <div className="space-y-4">
-                    {DELIVERY_OPTIONS.map((option) => (
+                <fieldset className="border-0 m-0 p-0 min-w-0 flex flex-col gap-3">
+                  <legend className={legendClass}>
+                    <span className={stepNumClass}>2</span>
+                    <span className="font-serif text-[24px] md:text-[26px] leading-none">Delivery</span>
+                  </legend>
+                  {DELIVERY_OPTIONS.map((option) => {
+                    const selected = deliveryMethod === option.id;
+                    return (
                       <label
                         key={option.id}
-                        className={`flex items-center justify-between gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryMethod === option.id ? 'border-blue-700 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}
+                        className={`flex items-start gap-3.5 p-5 rounded-[18px] bg-[#FBF6EF] cursor-pointer transition-shadow motion-reduce:transition-none focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#7A1F2E] ${selected ? 'shadow-[inset_0_0_0_2px_#2B0B12]' : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] hover:shadow-[inset_0_0_0_1px_rgba(31,17,21,0.4)]'}`}
                       >
-                        <div className="flex items-center space-x-4">
-                          <input
-                            type="radio"
-                            name="delivery"
-                            value={option.id}
-                            checked={deliveryMethod === option.id}
-                            onChange={(e) => setDeliveryMethod(e.target.value)}
-                            className="w-5 h-5 text-blue-700"
-                          />
-                          <i className={`${option.icon} text-2xl text-blue-700`} aria-hidden="true"></i>
-                          <div>
-                            <p className="font-semibold text-gray-900">{option.label}</p>
-                            <p className="text-sm text-gray-600">{option.description}</p>
-                          </div>
-                        </div>
-                        <p className={`text-sm font-semibold text-right ${option.id === 'pickup' ? 'text-blue-700' : 'text-amber-700'}`}>{option.feeLabel}</p>
+                        <input
+                          type="radio"
+                          name="delivery"
+                          value={option.id}
+                          checked={selected}
+                          onChange={(e) => setDeliveryMethod(e.target.value)}
+                          className="flex-none mt-0.5 w-[18px] h-[18px] accent-[#2B0B12] focus:outline-none"
+                        />
+                        <span className="flex-1 min-w-0 flex flex-col gap-1">
+                          <span className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                            <span className="inline-flex items-center gap-2 font-semibold">
+                              <i className={`${option.icon} text-lg text-[#7A1F2E]`} aria-hidden="true"></i>
+                              {option.label}
+                            </span>
+                            <span className={`text-[13px] font-semibold ${option.id === 'pickup' ? 'text-[#2F6B3A]' : 'text-[#7A1F2E]'}`}>{option.feeLabel}</span>
+                          </span>
+                          <span className="text-sm leading-relaxed text-[#6B565B]">{option.description}</span>
+                        </span>
                       </label>
-                    ))}
+                    );
+                  })}
+                </fieldset>
+
+                <section aria-labelledby="checkout-payment" className="flex flex-col gap-4">
+                  <h2 id="checkout-payment" className="flex items-center gap-3.5 m-0">
+                    <span className={stepNumClass}>3</span>
+                    <span className="font-serif text-[24px] md:text-[26px] leading-none">Payment</span>
+                  </h2>
+                  <div className="flex flex-col gap-3 p-6 rounded-[22px] bg-[#FBF6EF] shadow-[inset_0_0_0_2px_#2B0B12]">
+                    <span className="flex items-center gap-3">
+                      <span className="w-10 h-10 rounded-full bg-[#2B0B12] text-[#E5B65A] inline-flex items-center justify-center flex-none">
+                        <i className="ri-smartphone-line text-lg" aria-hidden="true"></i>
+                      </span>
+                      <span className="font-semibold text-[15px]">Mobile Money</span>
+                    </span>
+                    <p className="m-0 text-sm leading-relaxed text-[#4D3A3F]">
+                      When you tap pay, we save your order and take you to Moolre&apos;s secure page to pay with Mobile Money.
+                    </p>
                   </div>
 
-                  <div className="flex flex-col-reverse md:flex-row gap-4 mt-6">
+                  <div className="flex flex-col-reverse md:flex-row gap-3 mt-2">
                     <button
+                      type="button"
                       onClick={() => setCurrentStep(1)}
                       disabled={isLoading}
-                      className="flex-1 border-2 border-gray-300 hover:border-gray-400 text-gray-700 py-4 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
+                      className="md:flex-none md:px-8 min-h-[58px] rounded-full text-[15px] font-semibold text-[#1F1115] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.25)] hover:shadow-[inset_0_0_0_1px_rgba(31,17,21,0.5)] transition-shadow motion-reduce:transition-none cursor-pointer disabled:opacity-50"
                     >
                       Back
                     </button>
                     <button
+                      type="button"
                       onClick={handleContinueToPayment}
                       disabled={isLoading}
-                      className="flex-1 bg-blue-700 hover:bg-blue-800 text-white py-4 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-70 flex items-center justify-center"
+                      className="flex-1 min-h-[58px] px-6 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-semibold hover:bg-[#4A1520] active:scale-[0.99] transition-[background-color,transform] motion-reduce:transition-none motion-reduce:active:scale-100 cursor-pointer disabled:opacity-70 inline-flex items-center justify-center"
                     >
                       {isLoading ? (
                         <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <svg className="animate-spin motion-reduce:hidden -ml-1 mr-3 h-5 w-5 text-[#F6EDE3]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
@@ -530,16 +607,14 @@ export default function CheckoutPage() {
                       )}
                     </button>
                   </div>
-                </div>
-
-
+                </section>
               </>
             )}
 
             {/* Step 3 removed - payment now initiates directly from step 2 */}
           </div>
 
-          <div className="lg:col-span-1">
+          <div className="hidden lg:block">
             <OrderSummary
               items={cart}
               subtotal={subtotal}

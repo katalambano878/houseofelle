@@ -147,267 +147,236 @@ function OrderTrackingContent() {
   };
 
   const getStatusBadge = () => {
-    if (!order) return { label: 'Unknown', color: 'bg-gray-100 text-gray-800' };
+    if (!order) return { label: 'Unknown', color: 'bg-[#F6EDE3]/15 text-[#F6EDE3]' };
     
     const statusMap: Record<string, { label: string; color: string }> = {
-      'pending': { label: 'Pending', color: 'bg-amber-100 text-amber-800' },
-      'processing': { label: 'Processing', color: 'bg-blue-100 text-blue-800' },
-      'shipped': { label: 'Packaged', color: 'bg-purple-100 text-purple-800' },
-      'delivered': { label: 'Delivered', color: 'bg-blue-100 text-blue-800' },
-      'cancelled': { label: 'Cancelled', color: 'bg-red-100 text-red-800' }
+      'pending': { label: 'Pending', color: 'bg-[#E8C5BE] text-[#2B0B12]' },
+      'processing': { label: 'Processing', color: 'bg-[#E8C5BE] text-[#2B0B12]' },
+      'shipped': { label: 'Packaged', color: 'bg-[#D9A441] text-[#2B0B12]' },
+      'delivered': { label: 'Delivered', color: 'bg-[#DDE7D6] text-[#244A2C]' },
+      'cancelled': { label: 'Cancelled', color: 'bg-[#F6DCD7] text-[#7A1F2E]' }
     };
 
-    return statusMap[order.status] || { label: order.status, color: 'bg-gray-100 text-gray-800' };
+    return statusMap[order.status] || { label: order.status, color: 'bg-[#F6EDE3]/15 text-[#F6EDE3]' };
   };
+
+  const field =
+    'w-full h-[54px] px-[18px] rounded-[16px] bg-white text-[16px] text-[#1F1115] placeholder:text-[#8A7479] outline-none shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] focus:shadow-[inset_0_0_0_1.5px_#2B0B12] transition-shadow motion-reduce:transition-none';
 
   // Search form
   if (!isTracking || !order) {
     return (
-      <main className="min-h-screen bg-[#F1E8DC] py-12 px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Track Your Order</h1>
-            <p className="text-gray-600">Enter your order number or tracking number to track your shipment</p>
-          </div>
+      <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+        <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 md:pt-16 pb-7 md:pb-10 flex flex-col gap-2.5">
+          <h1 className="font-serif text-[40px] md:text-[56px] leading-[0.95] tracking-[-0.02em]">Track your <em>order</em></h1>
+          <p className="text-[15px] leading-relaxed text-[#6B565B] max-w-[520px]">Enter your order number and the email you used at checkout. No account needed.</p>
+        </section>
 
-          <div className="bg-white rounded-xl shadow-sm p-8">
-            <form onSubmit={handleTrack} className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Order Number or Tracking Number
-                </label>
-                <input
-                  type="text"
-                  value={orderNumber}
-                  onChange={(e) => setOrderNumber(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g. ORD-1770328211911-915 or HOE-ABC123"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Email Address <span className="text-red-500 font-normal">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="you@example.com"
-                />
-              </div>
-
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-700 hover:bg-blue-800 text-white py-4 rounded-lg font-semibold transition-colors whitespace-nowrap disabled:opacity-50"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center">
-                    <i className="ri-loader-4-line animate-spin mr-2"></i>
-                    Searching...
-                  </span>
-                ) : 'Track Order'}
-              </button>
-            </form>
-
-            <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <i className="ri-information-line text-xl text-blue-700 mt-0.5"></i>
-                <div>
-                  <p className="text-sm font-semibold text-blue-900">Need Help?</p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    You can find your order number and tracking number in the SMS or email we sent you after your order was confirmed.
-                  </p>
-                </div>
-              </div>
+        <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pb-16 md:pb-24 grid md:grid-cols-[1.3fr_1fr] gap-4 items-start">
+          <form onSubmit={handleTrack} noValidate className="flex flex-col gap-5 p-6 md:p-8 rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="ot-order" className="text-[14px] font-semibold">Order number or tracking number</label>
+              <input
+                id="ot-order"
+                type="text"
+                autoComplete="off"
+                value={orderNumber}
+                onChange={(e) => setOrderNumber(e.target.value)}
+                className={field}
+                placeholder="e.g. ORD-1770328211911-915 or HOE-ABC123"
+              />
             </div>
-          </div>
 
-          <div className="mt-8 text-center">
-            <Link href="/" className="text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap">
-              <i className="ri-arrow-left-line mr-2"></i>
-              Back to Home
+            <div className="flex flex-col gap-2">
+              <label htmlFor="ot-email" className="text-[14px] font-semibold">Email</label>
+              <input
+                id="ot-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={field}
+                placeholder="you@example.com"
+              />
+            </div>
+
+            {error && (
+              <p role="alert" className="rounded-2xl bg-[#F6DCD7] text-[#7A1F2E] px-4 py-3 text-sm">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="min-h-[56px] rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[16px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none disabled:opacity-50"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <i className="ri-loader-4-line animate-spin motion-reduce:animate-none" aria-hidden="true"></i>
+                  Searching…
+                </span>
+              ) : 'Track order'}
+            </button>
+          </form>
+
+          <aside className="flex flex-col gap-3 p-6 md:p-8 rounded-[24px] bg-[#2B0B12] text-[#F6EDE3]">
+            <span className="w-12 h-12 rounded-full bg-[#D9A441] text-[#2B0B12] inline-flex items-center justify-center">
+              <i className="ri-message-3-line text-xl" aria-hidden="true"></i>
+            </span>
+            <h2 className="font-serif text-[26px] md:text-[28px] leading-none mt-2">Where is my number?</h2>
+            <p className="text-[15px] leading-relaxed text-[#E3CFC7]">
+              You can find your order number and tracking number in the SMS or email we sent you after your order was confirmed.
+            </p>
+            <Link href="/contact" className="self-start inline-flex items-center gap-2 min-h-[44px] mt-1 text-[14px] font-bold text-[#F6EDE3]">
+              <span className="shadow-[inset_0_-1px_0_currentColor] pb-0.5">Can&apos;t find it? Contact us</span>
             </Link>
-          </div>
-        </div>
+          </aside>
+        </section>
       </main>
     );
   }
 
   // Order tracking results
   const trackingSteps = getTrackingSteps();
+  const progressSteps = trackingSteps.filter((step) => step.key !== 'placed');
+  const placedStep = trackingSteps.find((step) => step.key === 'placed');
   const statusBadge = getStatusBadge();
   const trackingNumber = order.metadata?.tracking_number || '';
   const shippingAddress = order.shipping_address || {};
+  const itemCount = order.order_items?.length || 0;
+  const thumbs: string[] = (order.order_items || [])
+    .map((item: any) => item.products?.product_images?.[0]?.url || item.metadata?.image)
+    .filter(Boolean)
+    .slice(0, 3);
 
   return (
-    <main className="min-h-screen bg-[#F1E8DC] py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <button 
-            onClick={() => { setIsTracking(false); setOrder(null); setOrderNumber(''); setEmail(''); }}
-            className="text-gray-600 hover:text-gray-900 font-medium inline-flex items-center whitespace-nowrap cursor-pointer"
-          >
-            <i className="ri-arrow-left-line mr-2"></i>
-            Track Another Order
-          </button>
-        </div>
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pt-8 md:pt-12 pb-16 md:pb-24 flex flex-col gap-6 md:gap-8">
+        <button
+          type="button"
+          onClick={() => { setIsTracking(false); setOrder(null); setOrderNumber(''); setEmail(''); }}
+          className="self-start inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-[#4D3A3F] hover:text-[#1F1115]"
+        >
+          <i className="ri-arrow-left-line" aria-hidden="true"></i>
+          Track another order
+        </button>
 
-        <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{order.order_number}</h1>
-              {trackingNumber && (
-                <p className="text-gray-600 mt-1">
-                  <span className="font-medium">Tracking:</span>{' '}
-                  <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-sm">{trackingNumber}</span>
-                </p>
-              )}
-              <p className="text-gray-500 text-sm mt-1">Delivery method: <span className="font-medium text-gray-700">{deliveryLabel(order.shipping_method)}</span></p>
+        <article className="flex flex-col gap-7 p-6 md:p-8 rounded-[24px] bg-[#2B0B12] text-[#F6EDE3]">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="flex flex-col gap-2 min-w-0">
+              <span className={`self-start inline-flex items-center h-7 px-3 rounded-full text-[13px] font-semibold ${statusBadge.color}`}>
+                {statusBadge.label}
+              </span>
+              <h1 className="font-serif text-[28px] md:text-[32px] leading-none break-all">{order.order_number}</h1>
+              <span className="text-[14px] text-[#E3CFC7] tabular-nums">
+                Placed {placedStep?.date} · {itemCount} item{itemCount !== 1 ? 's' : ''} · GH₵{money(order.total)}
+              </span>
             </div>
-            <div className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${statusBadge.color}`}>
-              {statusBadge.label}
-            </div>
+            {thumbs.length > 0 && (
+              <div className="flex gap-2" aria-hidden="true">
+                {thumbs.map((src, i) => (
+                  <span key={`${src}-${i}`} className="flex items-center justify-center w-[54px] h-16 rounded-[12px] bg-[#F6EDE3]">
+                    <img src={src} alt="" className="w-[78%] h-[78%] object-contain mix-blend-multiply" />
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 flex items-center justify-center bg-blue-100 rounded-full">
-                  <i className="ri-map-pin-line text-xl text-blue-700"></i>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Shipping To</p>
-                  <p className="font-semibold text-gray-900">
-                    {shippingAddress.city || shippingAddress.region || 'Ghana'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 flex items-center justify-center bg-blue-100 rounded-full">
-                  <i className="ri-money-cny-circle-line text-xl text-blue-700"></i>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Total</p>
-                  <p className="font-semibold text-gray-900">GH₵ {money((order.total))}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 flex items-center justify-center bg-blue-100 rounded-full">
-                  <i className="ri-box-3-line text-xl text-blue-700"></i>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Items</p>
-                  <p className="font-semibold text-gray-900">
-                    {order.order_items?.length || 0} Product{(order.order_items?.length || 0) !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tracking Timeline */}
-          <div className="relative">
-            {trackingSteps.map((step, index) => (
-              <div key={step.key} className="flex items-start mb-8 last:mb-0">
-                <div className="relative flex flex-col items-center mr-6">
-                  <div className={`w-12 h-12 flex items-center justify-center rounded-full font-bold transition-colors ${
-                    step.status === 'completed'
-                      ? 'bg-blue-700 text-white'
-                      : step.status === 'active'
-                      ? 'bg-blue-100 text-blue-700 ring-4 ring-blue-200'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    <i className={`${step.icon} text-xl`}></i>
-                  </div>
-                  {index < trackingSteps.length - 1 && (
-                    <div className={`w-0.5 h-16 mt-2 ${
-                      step.status === 'completed' ? 'bg-blue-700' : 'bg-gray-200'
-                    }`}></div>
-                  )}
-                </div>
-                <div className="flex-1 pt-2">
-                  <h3 className={`font-bold text-lg ${
-                    step.status === 'pending' ? 'text-gray-500' : 'text-gray-900'
-                  }`}>
-                    {step.title}
-                  </h3>
-                  <p className={`text-sm mt-1 ${
-                    step.status === 'pending' ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    {step.description}
-                  </p>
-                  <p className={`text-sm mt-1 font-semibold ${
-                    step.status === 'pending' ? 'text-gray-400' : 'text-blue-700'
-                  }`}>
-                    {step.date}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Order Items */}
-        <div className="bg-white rounded-xl shadow-sm p-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Order Items</h2>
-          <div className="space-y-4">
-            {order.order_items?.map((item: any) => (
-              <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
-                  {item.products?.product_images?.[0]?.url || item.metadata?.image ? (
-                    <img
-                      src={item.products?.product_images?.[0]?.url || item.metadata?.image}
-                      alt={item.product_name}
-                      className="w-full h-full object-cover"
+          <ol aria-label="Order progress" className="grid grid-cols-2 md:grid-cols-4 gap-y-5">
+            {progressSteps.map((step, index) => {
+              const done = step.status === 'completed';
+              const active = step.status === 'active';
+              const isLast = index === progressSteps.length - 1;
+              return (
+                <li key={step.key} className="flex flex-col gap-2.5" aria-current={active ? 'step' : undefined}>
+                  <span className="flex items-center" aria-hidden="true">
+                    <span
+                      className={`w-3.5 h-3.5 flex-none rounded-full ${
+                        done
+                          ? 'bg-[#D9A441] shadow-[0_0_0_4px_rgba(217,164,65,0.25)]'
+                          : active
+                          ? 'bg-[#2B0B12] shadow-[inset_0_0_0_2px_#D9A441,0_0_0_4px_rgba(217,164,65,0.25)]'
+                          : 'bg-[#F6EDE3]/30'
+                      }`}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <i className="ri-image-line text-2xl text-gray-300"></i>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">{item.product_name}</h3>
-                  <p className="text-sm text-gray-600 mt-1">Quantity: {item.quantity}</p>
-                  {item.variant_name && (
-                    <p className="text-xs text-gray-500">{item.variant_name}</p>
-                  )}
-                </div>
-                <p className="font-bold text-blue-700">GH₵ {money((item.unit_price))}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+                    <span className={`flex-1 h-0.5 ml-2.5 ${isLast ? 'bg-transparent' : done ? 'bg-[#D9A441]' : 'bg-[#F6EDE3]/[0.18]'}`} />
+                  </span>
+                  <span className="flex flex-col gap-0.5 pr-3">
+                    <span className={`text-[15px] font-bold ${step.status === 'pending' ? 'text-[#CDB5AD]' : ''}`}>
+                      {step.title}
+                      <span className="sr-only">: {done ? 'done' : active ? 'in progress' : 'not yet'}</span>
+                    </span>
+                    <span className="text-[13px] text-[#CDB5AD]">{step.description}</span>
+                    <span className="text-[13px] text-[#E3CFC7] tabular-nums">{step.date}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
 
-        <div className="mt-8 text-center">
-          <p className="text-gray-600 mb-4">Need help with your order?</p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link href="/contact" className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
-              <i className="ri-customer-service-line mr-1"></i>
-              Contact Support
+          <div className="flex flex-wrap gap-2.5">
+            <Link
+              href={`/contact?order=${encodeURIComponent(order.order_number || '')}`}
+              className="inline-flex items-center min-h-[48px] px-[22px] rounded-full bg-[#D9A441] text-[#2B0B12] text-[14px] font-bold hover:bg-[#E5B65A] transition-colors motion-reduce:transition-none"
+            >
+              Ask about this order
             </Link>
-            <Link href="/returns" className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
-              <i className="ri-arrow-left-right-line mr-1"></i>
-              Returns Policy
+            <Link
+              href="/returns"
+              className="inline-flex items-center min-h-[48px] px-[22px] rounded-full shadow-[inset_0_0_0_1px_rgba(246,237,227,0.35)] text-[14px] font-semibold hover:bg-[#F6EDE3]/10 transition-colors motion-reduce:transition-none"
+            >
+              Returns policy
             </Link>
           </div>
-        </div>
-      </div>
+        </article>
+
+        <dl className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="flex flex-col gap-1 p-5 rounded-[20px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+            <dt className="text-[13px] text-[#6B565B]">Delivery method</dt>
+            <dd className="text-[15px] font-semibold">{deliveryLabel(order.shipping_method)}</dd>
+          </div>
+          <div className="flex flex-col gap-1 p-5 rounded-[20px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+            <dt className="text-[13px] text-[#6B565B]">Shipping to</dt>
+            <dd className="text-[15px] font-semibold">{shippingAddress.city || shippingAddress.region || 'Ghana'}</dd>
+          </div>
+          <div className="flex flex-col gap-1 p-5 rounded-[20px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+            <dt className="text-[13px] text-[#6B565B]">Total</dt>
+            <dd className="text-[15px] font-semibold tabular-nums">GH₵{money(order.total)}</dd>
+          </div>
+          <div className="flex flex-col gap-1 p-5 rounded-[20px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] min-w-0">
+            <dt className="text-[13px] text-[#6B565B]">{trackingNumber ? 'Tracking number' : 'Items'}</dt>
+            <dd className={`text-[15px] font-semibold ${trackingNumber ? 'font-mono break-all' : ''}`}>
+              {trackingNumber || `${itemCount} product${itemCount !== 1 ? 's' : ''}`}
+            </dd>
+          </div>
+        </dl>
+
+        <section className="flex flex-col gap-4">
+          <h2 className="font-serif text-[28px] md:text-[30px] leading-none">In this order</h2>
+          <ul className="border-t border-[#1F1115]/[0.12]">
+            {order.order_items?.map((item: any) => {
+              const img = item.products?.product_images?.[0]?.url || item.metadata?.image;
+              return (
+                <li key={item.id} className="flex items-center gap-4 py-4 border-b border-[#1F1115]/[0.12]">
+                  <span className="flex-none flex items-center justify-center w-16 h-20 rounded-[14px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)] overflow-hidden">
+                    {img ? (
+                      <img src={img} alt={item.product_name} className="w-[84%] h-[84%] object-contain mix-blend-multiply" />
+                    ) : (
+                      <i className="ri-image-line text-2xl text-[#CDB5AD]" aria-hidden="true"></i>
+                    )}
+                  </span>
+                  <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <span className="font-serif text-[18px] leading-tight">{item.product_name}</span>
+                    {item.variant_name && <span className="text-[13px] text-[#6B565B]">{item.variant_name}</span>}
+                    <span className="text-[13px] text-[#6B565B]">Quantity: {item.quantity}</span>
+                  </span>
+                  <span className="text-[15px] font-semibold tabular-nums">GH₵{money(item.unit_price)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </section>
     </main>
   );
 }
@@ -415,10 +384,8 @@ function OrderTrackingContent() {
 export default function OrderTrackingPage() {
   return (
     <Suspense fallback={
-      <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full animate-spin mx-auto"></div>
-        </div>
+      <main className="min-h-screen bg-[#F1E8DC] flex items-center justify-center" aria-busy="true">
+        <div className="w-10 h-10 border-[3px] border-[#2B0B12] border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-label="Loading"></div>
       </main>
     }>
       <OrderTrackingContent />

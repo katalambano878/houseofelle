@@ -22,7 +22,7 @@ function OrderSuccessContent() {
       top: Math.random() * 20,
       delay: Math.random() * 3,
       duration: 3 + Math.random() * 2,
-      icon: ['ri-heart-fill text-blue-500', 'ri-star-fill text-amber-500', 'ri-gift-fill text-blue-500'][i % 3],
+      icon: ['ri-heart-fill text-[#E8C5BE]', 'ri-star-fill text-[#D9A441]', 'ri-gift-fill text-[#E5B65A]'][i % 3],
     }))
   );
   const [verifying, setVerifying] = useState(false);
@@ -105,25 +105,27 @@ function OrderSuccessContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <i className="ri-loader-4-line text-4xl text-blue-700 animate-spin mb-4 block"></i>
-          <p className="text-gray-500">Loading order details...</p>
+      <main className="min-h-screen flex items-center justify-center bg-[#2B0B12] text-[#F6EDE3] px-5">
+        <div className="text-center" role="status">
+          <i className="ri-loader-4-line text-4xl text-[#D9A441] animate-spin motion-reduce:animate-none mb-4 block" aria-hidden="true"></i>
+          <p className="text-[15px] text-[#E3CFC7]">Loading order details...</p>
         </div>
-      </div>
+      </main>
     );
   }
 
   // Use a fallback or nice error if order not found
   if (!order) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <i className="ri-error-warning-line text-4xl text-red-500 mb-4 block"></i>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Not Found</h1>
-          <p className="text-gray-600 mb-6">We couldn't locate the order details.</p>
-          <Link href="/shop" className="text-blue-700 font-semibold hover:underline">
-            Return to Shop
+      <main className="min-h-screen flex items-center justify-center bg-[#F1E8DC] text-[#1F1115] px-5 py-20">
+        <div className="text-center max-w-md flex flex-col items-center gap-4">
+          <span className="w-20 h-20 rounded-full bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.12)] inline-flex items-center justify-center">
+            <i className="ri-error-warning-line text-3xl text-[#A1271F]" aria-hidden="true"></i>
+          </span>
+          <h1 className="font-serif text-[36px] md:text-[44px] leading-[0.95] tracking-[-0.02em]">Order not found</h1>
+          <p className="text-[15px] text-[#6B565B]">We couldn&apos;t locate the order details.</p>
+          <Link href="/shop" className="mt-2 inline-flex items-center justify-center min-h-[54px] px-8 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none">
+            Return to shop
           </Link>
         </div>
       </main>
@@ -133,11 +135,29 @@ function OrderSuccessContent() {
   const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const isPaid = order.payment_status === 'paid';
   const trackHref = `/order-tracking?order=${encodeURIComponent(order.order_number)}&email=${encodeURIComponent(order.email || '')}`;
+  const firstName = order.shipping_address?.firstName || order.metadata?.first_name || '';
+
+  // Progress shown from the order's real payment and fulfilment status.
+  const status = String(order.status || '');
+  const reached = {
+    processing: isPaid && ['processing', 'shipped', 'delivered', 'completed'].includes(status),
+    packed: ['shipped', 'delivered', 'completed'].includes(status),
+    delivered: ['delivered', 'completed'].includes(status),
+  };
+  const progress = [
+    { title: 'Paid', detail: isPaid ? 'Payment received' : 'Waiting for payment', done: isPaid },
+    { title: 'Processing', detail: 'We prepare your order', done: reached.processing },
+    { title: 'Packed', detail: 'Wrapped and on its way', done: reached.packed },
+    { title: 'Delivered', detail: 'With you, or collected', done: reached.delivered },
+  ];
+
+  const ghostBtn = 'inline-flex items-center justify-center gap-2 min-h-[56px] px-7 rounded-full text-[15px] font-semibold text-[#F6EDE3] shadow-[inset_0_0_0_1px_rgba(246,237,227,0.35)] hover:shadow-[inset_0_0_0_1px_rgba(246,237,227,0.7)] transition-shadow motion-reduce:transition-none whitespace-nowrap';
+  const saffronBtn = 'inline-flex items-center justify-center gap-2 min-h-[56px] px-7 rounded-full bg-[#D9A441] text-[#2B0B12] text-[15px] font-bold hover:bg-[#E5B65A] active:scale-[0.98] transition-[background-color,transform] motion-reduce:transition-none motion-reduce:active:scale-100 whitespace-nowrap';
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
+    <main className="min-h-screen bg-[#2B0B12] text-[#F6EDE3]">
       {showConfetti && isPaid && (
-        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden motion-reduce:hidden" aria-hidden="true">
           {confetti.map((piece, i) => (
             <div
               key={i}
@@ -155,195 +175,187 @@ function OrderSuccessContent() {
         </div>
       )}
 
-      <section className="py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 text-center mb-8">
-            <div className={`w-24 h-24 flex items-center justify-center mx-auto mb-6 rounded-full ${isPaid ? 'bg-blue-100' : 'bg-amber-100'}`}>
-              <i className={`text-6xl ${isPaid ? 'ri-checkbox-circle-fill text-blue-600' : verifying ? 'ri-loader-4-line animate-spin text-amber-600' : 'ri-time-line text-amber-600'}`}></i>
-            </div>
-
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              {isPaid ? 'Order Confirmed!' : verifying ? 'Confirming your payment…' : 'Order received, payment pending'}
-            </h1>
-            <p className="text-xl text-gray-600 mb-8">
-              {isPaid
-                ? "Thank you for your purchase. We're processing your order now."
-                : verifying
-                  ? 'This takes a few seconds. Please keep this page open.'
-                  : "We haven't received your payment yet. If you paid, it can take a minute to show; otherwise you can pay now."}
-            </p>
-            {!isPaid && !verifying && (
-              <Link
-                href={`/pay/${order.id}`}
-                className="inline-flex items-center justify-center bg-blue-700 hover:bg-blue-800 text-white px-8 py-4 rounded-lg font-semibold transition-colors mb-8"
-              >
-                <i className="ri-bank-card-line mr-2"></i>
-                Pay now
-              </Link>
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pt-12 md:pt-24 pb-20 md:pb-24 flex flex-col gap-12 md:gap-14">
+        <div className="flex flex-col gap-5 md:gap-6 max-w-[900px]">
+          <span className="w-16 h-16 md:w-[72px] md:h-[72px] rounded-full bg-[#D9A441] text-[#2B0B12] inline-flex items-center justify-center" aria-hidden="true">
+            <i className={`text-[30px] md:text-[32px] ${isPaid ? 'ri-check-line' : verifying ? 'ri-loader-4-line animate-spin motion-reduce:animate-none' : 'ri-time-line'}`}></i>
+          </span>
+          <h1 className="font-serif text-[40px] md:text-[56px] leading-[0.95] tracking-[-0.02em]">
+            {isPaid ? (
+              <>Thank you{firstName ? ', ' : ''}<em className="text-[#E5B65A]">{firstName ? `${firstName}.` : '.'}</em></>
+            ) : verifying ? (
+              <>Confirming your <em className="text-[#E5B65A]">payment</em></>
+            ) : (
+              <>Order received, <em className="text-[#E5B65A]">payment pending</em></>
             )}
+          </h1>
+          <p className="text-[15px] md:text-[17px] leading-relaxed text-[#E3CFC7] max-w-[620px]" aria-live="polite">
+            {isPaid
+              ? "Your payment went through and we're processing your order now."
+              : verifying
+                ? 'This takes a few seconds. Please keep this page open.'
+                : "We haven't received your payment yet. If you paid, it can take a minute to show; otherwise you can pay now."}
+          </p>
+          {!isPaid && !verifying && (
+            <Link href={`/pay/${order.id}`} className={`${saffronBtn} self-start`}>
+              <i className="ri-bank-card-line" aria-hidden="true"></i>
+              Pay now
+            </Link>
+          )}
+        </div>
 
-            <div className="bg-blue-50 rounded-xl p-6 mb-8">
-              <div className="grid md:grid-cols-3 gap-6 text-center">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Order Number</p>
-                  <p className="text-lg font-bold text-gray-900">{order.order_number}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Order Date</p>
-                  <p className="text-lg font-bold text-gray-900">{orderDate}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Payment</p>
-                  <p className={`text-lg font-bold ${isPaid ? 'text-blue-700' : 'text-amber-700'}`}>{isPaid ? 'Paid' : 'Pending'}</p>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-10 lg:gap-16 items-start">
+          <div className="flex flex-col gap-7 min-w-0">
+            <div className="flex flex-wrap justify-between items-baseline gap-x-4 gap-y-1 pb-5 border-b border-[#F6EDE3]/16">
+              <span className="font-serif text-[24px] md:text-[26px] break-all">Order {order.order_number}</span>
+              <span className="text-sm text-[#CDB5AD]">{orderDate}</span>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <Link
-                href={trackHref}
-                className="bg-blue-700 hover:bg-blue-800 text-white px-8 py-4 rounded-lg font-semibold transition-colors inline-flex items-center justify-center whitespace-nowrap"
-              >
-                <i className="ri-file-list-3-line mr-2"></i>
-                View Order
+            <ol aria-label="Order progress" className="list-none m-0 p-0 grid grid-cols-2 md:grid-cols-4 gap-3">
+              {progress.map((step) => (
+                <li
+                  key={step.title}
+                  className={`flex flex-col gap-3 p-5 rounded-[20px] ${step.done ? 'bg-[#F6EDE3] text-[#2B0B12]' : 'bg-[#F6EDE3]/[0.06] text-[#E3CFC7]'}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`w-7 h-7 rounded-full inline-flex items-center justify-center ${step.done ? 'bg-[#2B0B12] text-[#E5B65A]' : 'shadow-[inset_0_0_0_1px_rgba(246,237,227,0.3)]'}`}
+                  >
+                    {step.done && <i className="ri-check-line text-sm"></i>}
+                  </span>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="font-bold text-[15px]">
+                      {step.title}
+                      <span className="sr-only">{step.done ? ', done' : ', not yet'}</span>
+                    </span>
+                    <span className="text-[13px]">{step.detail}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+              <Link href={trackHref} className={saffronBtn}>
+                Track this order
               </Link>
-              <Link
-                href="/shop"
-                className="border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-8 py-4 rounded-lg font-semibold transition-colors inline-flex items-center justify-center whitespace-nowrap"
-              >
-                <i className="ri-shopping-bag-line mr-2"></i>
-                Continue Shopping
+              <Link href="/shop" className={ghostBtn}>
+                Continue shopping
               </Link>
             </div>
 
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 mb-8">
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Order Items</h2>
-              <div className="space-y-4">
-                {order.order_items.map((item: any) => (
-                  <div key={item.id} className="flex items-center space-x-4">
-                    <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
-                      <img
-                        src={item.metadata?.image || '/placeholder-product.svg'}
-                        alt={item.product_name}
-                        className="w-full h-full object-cover object-center"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900 line-clamp-2">{item.product_name}</p>
-                      <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                      {item.variant_name && (
-                        <p className="text-xs text-gray-500">{item.variant_name}</p>
-                      )}
-                      {item.metadata?.preorder_shipping && (
-                        <p className="text-xs text-amber-700 bg-amber-50 inline-flex items-center gap-1 px-2 py-0.5 rounded mt-1 border border-amber-200">
-                          <i className="ri-time-line"></i> {item.metadata.preorder_shipping}
-                        </p>
-                      )}
-                    </div>
-                    <p className="font-bold text-gray-900">GH₵{money(item.unit_price)}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-gray-200 mt-4 pt-4">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>Subtotal</span>
-                  <span>GH₵{money(order.subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>Shipping</span>
-                  <span>GH₵{money(order.shipping_total)}</span>
-                </div>
-
-                <div className="flex justify-between text-xl font-bold text-gray-900 border-t border-gray-200 pt-2">
-                  <span>Total Paid</span>
-                  <span>GH₵{money(order.total)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Delivery Details</h2>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Delivery method</p>
-                  <p className="text-gray-900 font-semibold">{deliveryLabel(order.shipping_method)}</p>
+            <section aria-labelledby="delivery-heading" className="flex flex-col gap-5 p-6 sm:p-8 rounded-[24px] bg-[#F6EDE3]/[0.06] shadow-[inset_0_0_0_1px_rgba(246,237,227,0.12)]">
+              <h2 id="delivery-heading" className="font-serif text-[24px] leading-none">Delivery details</h2>
+              <dl className="m-0 grid sm:grid-cols-2 gap-x-8 gap-y-4 text-[15px]">
+                <div className="flex flex-col gap-1">
+                  <dt className="text-[13px] text-[#CDB5AD]">Delivery method</dt>
+                  <dd className="m-0 font-semibold">{deliveryLabel(order.shipping_method)}</dd>
                   {order.shipping_method && order.shipping_method !== 'pickup' && Number(order.shipping_total) === 0 && (
-                    <p className="text-sm text-amber-700">We&apos;ll call you to confirm the delivery fee.</p>
+                    <dd className="m-0 text-sm text-[#E5B65A]">We&apos;ll call you to confirm the delivery fee.</dd>
                   )}
                 </div>
                 {order.shipping_address && (
                   <>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Recipient</p>
-                      <p className="font-semibold text-gray-900">
-                        {order.shipping_address.firstName} {order.shipping_address.lastName}
-                      </p>
+                    <div className="flex flex-col gap-1">
+                      <dt className="text-[13px] text-[#CDB5AD]">Recipient</dt>
+                      <dd className="m-0 font-semibold">{order.shipping_address.firstName} {order.shipping_address.lastName}</dd>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Address</p>
-                      <p className="text-gray-900">{order.shipping_address.address}</p>
-                      <p className="text-gray-900">{order.shipping_address.city}, {order.shipping_address.region}</p>
+                    <div className="flex flex-col gap-1">
+                      <dt className="text-[13px] text-[#CDB5AD]">Address</dt>
+                      <dd className="m-0">
+                        {order.shipping_address.address}
+                        <br />
+                        {order.shipping_address.city}, {order.shipping_address.region}
+                      </dd>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Phone</p>
-                      <p className="text-gray-900">{order.phone}</p>
+                    <div className="flex flex-col gap-1">
+                      <dt className="text-[13px] text-[#CDB5AD]">Phone</dt>
+                      <dd className="m-0 tabular-nums">{order.phone}</dd>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Email</p>
-                      <p className="text-gray-900">{order.email}</p>
+                    <div className="flex flex-col gap-1 sm:col-span-2">
+                      <dt className="text-[13px] text-[#CDB5AD]">Email</dt>
+                      <dd className="m-0 break-all">{order.email}</dd>
                     </div>
                   </>
                 )}
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="font-semibold text-gray-900 mb-3">What's Next?</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-3">
-                    <i className="ri-mail-line text-blue-700 mt-1"></i>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Email Confirmation</p>
-                      <p className="text-sm text-gray-600">Sent to {order.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <i className="ri-box-3-line text-blue-700 mt-1"></i>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Processing</p>
-                      <p className="text-sm text-gray-600">We'll pack your order today</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <i className="ri-truck-line text-blue-700 mt-1"></i>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Shipping Updates</p>
-                      <p className="text-sm text-gray-600">Track via email & SMS</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+              </dl>
+              <ul className="list-none m-0 p-0 pt-5 border-t border-[#F6EDE3]/12 flex flex-col gap-3 text-sm text-[#E3CFC7]">
+                <li className="flex items-start gap-3">
+                  <i className="ri-mail-line text-base text-[#E5B65A] leading-none mt-0.5" aria-hidden="true"></i>
+                  <span>Email confirmation sent to <span className="text-[#F6EDE3] break-all">{order.email}</span></span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-truck-line text-base text-[#E5B65A] leading-none mt-0.5" aria-hidden="true"></i>
+                  <span>Shipping updates by email and SMS</span>
+                </li>
+              </ul>
+            </section>
           </div>
 
-          <div className="mt-8 text-center">
-            <p className="text-gray-600 mb-4">Need help with your order?</p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/contact" className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
-                <i className="ri-customer-service-line mr-1"></i>
-                Contact Support
-              </Link>
-              <Link href={trackHref} className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
-                <i className="ri-question-line mr-1"></i>
-                Order Help
-              </Link>
-              <Link href="/returns" className="text-blue-700 hover:text-blue-900 font-semibold whitespace-nowrap">
-                <i className="ri-arrow-left-right-line mr-1"></i>
-                Returns Policy
-              </Link>
-            </div>
+          <aside aria-label="What you ordered" className="flex flex-col gap-5 p-6 sm:p-8 rounded-[28px] bg-[#F6EDE3] text-[#1F1115]">
+            <h2 className="font-serif text-[24px] leading-none">What you ordered</h2>
+            <ul className="list-none m-0 p-0 flex flex-col gap-4">
+              {order.order_items.map((item: any) => (
+                <li key={item.id} className="grid grid-cols-[64px_minmax(0,1fr)_auto] gap-4 items-center">
+                  <span className="flex items-center justify-center w-16 h-[78px] rounded-[12px] bg-white overflow-hidden">
+                    <img
+                      src={item.metadata?.image || '/placeholder-product.svg'}
+                      alt={item.product_name}
+                      className="w-[76%] h-[76%] object-contain"
+                    />
+                  </span>
+                  <span className="flex flex-col gap-0.5 min-w-0">
+                    <span className="font-serif text-[18px] leading-tight line-clamp-2">{item.product_name}</span>
+                    <span className="text-[13px] text-[#6B565B]">
+                      Qty {item.quantity}{item.variant_name ? ` · ${item.variant_name}` : ''}
+                    </span>
+                    {item.metadata?.preorder_shipping && (
+                      <span className="self-start inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs text-[#7A1F2E] bg-[#E8C5BE]/50">
+                        <i className="ri-time-line" aria-hidden="true"></i> {item.metadata.preorder_shipping}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-semibold tabular-nums whitespace-nowrap">GH₵{money(item.unit_price)}</span>
+                </li>
+              ))}
+            </ul>
+            <dl className="m-0 flex flex-col gap-2.5 pt-5 border-t border-[#1F1115]/12 text-[15px]">
+              <div className="flex justify-between gap-4">
+                <dt className="text-[#4D3A3F]">Subtotal</dt>
+                <dd className="m-0 tabular-nums">GH₵{money(order.subtotal)}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-[#4D3A3F]">Shipping</dt>
+                <dd className="m-0 tabular-nums">GH₵{money(order.shipping_total)}</dd>
+              </div>
+              {Number(order.discount_total) > 0 && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#2F6B3A]">Discount</dt>
+                  <dd className="m-0 text-[#2F6B3A] tabular-nums">-GH₵{money(order.discount_total)}</dd>
+                </div>
+              )}
+              <div className="flex justify-between items-baseline gap-4 pt-3 border-t border-[#1F1115]/12">
+                <dt className="font-serif text-[20px]">{isPaid ? 'Total paid' : 'Total'}</dt>
+                <dd className="m-0 text-[19px] font-semibold tabular-nums">GH₵{money(order.total)}</dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
+
+        <div className="flex flex-col items-center gap-2 pt-4 text-center">
+          <p className="text-[15px] text-[#E3CFC7]">Need help with your order?</p>
+          <div className="flex flex-wrap justify-center gap-x-6">
+            <Link href="/contact" className="inline-flex items-center gap-1.5 min-h-[44px] text-sm font-semibold text-[#F6EDE3] underline underline-offset-4 decoration-[#F6EDE3]/40 hover:decoration-[#F6EDE3] whitespace-nowrap">
+              <i className="ri-customer-service-line" aria-hidden="true"></i>
+              Contact support
+            </Link>
+            <Link href={trackHref} className="inline-flex items-center gap-1.5 min-h-[44px] text-sm font-semibold text-[#F6EDE3] underline underline-offset-4 decoration-[#F6EDE3]/40 hover:decoration-[#F6EDE3] whitespace-nowrap">
+              <i className="ri-question-line" aria-hidden="true"></i>
+              Order help
+            </Link>
+            <Link href="/returns" className="inline-flex items-center gap-1.5 min-h-[44px] text-sm font-semibold text-[#F6EDE3] underline underline-offset-4 decoration-[#F6EDE3]/40 hover:decoration-[#F6EDE3] whitespace-nowrap">
+              <i className="ri-arrow-left-right-line" aria-hidden="true"></i>
+              Returns policy
+            </Link>
           </div>
         </div>
       </section>
@@ -358,6 +370,12 @@ function OrderSuccessContent() {
         .animate-fall {
           animation: fall linear forwards;
         }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-fall {
+            animation: none;
+            display: none;
+          }
+        }
       `}</style>
     </main>
   );
@@ -366,8 +384,8 @@ function OrderSuccessContent() {
 export default function OrderSuccessPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-blue-700 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#2B0B12]">
+        <div className="w-12 h-12 border-[3px] border-[#D9A441] border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-hidden="true"></div>
       </div>
     }>
       <OrderSuccessContent />

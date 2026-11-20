@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import PageHero from '@/components/PageHero';
+import { SCENT_FAMILIES } from '@/components/home/families-data';
 
 export const revalidate = 0; // Ensure fresh data on every visit
 
@@ -18,107 +18,93 @@ export default async function CategoriesPage() {
     .eq('status', 'active')
     .order('position', { ascending: true });
 
-  // Palette to cycle through for visual variety since DB doesn't have colors
-  const palette = [
-    { color: 'from-blue-500 to-blue-700', icon: 'ri-store-2-line' },
-    { color: 'from-blue-500 to-blue-700', icon: 'ri-shopping-bag-3-line' },
-    { color: 'from-purple-500 to-purple-700', icon: 'ri-drop-line' },
-    { color: 'from-amber-500 to-amber-700', icon: 'ri-home-smile-line' },
-    { color: 'from-rose-500 to-rose-700', icon: 'ri-heart-line' },
-    { color: 'from-indigo-500 to-indigo-700', icon: 'ri-star-smile-line' },
-  ];
-
-  const categories = ((categoriesData as any[]) || []).map((c, i) => {
-    const style = palette[i % palette.length];
-    return {
-      ...c,
-      image: c.image_url || '/placeholder-product.svg',
-      color: style.color,
-      icon: style.icon,
-      // Optional: Fetch product count if needed, currently skipping for performance/simplicity
-      productCount: 'Browse',
-    };
-  });
+  const categories = ((categoriesData as any[]) || []).map((c) => ({
+    ...c,
+    image: c.image_url || '/placeholder-product.svg',
+  }));
 
   return (
-    <div className="min-h-screen bg-[#F1E8DC]">
-      <PageHero
-        eyebrow="Fragrance Families"
-        title="Shop by Category"
-        subtitle="Explore House of Elle collections by scent profile, mood, and everyday lifestyle."
-        backgroundImage="/Whisk_6f28ce8873000718f834bc0d63e3bc87dr.jpeg"
-      />
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <section className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 md:pt-20 pb-8 md:pb-10 flex flex-wrap items-end justify-between gap-5">
+        <h1 className="font-serif text-[40px] md:text-[56px] leading-[0.95] tracking-[-0.02em]">
+          The <em>collections</em>
+        </h1>
+        <p className="text-[15px] leading-relaxed text-[#6B565B] max-w-[420px]">
+          Explore House of Elle collections by scent profile, mood, and everyday lifestyle.
+        </p>
+      </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section aria-label="Collections" className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pb-20 md:pb-[120px]">
         {categories.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {categories.map((category) => (
-              <Link
-                key={category.id}
-                href={`/shop?category=${category.slug}`}
-                className="group bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-2xl transition-all cursor-pointer"
-              >
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={category.image}
-                    alt={category.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className={`absolute inset-0 bg-gradient-to-t ${category.color} opacity-0 group-hover:opacity-20 transition-opacity`}></div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${category.color} rounded-full flex items-center justify-center`}>
-                      <i className={`${category.icon} text-2xl text-white`}></i>
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">{category.name}</h3>
-                      <p className="text-sm text-gray-500">Collection</p>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 leading-relaxed text-sm mb-4 line-clamp-2">
-                    {category.description || 'Explore our exclusive collection in this category.'}
-                  </p>
-                  <div className="flex items-center text-blue-700 font-medium text-sm group-hover:gap-2 transition-all">
-                    <span>Browse Collection</span>
-                    <i className="ri-arrow-right-line ml-2"></i>
-                  </div>
-                </div>
-              </Link>
+          <ul className="border-t border-[#1F1115]/14">
+            {categories.map((category, i) => (
+              <li key={category.id} className="border-b border-[#1F1115]/14">
+                <Link
+                  href={`/shop?category=${category.slug}`}
+                  className="group grid gap-5 md:gap-10 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-center py-8 md:py-10"
+                >
+                  <span className={`flex flex-col gap-3 md:gap-3.5 ${i % 2 === 1 ? 'md:order-2 md:pl-4 lg:pl-8' : ''}`}>
+                    <span className="font-serif text-[30px] md:text-[39px] leading-[0.95] tracking-[-0.02em]">{category.name}</span>
+                    {category.description && (
+                      <span className="text-[15px] leading-[1.65] text-[#4D3A3F] max-w-[380px]">{category.description}</span>
+                    )}
+                    <span className="inline-flex items-center gap-2.5 min-h-[44px] mt-1 font-semibold text-[15px]">
+                      Shop {category.name}
+                      <i className="ri-arrow-right-line text-lg transition-transform duration-300 group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" aria-hidden="true" />
+                    </span>
+                  </span>
+                  <span className="relative block h-[240px] sm:h-[300px] md:h-[360px] rounded-[24px] overflow-hidden bg-[#2B0B12]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={category.image}
+                      alt=""
+                      loading={i < 2 ? 'eager' : 'lazy'}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                    />
+                  </span>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
-          <div className="text-center py-20 bg-gray-50 rounded-xl">
-            <i className="ri-inbox-line text-5xl text-gray-300 mb-4"></i>
-            <p className="text-xl text-gray-500">No categories found.</p>
+          <div className="flex flex-col items-center gap-4 text-center py-20 rounded-[24px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+            <p className="font-serif text-[26px] leading-tight">No collections to show yet.</p>
+            <Link href="/shop" className="inline-flex items-center gap-2 min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold">
+              Browse everything <i className="ri-arrow-right-line" aria-hidden="true" />
+            </Link>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="bg-gradient-to-br from-blue-700 to-blue-900 py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">Can't Find What You're Looking For?</h2>
-          <p className="text-xl text-blue-100 mb-8 leading-relaxed">
-            Try our advanced search or contact our team for personalised product recommendations
-          </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Link
-              href="/shop"
-              className="inline-flex items-center gap-2 bg-white text-blue-700 px-8 py-4 rounded-full font-medium hover:bg-blue-50 transition-colors whitespace-nowrap"
-            >
-              <i className="ri-search-line"></i>
-              Search All Products
-            </Link>
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-full font-medium hover:bg-blue-500 transition-colors whitespace-nowrap"
-            >
-              <i className="ri-customer-service-line"></i>
-              Contact Support
-            </Link>
+      <section aria-labelledby="by-smell" className="bg-[#2B0B12] text-[#F6EDE3]">
+        <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-16 md:pt-[104px] pb-20 md:pb-28 flex flex-col gap-8 md:gap-11">
+          <div className="flex flex-wrap items-end justify-between gap-5 md:gap-8">
+            <h2 id="by-smell" className="font-serif text-[32px] md:text-[41px] leading-[0.95] tracking-[-0.02em]">
+              Or shop by how it <em className="text-[#E5B65A]">smells</em>
+            </h2>
+            <p className="text-[15px] leading-[1.7] text-[#E3CFC7] max-w-[340px]">Pick a family and we&apos;ll show you bottles with those notes.</p>
           </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+            {SCENT_FAMILIES.map((f) => (
+              <li key={f.name}>
+                <Link
+                  href={`/shop?search=${encodeURIComponent(f.keyword)}`}
+                  className="group flex h-full flex-col gap-6 md:gap-[26px] p-6 md:p-7 rounded-[24px] bg-[#F6EDE3]/5 shadow-[inset_0_0_0_1px_rgba(246,237,227,0.14)] hover:bg-[#F6EDE3]/10 transition-colors motion-reduce:transition-none"
+                >
+                  <span className="flex items-center justify-between">
+                    <span className="w-11 h-11 rounded-full shadow-[inset_0_0_0_1px_rgba(246,237,227,0.25)]" style={{ backgroundColor: f.swatch }} aria-hidden="true" />
+                    <i className="ri-arrow-right-line text-xl transition-transform duration-300 group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" aria-hidden="true" />
+                  </span>
+                  <span className="flex flex-col gap-1.5">
+                    <span className="font-serif text-[26px] md:text-[30px] leading-none">{f.name}</span>
+                    <span className="text-sm text-[#CDB5AD]">{f.notes.slice(0, 3).join(', ')}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

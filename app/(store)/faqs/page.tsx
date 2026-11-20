@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import PageHero from '@/components/PageHero';
 
 export default function FAQsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
 
   const categories = [
-    { id: 'all', name: 'All Questions', icon: 'ri-question-line' },
+    { id: 'all', name: 'All', icon: 'ri-question-line' },
     { id: 'orders', name: 'Orders', icon: 'ri-shopping-bag-line' },
     { id: 'shipping', name: 'Delivery', icon: 'ri-truck-line' },
     { id: 'returns', name: 'Returns', icon: 'ri-arrow-go-back-line' },
@@ -133,148 +134,107 @@ export default function FAQsPage() {
     return matchesCategory && matchesSearch;
   });
 
-  return (
-    <div className="min-h-screen bg-[#F1E8DC]">
-      <div className="bg-gradient-to-br from-blue-50 via-white to-amber-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
-              Frequently Asked Questions
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-              Find quick answers about ordering, delivery, payment, our fragrances and more.
-            </p>
+  const links = [
+    { href: '/shipping', title: 'Delivery', text: 'How delivery works and how to track your orders' },
+    { href: '/returns', title: 'Returns', text: 'Report a damaged, leaking or wrong item from your order' },
+    { href: '/privacy', title: 'Privacy and security', text: 'See how we protect your personal information and data' },
+  ];
 
-            <div className="relative">
+  return (
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <PageHero
+        title="Questions, answered"
+        subtitle="Find quick answers about ordering, delivery, payment, our fragrances and more."
+      />
+
+      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 py-12 md:py-20">
+        <div className="max-w-[720px] mx-auto flex flex-col gap-8 md:gap-10">
+          <div className="flex flex-col gap-4">
+            <label className="relative block">
+              <span className="sr-only">Search the questions</span>
+              <i className="ri-search-line absolute left-5 top-1/2 -translate-y-1/2 text-lg text-[#6B565B]" aria-hidden="true" />
               <input
-                type="text"
+                type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search for answers..."
-                className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm shadow-lg"
+                placeholder="Search for answers"
+                className="w-full h-[54px] pl-12 pr-5 rounded-full bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)] text-[15px] text-[#1F1115] placeholder:text-[#6B565B] outline-none focus:shadow-[inset_0_0_0_1.5px_#2B0B12]"
               />
-              <i className="ri-search-line absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl"></i>
+            </label>
+            <div role="group" aria-label="Filter by topic" className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 sm:flex-wrap">
+              {categories.map((category) => {
+                const on = activeCategory === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setActiveCategory(category.id)}
+                    className={`shrink-0 min-h-[44px] px-4 rounded-full text-sm font-semibold whitespace-nowrap transition-colors motion-reduce:transition-none ${
+                      on ? 'bg-[#2B0B12] text-[#F6EDE3]' : 'shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:bg-[#FBF6EF]'
+                    }`}
+                  >
+                    {category.name}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="flex flex-wrap gap-3 justify-center mb-12">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setActiveCategory(category.id)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-full font-medium transition-all whitespace-nowrap ${
-                activeCategory === category.id
-                  ? 'bg-blue-700 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <i className={`${category.icon} text-lg`}></i>
-              {category.name}
-            </button>
-          ))}
-        </div>
+          {filteredFAQs.length > 0 ? (
+            <div className="border-t border-[#1F1115]/14" aria-live="polite">
+              {filteredFAQs.map((faq) => (
+                <details key={faq.question} className="group border-b border-[#1F1115]/14">
+                  <summary className="flex items-center justify-between gap-4 min-h-[64px] py-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden text-[15px] md:text-base font-semibold">
+                    {faq.question}
+                    <i className="ri-add-line flex-none text-xl text-[#7A1F2E] transition-transform group-open:rotate-45 motion-reduce:transition-none" aria-hidden="true" />
+                  </summary>
+                  <p className="pb-5 pr-8 text-[15px] leading-[1.7] text-[#4D3A3F]">{faq.answer}</p>
+                </details>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-center py-12" role="status">
+              <p className="font-serif text-[26px] leading-tight">No answers match that</p>
+              <p className="text-[15px] text-[#6B565B]">Try other words, or pick a different topic.</p>
+            </div>
+          )}
 
-        {filteredFAQs.length > 0 ? (
-          <div className="max-w-4xl mx-auto space-y-4">
-            {filteredFAQs.map((faq, index) => (
-              <details
-                key={index}
-                className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition-shadow"
+          <section aria-labelledby="still-questions" className="mt-4 flex flex-col gap-5 p-6 md:p-8 rounded-[24px] bg-[#2B0B12] text-[#F6EDE3]">
+            <h2 id="still-questions" className="font-serif text-[28px] md:text-[30px] leading-none">Still have a <em className="text-[#E5B65A]">question?</em></h2>
+            <p className="text-[15px] leading-relaxed text-[#E3CFC7] max-w-[480px]">Our House of Elle team is ready to help with product and wholesale enquiries.</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <a
+                href="https://wa.me/233570551050"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 min-h-[52px] px-7 rounded-full bg-[#D9A441] text-[#2B0B12] font-semibold hover:bg-[#E5B65A] transition-colors motion-reduce:transition-none"
               >
-                <summary className="px-6 py-5 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-between">
-                  <span className="flex-1 pr-4">{faq.question}</span>
-                  <i className="ri-arrow-down-s-line text-xl text-gray-400"></i>
-                </summary>
-                <div className="px-6 pb-5 text-gray-600 leading-relaxed border-t border-gray-100 pt-4">
-                  {faq.answer}
-                </div>
-              </details>
+                <i className="ri-whatsapp-line text-lg" aria-hidden="true" />
+                Chat on WhatsApp
+              </a>
+              <Link
+                href="/contact"
+                className="inline-flex items-center justify-center gap-2 min-h-[52px] px-7 rounded-full shadow-[inset_0_0_0_1.5px_rgba(246,237,227,0.5)] font-semibold hover:bg-[#F6EDE3]/10 transition-colors motion-reduce:transition-none"
+              >
+                Contact us
+              </Link>
+            </div>
+          </section>
+
+          <nav aria-label="More help" className="border-t border-[#1F1115]/14">
+            {links.map((l) => (
+              <Link key={l.href} href={l.href} className="group flex items-center justify-between gap-4 py-5 border-b border-[#1F1115]/14">
+                <span className="flex flex-col gap-1">
+                  <span className="font-serif text-[22px] leading-tight">{l.title}</span>
+                  <span className="text-sm text-[#6B565B]">{l.text}</span>
+                </span>
+                <i className="ri-arrow-right-line text-xl transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" aria-hidden="true" />
+              </Link>
             ))}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i className="ri-search-line text-4xl text-gray-400"></i>
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No results found</h3>
-            <p className="text-gray-600">
-              Try adjusting your search or browse different categories
-            </p>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-gradient-to-br from-blue-700 to-blue-900 py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <i className="ri-customer-service-2-line text-3xl text-white"></i>
-          </div>
-          <h2 className="text-3xl font-bold text-white mb-4">Still Have Questions?</h2>
-          <p className="text-xl text-blue-100 mb-8 leading-relaxed">
-            Our House of Elle team is ready to help with product and wholesale enquiries.
-          </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 bg-white text-blue-700 px-8 py-4 rounded-full font-medium hover:bg-blue-50 transition-colors whitespace-nowrap"
-            >
-              <i className="ri-mail-line text-lg"></i>
-              Contact Support
-            </Link>
-            <a
-              href="https://wa.me/233570551050"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-full font-medium hover:bg-blue-500 transition-colors whitespace-nowrap"
-            >
-              <i className="ri-whatsapp-line text-lg"></i>
-              Chat on WhatsApp
-            </a>
-          </div>
+          </nav>
         </div>
       </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Quick Links</h2>
-          <p className="text-gray-600">Explore more helpful resources</p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          <Link href="/shipping" className="bg-gray-50 p-8 rounded-2xl hover:shadow-lg transition-all cursor-pointer">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <i className="ri-truck-line text-2xl text-blue-700"></i>
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Shipping Policy</h3>
-            <p className="text-gray-600 leading-relaxed">
-              How delivery works and how to track your orders
-            </p>
-          </Link>
-
-          <Link href="/returns" className="bg-gray-50 p-8 rounded-2xl hover:shadow-lg transition-all cursor-pointer">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <i className="ri-arrow-go-back-line text-2xl text-blue-700"></i>
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Returns</h3>
-            <p className="text-gray-600 leading-relaxed">
-              Report a damaged, leaking or wrong item from your order
-            </p>
-          </Link>
-
-          <Link href="/privacy" className="bg-gray-50 p-8 rounded-2xl hover:shadow-lg transition-all cursor-pointer">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <i className="ri-shield-check-line text-2xl text-blue-700"></i>
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Privacy & Security</h3>
-            <p className="text-gray-600 leading-relaxed">
-              See how we protect your personal information and data
-            </p>
-          </Link>
-        </div>
-      </div>
-    </div>
+    </main>
   );
 }

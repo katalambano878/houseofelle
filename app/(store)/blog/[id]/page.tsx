@@ -114,36 +114,34 @@ export default function BlogPostPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <i className="ri-loader-4-line animate-spin text-4xl text-blue-700"></i>
-      </div>
+      <main className="min-h-screen flex items-center justify-center bg-[#F1E8DC]" role="status">
+        <i className="ri-loader-4-line animate-spin motion-reduce:animate-none text-4xl text-[#7A1F2E]" aria-hidden="true" />
+        <span className="sr-only">Loading the post</span>
+      </main>
     );
   }
 
   if (status === 'missing' || status === 'error' || !post) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-white px-4">
-        <div className="text-center max-w-md">
-          <div className="w-20 h-20 flex items-center justify-center bg-gray-100 rounded-full mx-auto mb-6">
-            <i className="ri-article-line text-4xl text-gray-400"></i>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+      <main className="min-h-[60vh] flex items-center justify-center bg-[#F1E8DC] text-[#1F1115] px-5 py-16">
+        <div className="text-center max-w-md flex flex-col items-center gap-3">
+          <h1 className="font-serif text-[36px] md:text-[44px] leading-none">
             {status === 'error' ? 'Something went wrong' : 'Post not found'}
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-[15px] text-[#6B565B]">
             {status === 'error'
               ? 'We could not load this article. Please try again.'
               : 'This article may have been moved or is no longer available.'}
           </p>
           <Link
             href="/blog"
-            className="inline-flex items-center gap-2 bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors"
+            className="mt-3 inline-flex items-center gap-2 min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] font-semibold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none"
           >
-            <i className="ri-arrow-left-line"></i>
-            Back to Blog
+            <i className="ri-arrow-left-line" aria-hidden="true" />
+            Back to the journal
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -154,109 +152,115 @@ export default function BlogPostPage() {
     .filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-[#F1E8DC]">
-      <div className="relative h-80 sm:h-96 bg-gray-900">
-        {post.featured_image && (
-          <img src={post.featured_image} alt={post.title} className="w-full h-full object-cover opacity-50" />
-        )}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            {post.tags?.[0] && (
-              <span className="inline-block bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
-                {post.tags[0]}
-              </span>
-            )}
-            <h1 className="text-3xl sm:text-5xl font-bold text-white mb-6">{post.title}</h1>
-            <div className="flex flex-wrap items-center justify-center gap-6 text-blue-100">
-              <span className="flex items-center gap-2">
-                <i className="ri-calendar-line"></i>
-                {formatDate(post.published_at || post.created_at)}
-              </span>
-              <span className="flex items-center gap-2">
-                <i className="ri-time-line"></i>
-                {readTime(post.content)}
-              </span>
-            </div>
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <section className="bg-[#2B0B12] text-[#F6EDE3]">
+        <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 md:pt-16 pb-14 md:pb-20">
+          <div className="max-w-[820px] mx-auto flex flex-col gap-5">
+            <Link href="/blog" className="self-start inline-flex items-center gap-2 min-h-[44px] text-sm font-semibold text-[#E3CFC7] hover:text-[#F6EDE3]">
+              <i className="ri-arrow-left-line" aria-hidden="true" />
+              The journal
+            </Link>
+            <h1 className="font-serif text-[36px] md:text-[52px] leading-[1] tracking-[-0.02em] text-balance">{post.title}</h1>
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#CDB5AD]">
+              {post.tags?.[0] && <span className="font-semibold text-[#E5B65A]">{post.tags[0]}</span>}
+              <span>{formatDate(post.published_at || post.created_at)}</span>
+              <span aria-hidden="true">·</span>
+              <span>{readTime(post.content)}</span>
+            </p>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <article className="max-w-none space-y-6 text-gray-700 text-lg leading-relaxed">
-          {paragraphs.map((para, i) => (
-            <p key={i} className="whitespace-pre-line">{para}</p>
-          ))}
-        </article>
+      {post.featured_image && (
+        <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 -mt-6 md:-mt-8">
+          <div className="max-w-[1000px] mx-auto relative h-[240px] sm:h-[360px] md:h-[480px] rounded-[24px] overflow-hidden bg-[#4A1520]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={post.featured_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          </div>
+        </div>
+      )}
 
-        {post.tags && post.tags.length > 0 && (
-          <div className="mt-10 flex flex-wrap gap-2">
-            {post.tags.map((tag) => (
-              <span key={tag} className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-700">
-                #{tag}
-              </span>
+      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 py-12 md:py-16">
+        <div className="max-w-[720px] mx-auto">
+          <article className="flex flex-col gap-6 text-[16px] md:text-[17px] leading-[1.8] text-[#2E1E22]">
+            {paragraphs.map((para, i) => (
+              <p key={i} className="whitespace-pre-line">{para}</p>
             ))}
-          </div>
-        )}
+          </article>
 
-        <div className="mt-12 pt-12 border-t border-gray-200">
-          <p className="text-sm text-gray-500 mb-3">Share this article</p>
-          <div className="flex gap-3">
-            <button onClick={() => share()} aria-label="Share or copy link" className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-blue-100 transition-colors">
-              <i className="ri-share-line text-gray-600"></i>
-            </button>
-            <button onClick={() => share('whatsapp')} aria-label="Share on WhatsApp" className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-blue-100 transition-colors">
-              <i className="ri-whatsapp-line text-gray-600"></i>
-            </button>
-            <button onClick={() => share('facebook')} aria-label="Share on Facebook" className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-blue-100 transition-colors">
-              <i className="ri-facebook-fill text-gray-600"></i>
-            </button>
-            <button onClick={() => share('x')} aria-label="Share on X" className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-blue-100 transition-colors">
-              <i className="ri-twitter-x-fill text-gray-600"></i>
-            </button>
+          {post.tags && post.tags.length > 0 && (
+            <ul className="mt-10 flex flex-wrap gap-2" aria-label="Tags">
+              {post.tags.map((tag) => (
+                <li key={tag} className="px-3.5 py-1.5 rounded-full bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.12)] text-sm text-[#4D3A3F]">
+                  {tag}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-12 pt-8 border-t border-[#1F1115]/14 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-[15px] font-semibold">Share this article</p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => share()} aria-label="Share or copy link" className="w-11 h-11 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:bg-[#2B0B12] hover:text-[#F6EDE3] transition-colors motion-reduce:transition-none">
+                <i className="ri-share-line text-lg" aria-hidden="true" />
+              </button>
+              <button type="button" onClick={() => share('whatsapp')} aria-label="Share on WhatsApp" className="w-11 h-11 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:bg-[#2B0B12] hover:text-[#F6EDE3] transition-colors motion-reduce:transition-none">
+                <i className="ri-whatsapp-line text-lg" aria-hidden="true" />
+              </button>
+              <button type="button" onClick={() => share('facebook')} aria-label="Share on Facebook" className="w-11 h-11 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:bg-[#2B0B12] hover:text-[#F6EDE3] transition-colors motion-reduce:transition-none">
+                <i className="ri-facebook-fill text-lg" aria-hidden="true" />
+              </button>
+              <button type="button" onClick={() => share('x')} aria-label="Share on X" className="w-11 h-11 rounded-full inline-flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(31,17,21,0.2)] hover:bg-[#2B0B12] hover:text-[#F6EDE3] transition-colors motion-reduce:transition-none">
+                <i className="ri-twitter-x-fill text-lg" aria-hidden="true" />
+              </button>
+            </div>
+            {shareStatus && <p className="w-full text-sm text-[#6B565B]" role="status">{shareStatus}</p>}
           </div>
-          {shareStatus && <p className="mt-3 text-sm text-gray-600" role="status">{shareStatus}</p>}
         </div>
 
         {related.length > 0 && (
-          <div className="mt-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-8">More Articles</h2>
-            <div className="grid md:grid-cols-2 gap-8">
+          <section aria-labelledby="post-more" className="max-w-[1000px] mx-auto mt-16 md:mt-20 flex flex-col gap-6">
+            <h2 id="post-more" className="font-serif text-[28px] md:text-[34px] leading-none">Keep <em>reading</em></h2>
+            <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-10">
               {related.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/blog/${item.slug || item.id}`}
-                  className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all"
-                >
-                  <div className="relative h-48 bg-gray-100">
-                    {item.featured_image ? (
-                      <img src={item.featured_image} alt={item.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <i className="ri-article-line text-5xl text-gray-300"></i>
-                      </div>
-                    )}
-                    {item.tags?.[0] && (
-                      <span className="absolute top-4 left-4 bg-blue-700 text-white px-3 py-1 rounded-full text-xs font-medium">
-                        {item.tags[0]}
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 leading-tight">{item.title}</h3>
-                  </div>
-                </Link>
+                <li key={item.id}>
+                  <Link href={`/blog/${item.slug || item.id}`} className="group flex flex-col gap-4">
+                    <span className="relative block aspect-[4/3] rounded-[22px] overflow-hidden bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+                      {item.featured_image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.featured_image}
+                          alt=""
+                          loading="lazy"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                        />
+                      ) : (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <i className="ri-article-line text-4xl text-[#6B565B]" aria-hidden="true" />
+                        </span>
+                      )}
+                    </span>
+                    <span className="flex flex-col gap-1.5">
+                      {item.tags?.[0] && <span className="text-[13px] font-semibold text-[#7A1F2E]">{item.tags[0]}</span>}
+                      <h3 className="font-serif text-[22px] md:text-[24px] leading-[1.1] group-hover:text-[#7A1F2E] transition-colors motion-reduce:transition-none">{item.title}</h3>
+                    </span>
+                  </Link>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
         )}
 
-        <div className="mt-12 text-center">
-          <Link href="/blog" className="inline-flex items-center gap-2 text-blue-700 font-medium hover:gap-3 transition-all">
-            <i className="ri-arrow-left-line"></i>
-            Back to Blog
+        <div className="mt-14 text-center">
+          <Link
+            href="/blog"
+            className="inline-flex items-center gap-2 min-h-[52px] px-7 rounded-full shadow-[inset_0_0_0_1.5px_rgba(31,17,21,0.3)] font-semibold hover:bg-[#FBF6EF] transition-colors motion-reduce:transition-none"
+          >
+            <i className="ri-arrow-left-line" aria-hidden="true" />
+            Back to the journal
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
-import PageHero from '@/components/PageHero';
 import { useWishlist } from '@/context/WishlistContext';
 import ProductCard from '@/components/ProductCard';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -148,83 +147,85 @@ export default function WishlistPage() {
     }
   };
 
-  return (
-    <main className="min-h-screen bg-[#F1E8DC]">
-      <PageHero title="My Wishlist" backgroundImage="/Whisk_a23750058b309cf9155424b5e8ea85dcdr.jpeg" />
+  const count = wishlistItems.length;
+  const shareBtn =
+    'w-11 h-11 inline-flex items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgba(246,237,227,0.3)] text-[#F6EDE3] hover:bg-[#F6EDE3]/10 transition-colors motion-reduce:transition-none';
 
-      <section className="py-8 bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <nav className="flex items-center space-x-2 text-sm mb-2">
-                <Link href="/" className="text-gray-600 hover:text-blue-700 transition-colors">Home</Link>
-                <i className="ri-arrow-right-s-line text-gray-400"></i>
-                <span className="text-gray-900 font-medium">Wishlist</span>
-              </nav>
-              <p className="text-gray-600">
-                {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} saved
-              </p>
-            </div>
-            {wishlistItems.length > 0 && (
-              <button
-                onClick={addAllToCart}
-                className="bg-gray-900 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
-              >
-                Add All to Cart
-              </button>
-            )}
-          </div>
+  return (
+    <main className="min-h-screen bg-[#F1E8DC] text-[#1F1115]">
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 md:pt-16 pb-7 md:pb-10 flex flex-wrap items-end justify-between gap-6">
+        <div className="flex flex-col gap-2.5">
+          <h1 className="font-serif text-[40px] md:text-[56px] leading-[0.95] tracking-[-0.02em]">
+            Saved for <em>later</em>
+          </h1>
+          <p className="text-[15px] text-[#6B565B] tabular-nums">
+            {count} {count === 1 ? 'scent' : 'scents'} saved
+          </p>
         </div>
+        {count > 0 && (
+          <button
+            type="button"
+            onClick={addAllToCart}
+            className="inline-flex items-center gap-2 min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none"
+          >
+            <i className="ri-shopping-bag-3-line text-lg" aria-hidden="true"></i>
+            Add all to bag
+          </button>
+        )}
       </section>
 
       {notice && (
-        <section className="pt-6">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <div className={`p-4 rounded-lg border text-sm flex items-start gap-3 ${notice.type === 'success' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-              <i className="ri-information-line text-lg mt-0.5"></i>
-              <div className="flex-1">
-                <p>{notice.text}</p>
-                {notice.links && notice.links.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {notice.links.map((link) => (
-                      <li key={link.slug}>
-                        <Link href={`/product/${link.slug}`} className="font-semibold underline hover:no-underline">
-                          {link.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <button onClick={() => setNotice(null)} aria-label="Dismiss" className="text-current opacity-60 hover:opacity-100">
-                <i className="ri-close-line text-lg"></i>
-              </button>
+        <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pb-6">
+          <div
+            role="status"
+            className={`flex items-start gap-3 px-4 py-3.5 rounded-2xl text-sm ${notice.type === 'success' ? 'bg-[#DDE7D6] text-[#244A2C]' : 'bg-[#FBF6EF] text-[#4D3A3F] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.12)]'}`}
+          >
+            <i className="ri-information-line text-lg leading-5" aria-hidden="true"></i>
+            <div className="flex-1 min-w-0">
+              <p className="leading-5">{notice.text}</p>
+              {notice.links && notice.links.length > 0 && (
+                <ul className="mt-1.5 flex flex-col">
+                  {notice.links.map((link) => (
+                    <li key={link.slug}>
+                      <Link href={`/product/${link.slug}`} className="inline-flex items-center min-h-[36px] font-semibold underline underline-offset-[3px]">
+                        {link.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="-my-2 -mr-2 w-11 h-11 flex-none inline-flex items-center justify-center rounded-full opacity-70 hover:opacity-100">
+              <i className="ri-close-line text-lg" aria-hidden="true"></i>
+            </button>
           </div>
         </section>
       )}
 
-      {wishlistItems.length === 0 ? (
-        <section className="py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
-            <div className="w-24 h-24 flex items-center justify-center mx-auto mb-6 bg-gray-200 rounded-full">
-              <i className="ri-heart-line text-5xl text-gray-400"></i>
-            </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Your wishlist is empty</h2>
-            <p className="text-gray-600 mb-8 text-lg">Save your favourite items here to easily find them later</p>
-            <Link href="/shop" className="inline-block bg-gray-900 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-semibold transition-colors whitespace-nowrap">
-              Explore Products
+      {count === 0 ? (
+        <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pb-20 md:pb-28">
+          <div className="flex flex-col items-center text-center gap-4 px-6 py-14 md:py-20 rounded-[28px] bg-[#FBF6EF] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.1)]">
+            <span className="w-14 h-14 rounded-full bg-[#F1E8DC] text-[#7A1F2E] inline-flex items-center justify-center">
+              <i className="ri-heart-line text-2xl" aria-hidden="true"></i>
+            </span>
+            <h2 className="font-serif text-[28px] md:text-[34px] leading-none">Nothing saved <em>yet</em></h2>
+            <p className="text-[15px] leading-relaxed text-[#6B565B] max-w-[420px]">Tap the heart on any scent to keep it here and find it again later.</p>
+            <Link
+              href="/shop"
+              className="mt-2 inline-flex items-center gap-2 min-h-[52px] px-7 rounded-full bg-[#2B0B12] text-[#F6EDE3] text-[15px] font-bold hover:bg-[#4A1520] transition-colors motion-reduce:transition-none"
+            >
+              Browse the shop
+              <i className="ri-arrow-right-line" aria-hidden="true"></i>
             </Link>
           </div>
         </section>
       ) : (
-        <section className="py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {wishlistItems.map((product) => {
-                const info = live[product.id];
-                return (
-                <div key={product.id} className="relative">
+        <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pb-14 md:pb-20">
+          <ul className="grid grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-8 sm:gap-x-6 sm:gap-y-12">
+            {wishlistItems.map((product) => {
+              const info = live[product.id];
+              return (
+                <li key={product.id} className="relative">
                   <ProductCard
                     {...product}
                     slug={product.slug || product.id}
@@ -236,45 +237,46 @@ export default function WishlistPage() {
                     minVariantPrice={info?.minVariantPrice}
                   />
                   <button
+                    type="button"
                     onClick={() => removeFromWishlist(product.id)}
-                    aria-label={`Remove ${product.name} from wishlist`}
-                    className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-md hover:bg-red-50 transition-colors z-10"
+                    aria-label={`Remove ${product.name} from saved items`}
+                    className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5 z-10 w-11 h-11 inline-flex items-center justify-center rounded-full bg-[#FBF6EF] text-[#1F1115] shadow-[0_1px_2px_rgba(31,17,21,0.12),inset_0_0_0_1px_rgba(31,17,21,0.12)] hover:bg-[#2B0B12] hover:text-[#F6EDE3] transition-colors motion-reduce:transition-none"
                   >
-                    <i className="ri-close-line text-gray-700 text-xl"></i>
+                    <i className="ri-close-line text-xl" aria-hidden="true"></i>
                   </button>
-                </div>
-                );
-              })}
-            </div>
-          </div>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 
-      {wishlistItems.length > 0 && (
-        <section className="py-16 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <div className="bg-gradient-to-r from-blue-700 to-blue-800 rounded-2xl p-8 sm:p-12 text-center text-white">
-              <h2 className="text-3xl font-bold mb-4">Share Your Wishlist</h2>
-              <p className="text-blue-100 mb-8 text-lg">Let friends and family know what you love</p>
-              <div className="flex flex-wrap justify-center gap-4">
-                <button onClick={() => shareWishlist()} aria-label="Share or copy wishlist" className="w-12 h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <i className="ri-share-line text-xl"></i>
-                </button>
-                <button onClick={() => shareWishlist('whatsapp')} aria-label="Share on WhatsApp" className="w-12 h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <i className="ri-whatsapp-fill text-xl"></i>
-                </button>
-                <button onClick={() => shareWishlist('facebook')} aria-label="Share on Facebook" className="w-12 h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <i className="ri-facebook-fill text-xl"></i>
-                </button>
-                <button onClick={() => shareWishlist('x')} aria-label="Share on X" className="w-12 h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <i className="ri-twitter-x-fill text-xl"></i>
-                </button>
-                <button onClick={() => shareWishlist('email')} aria-label="Share by email" className="w-12 h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <i className="ri-mail-fill text-xl"></i>
-                </button>
-              </div>
-              {shareStatus && <p className="mt-4 text-sm text-blue-100" role="status">{shareStatus}</p>}
+      {count > 0 && (
+        <section className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-12 pb-16 md:pb-24">
+          <div className="flex flex-wrap items-center justify-between gap-6 p-6 md:p-8 rounded-[24px] bg-[#2B0B12] text-[#F6EDE3]">
+            <div className="flex flex-col gap-1.5">
+              <h2 className="font-serif text-[26px] md:text-[30px] leading-none">Share your <em>list</em></h2>
+              <p className="text-[15px] text-[#E3CFC7]">Let friends and family know what you love.</p>
             </div>
+            <div className="flex flex-wrap gap-2.5">
+              <button type="button" onClick={() => shareWishlist()} aria-label="Share or copy wishlist" className={shareBtn}>
+                <i className="ri-share-line text-xl" aria-hidden="true"></i>
+              </button>
+              <button type="button" onClick={() => shareWishlist('whatsapp')} aria-label="Share on WhatsApp" className="h-11 px-5 inline-flex items-center gap-2 rounded-full bg-[#D9A441] text-[#2B0B12] text-[14px] font-bold hover:bg-[#E5B65A] transition-colors motion-reduce:transition-none">
+                <i className="ri-whatsapp-line text-lg" aria-hidden="true"></i>
+                WhatsApp
+              </button>
+              <button type="button" onClick={() => shareWishlist('facebook')} aria-label="Share on Facebook" className={shareBtn}>
+                <i className="ri-facebook-fill text-xl" aria-hidden="true"></i>
+              </button>
+              <button type="button" onClick={() => shareWishlist('x')} aria-label="Share on X" className={shareBtn}>
+                <i className="ri-twitter-x-fill text-xl" aria-hidden="true"></i>
+              </button>
+              <button type="button" onClick={() => shareWishlist('email')} aria-label="Share by email" className={shareBtn}>
+                <i className="ri-mail-line text-xl" aria-hidden="true"></i>
+              </button>
+            </div>
+            {shareStatus && <p className="basis-full text-sm text-[#E3CFC7]" role="status">{shareStatus}</p>}
           </div>
         </section>
       )}

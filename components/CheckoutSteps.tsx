@@ -4,36 +4,40 @@ interface CheckoutStepsProps {
 
 export default function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
   const steps = [
-    { number: 1, title: 'Shipping', icon: 'ri-map-pin-line' },
-    { number: 2, title: 'Delivery', icon: 'ri-truck-line' },
-    { number: 3, title: 'Payment', icon: 'ri-bank-card-line' }
+    { number: 1, title: 'Your details' },
+    { number: 2, title: 'Delivery' },
+    { number: 3, title: 'Payment' }
   ];
 
   return (
-    <div className="flex items-center justify-between max-w-2xl mx-auto">
-      {steps.map((step, index) => (
-        <div key={step.number} className="flex items-center flex-1">
-          <div className="flex flex-col items-center flex-1">
-            <div className={`w-12 h-12 flex items-center justify-center rounded-full font-bold transition-colors ${
-              currentStep >= step.number
-                ? 'bg-blue-700 text-white'
-                : 'bg-gray-200 text-gray-500'
-            }`}>
-              <i className={`${step.icon} text-xl`}></i>
-            </div>
-            <p className={`mt-2 text-sm font-semibold ${
-              currentStep >= step.number ? 'text-blue-700' : 'text-gray-500'
-            }`}>
+    <ol aria-label="Checkout progress" className="flex items-center gap-2 sm:gap-3 list-none m-0 p-0">
+      {steps.map((step, index) => {
+        const done = currentStep > step.number;
+        const active = currentStep === step.number;
+        return (
+          <li key={step.number} className="flex items-center gap-2 sm:gap-3 min-w-0" aria-current={active ? 'step' : undefined}>
+            <span
+              className={`flex-none w-8 h-8 rounded-full inline-flex items-center justify-center text-[13px] font-semibold tabular-nums transition-colors motion-reduce:transition-none ${
+                done || active
+                  ? 'bg-[#2B0B12] text-[#F6EDE3]'
+                  : 'bg-[#FBF6EF] text-[#6B565B] shadow-[inset_0_0_0_1px_rgba(31,17,21,0.16)]'
+              }`}
+            >
+              {done ? <i className="ri-check-line text-base" aria-hidden="true"></i> : step.number}
+              {done && <span className="sr-only">{step.number}, done</span>}
+            </span>
+            <span className={`text-[13px] sm:text-sm whitespace-nowrap ${active ? 'font-semibold text-[#1F1115]' : 'sr-only sm:not-sr-only text-[#6B565B]'}`}>
               {step.title}
-            </p>
-          </div>
-          {index < steps.length - 1 && (
-            <div className={`h-0.5 flex-1 mx-4 transition-colors ${
-              currentStep > step.number ? 'bg-blue-700' : 'bg-gray-200'
-            }`}></div>
-          )}
-        </div>
-      ))}
-    </div>
+            </span>
+            {index < steps.length - 1 && (
+              <span
+                aria-hidden="true"
+                className={`w-4 sm:w-10 h-px ${done ? 'bg-[#2B0B12]' : 'bg-[#1F1115]/20'}`}
+              ></span>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
