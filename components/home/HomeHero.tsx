@@ -49,7 +49,7 @@ export default function HomeHero() {
         aria-hidden="true"
       />
 
-      <div className="w-full max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-32 pb-28 md:pb-[72px] flex flex-col gap-7 md:gap-10">
+      <div className="w-full max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-32 pb-24 md:pb-[72px] flex flex-col gap-7 md:gap-10">
         <h1 className="font-serif font-normal text-[54px] sm:text-[80px] lg:text-[124px] leading-[0.94] tracking-[-0.03em] max-w-[900px] text-balance">
           Luxury fragrances <br className="hidden sm:block" />
           for <em className="text-[#E2BE72]">everyone.</em>
@@ -88,12 +88,6 @@ export default function HomeHero() {
             </button>
           </div>
         </form>
-
-        <ul className="flex flex-wrap gap-x-8 gap-y-1 text-[13px] text-[#BFAF9F]">
-          <li>Mobile Money: MTN, Telecel, AT</li>
-          <li>Delivery in Accra and beyond</li>
-          <li>Free pickup at Spintex Lashibi</li>
-        </ul>
       </div>
     </section>
   );

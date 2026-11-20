@@ -1,18 +1,29 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import ProductCard, { type ColorVariant } from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/skeletons/ProductCardSkeleton';
 import { getColorHex } from '@/components/ProductCard';
 import { supabase } from '@/lib/supabase';
 import { cachedQuery } from '@/lib/query-cache';
-import PageHero from '@/components/PageHero';
+import Link from 'next/link';
+import { SCENT_FAMILIES } from '@/components/home/families-data';
+
+const SORTS = [
+  ['popular', 'Most popular'],
+  ['new', 'Newest'],
+  ['price-low', 'Price: low to high'],
+  ['price-high', 'Price: high to low'],
+  ['rating', 'Highest rated'],
+] as const;
 
 function ShopContent() {
   usePageTitle('Shop All Products');
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '');
 
   // State
   const [products, setProducts] = useState<any[]>([]);
@@ -27,7 +38,7 @@ function ShopContent() {
   const [sortBy, setSortBy] = useState('popular');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const productsPerPage = 9;
+  const productsPerPage = 12;
 
   // Initialize from URL params
   useEffect(() => {
@@ -39,6 +50,7 @@ function ShopContent() {
     setSelectedCategory(category || 'all');
     const sortAliases: Record<string, string> = { newest: 'new', bestsellers: 'popular' };
     setSortBy(sort ? sortAliases[sort] || sort : 'popular');
+    setSearchInput(search || '');
     setPage(1);
     // Search is handled in the fetch function via searchParams directly or we could add a state for it
   }, [searchParams]);
@@ -177,7 +189,7 @@ function ShopContent() {
               image: p.product_images?.[0]?.url || '/placeholder-product.svg',
               rating: p.rating_avg || 0,
               reviewCount: p.review_count || 0,
-              badge: p.compare_at_price > p.price ? 'Sale' : undefined, // Simple badge logic
+              badge: undefined, // The card shows its own -x% pill on sale items
               inStock: effectiveStock > 0,
               maxStock: effectiveStock || 50,
               moq: p.moq || 1,
@@ -202,271 +214,272 @@ function ShopContent() {
 
   const totalPages = Math.ceil(totalProducts / productsPerPage);
 
-  return (
-    <main className="min-h-screen bg-white">
-      <PageHero
-        eyebrow="House of Elle Collection"
-        title="Shop All Products"
-        subtitle="Discover perfumes, body mists, diffusers, candles, and gift sets curated for retail and wholesale customers."
-        backgroundImage="/Whisk_6ec7df94ec3ca85b49644810b7fab2ecdr.jpeg"
-      />
+  const search = searchParams.get('search') || '';
+  const parents = categories.filter((c) => !c.parent_id && c.id !== 'all');
+  const current = categories.find((c) => c.slug === selectedCategory);
+  const family = SCENT_FAMILIES.find((f) => f.keyword === search.toLowerCase());
+  const title = family ? `${family.name} scents` : search ? `Results for “${search}”` : current?.name || 'All fragrances';
+  const filtersOn = (priceRange[1] < 5000 ? 1 : 0) + (selectedRating > 0 ? 1 : 0);
 
-      {/* Mobile Filter Toggle */}
-      <div className="lg:hidden bg-white border-b border-gray-200 py-4 px-4 sticky top-[72px] z-20">
-        <div className="flex justify-between items-center">
-          <button
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="flex items-center space-x-2 text-gray-900 font-medium"
-          >
-            <i className="ri-filter-3-line text-xl"></i>
-            <span>Filters & Sort</span>
-          </button>
-          <span className="text-sm text-gray-500">{totalProducts} Products</span>
+  const pickCategory = (slug: string) => {
+    setSelectedCategory(slug);
+    setPage(1);
+  };
+  const clearAll = () => {
+    setSelectedCategory('all');
+    setPriceRange([0, 5000]);
+    setSelectedRating(0);
+    setPage(1);
+    if (search) router.push('/shop');
+  };
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchInput.trim();
+    router.push(q ? `/shop?search=${encodeURIComponent(q)}` : '/shop');
+  };
+
+  const chip = (on: boolean) =>
+    `flex-none inline-flex items-center gap-2 h-10 px-4 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors ${
+      on ? 'bg-[#14100D] text-[#F5EDE4]' : 'shadow-[inset_0_0_0_1px_rgba(34,27,22,0.16)] hover:bg-white/70'
+    }`;
+  const rowBtn = (on: boolean) =>
+    `w-full flex items-center justify-between gap-3 min-h-11 px-4 rounded-2xl text-left text-[15px] transition-colors ${
+      on ? 'bg-[#14100D] text-[#F5EDE4] font-semibold' : 'hover:bg-white/70'
+    }`;
+
+  const filters = (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-3">
+        <h3 className="font-serif text-[22px]">Collections</h3>
+        <div className="flex flex-col gap-1">
+          <button type="button" onClick={() => pickCategory('all')} className={rowBtn(selectedCategory === 'all')}>All products</button>
+          {parents.map((parent) => {
+            const subs = categories.filter((c) => c.parent_id === parent.id);
+            const open = selectedCategory === parent.slug || subs.some((s) => s.slug === selectedCategory);
+            return (
+              <div key={parent.id} className="flex flex-col gap-1">
+                <button type="button" onClick={() => pickCategory(parent.slug)} className={rowBtn(selectedCategory === parent.slug)}>
+                  <span>{parent.name}</span>
+                  {subs.length > 0 && <i className={`ri-arrow-down-s-line transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />}
+                </button>
+                {open && subs.length > 0 && (
+                  <div className="ml-4 pl-3 border-l border-[#221B16]/15 flex flex-col gap-1">
+                    {subs.map((child) => (
+                      <button key={child.id} type="button" onClick={() => { pickCategory(child.slug); setIsFilterOpen(false); }} className={`${rowBtn(selectedCategory === child.slug)} text-sm min-h-10`}>
+                        {child.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <section className="py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col lg:flex-row gap-8">
-            <aside className={`${isFilterOpen ? 'fixed inset-0 z-50 bg-white overflow-y-auto' : 'hidden'} lg:block lg:w-64 lg:flex-shrink-0`}>
-              <div className="lg:sticky lg:top-24">
-                <div className="bg-white lg:bg-transparent p-6 lg:p-0">
-                  <div className="flex items-center justify-between mb-6 lg:hidden">
-                    <h2 className="text-xl font-bold text-gray-900">Filters</h2>
-                    <button
-                      onClick={() => setIsFilterOpen(false)}
-                      className="w-10 h-10 flex items-center justify-center text-gray-700"
-                    >
-                      <i className="ri-close-line text-2xl"></i>
-                    </button>
-                  </div>
+      <div className="flex flex-col gap-3 pt-7 border-t border-[#221B16]/12">
+        <h3 className="font-serif text-[22px]">Price</h3>
+        <p className="text-sm text-[#5E5148]">Up to <span className="font-semibold text-[#221B16] tabular-nums">{priceRange[1] >= 5000 ? 'any price' : `GH₵${priceRange[1].toLocaleString()}`}</span></p>
+        <input
+          type="range"
+          min="0"
+          max="5000"
+          step="50"
+          value={priceRange[1]}
+          aria-label="Highest price"
+          onChange={(e) => {
+            setPriceRange([0, parseInt(e.target.value)]);
+            setPage(1);
+          }}
+          className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#221B16]/15 accent-[#14100D]"
+        />
+        <div className="flex justify-between text-xs text-[#5E5148] tabular-nums"><span>GH₵0</span><span>GH₵5,000+</span></div>
+      </div>
 
-                  <div className="space-y-8">
-                    {/* Categories */}
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-4">Categories</h3>
-                      <div className="space-y-1">
-                        <button
-                          onClick={() => {
-                            setSelectedCategory('all');
-                            setPage(1);
-                            setIsFilterOpen(false);
-                          }}
-                          className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${selectedCategory === 'all'
-                            ? 'bg-blue-100 text-blue-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-100'
-                            }`}
-                        >
-                          All Products
-                        </button>
+      <div className="flex flex-col gap-3 pt-7 border-t border-[#221B16]/12">
+        <h3 className="font-serif text-[22px]">Rating</h3>
+        <div className="flex flex-col gap-1">
+          {[4, 3].map((rating) => (
+            <button
+              key={rating}
+              type="button"
+              onClick={() => {
+                setSelectedRating(rating === selectedRating ? 0 : rating);
+                setPage(1);
+              }}
+              aria-pressed={selectedRating === rating}
+              className={rowBtn(selectedRating === rating)}
+            >
+              <span className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <i key={star} className={`${star <= rating ? 'ri-star-fill text-[#C89B3C]' : 'ri-star-line opacity-40'} text-sm`} aria-hidden="true" />
+                ))}
+                <span className="ml-1.5 text-sm">{rating} and up</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
-                        {/* Parent Categories */}
-                        {categories.filter(c => !c.parent_id && c.id !== 'all').map(parent => {
-                          const subcategories = categories.filter(c => c.parent_id === parent.id);
-                          const isSelected = selectedCategory === parent.slug;
-                          const isChildSelected = subcategories.some(sub => sub.slug === selectedCategory);
-                          const isOpen = isSelected || isChildSelected; // Auto-expand if selected
+  return (
+    <main className="min-h-screen bg-[#F5EDE4] text-[#221B16]">
+      <section className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-8 md:pt-14 flex flex-col gap-6 md:gap-8">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+          <div className="flex flex-col gap-2">
+            <h1 className="font-serif text-[44px] md:text-[80px] leading-none tracking-[-0.02em] break-words">
+              {search || current ? title : <>All <em>fragrances</em></>}
+            </h1>
+            <p className="text-sm text-[#5E5148] tabular-nums" aria-live="polite">
+              {loading ? 'Finding scents…' : `${totalProducts} ${totalProducts === 1 ? 'product' : 'products'}`}
+            </p>
+          </div>
+          <form onSubmit={submitSearch} role="search" className="w-full lg:w-[420px]">
+            <label className="flex items-center gap-3 h-[52px] pl-5 pr-2 rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(34,27,22,0.14)] focus-within:shadow-[inset_0_0_0_1.5px_#14100D]">
+              <i className="ri-search-line text-lg text-[#5E5148]" aria-hidden="true" />
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search scents, brands, notes"
+                aria-label="Search products"
+                className="flex-1 min-w-0 bg-transparent text-base outline-none placeholder:text-[#7A6B5F]"
+              />
+              <button type="submit" className="h-10 px-4 rounded-full bg-[#14100D] text-[#F5EDE4] text-sm font-semibold">Search</button>
+            </label>
+          </form>
+        </div>
 
-                          return (
-                            <div key={parent.id} className="space-y-1">
-                              <button
-                                onClick={() => {
-                                  setSelectedCategory(parent.slug);
-                                  setPage(1);
-                                  // Don't close filter immediately if exploring hierarchy
-                                }}
-                                className={`w-full text-left px-4 py-2 rounded-lg transition-colors flex justify-between items-center ${isSelected
-                                  ? 'bg-blue-50 text-blue-700 font-medium'
-                                  : 'text-gray-700 hover:bg-gray-100'
-                                  }`}
-                              >
-                                <span>{parent.name}</span>
-                              </button>
+        <div role="group" aria-label="Scent family" className="-mx-5 px-5 sm:mx-0 sm:px-0 flex gap-2 overflow-x-auto sm:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <Link href="/shop" className={chip(!search)}>All scents</Link>
+          {SCENT_FAMILIES.map((f) => (
+            <Link key={f.name} href={`/shop?search=${encodeURIComponent(f.keyword)}`} className={chip(search.toLowerCase() === f.keyword)}>
+              <span className="w-4 h-4 rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.15)]" style={{ backgroundColor: f.swatch }} aria-hidden="true" />
+              {f.name}
+            </Link>
+          ))}
+        </div>
+      </section>
 
-                              {/* Subcategories */}
-                              {subcategories.length > 0 && (
-                                <div className="ml-4 border-l-2 border-gray-100 pl-2 space-y-1">
-                                  {subcategories.map(child => (
-                                    <button
-                                      key={child.id}
-                                      onClick={() => {
-                                        setSelectedCategory(child.slug);
-                                        setPage(1);
-                                        setIsFilterOpen(false);
-                                      }}
-                                      className={`w-full text-left px-4 py-1.5 rounded-lg text-sm transition-colors ${selectedCategory === child.slug
-                                        ? 'text-blue-700 font-medium bg-blue-50'
-                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                      {child.name}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+      <div className="lg:hidden sticky top-[72px] z-20 bg-[#F5EDE4]/95 backdrop-blur-md mt-4">
+        <div className="flex gap-2.5 px-5 py-3">
+          <button
+            type="button"
+            onClick={() => setIsFilterOpen(true)}
+            className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-[#FBF7F2] shadow-[inset_0_0_0_1px_rgba(34,27,22,0.14)] text-sm font-semibold"
+          >
+            <i className="ri-equalizer-line text-base" aria-hidden="true" />
+            Filters{selectedCategory !== 'all' || filtersOn ? ` · ${filtersOn + (selectedCategory !== 'all' ? 1 : 0)}` : ''}
+          </button>
+          <label className="relative flex-1">
+            <span className="sr-only">Sort by</span>
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setPage(1);
+              }}
+              className="w-full h-12 pl-4 pr-9 rounded-2xl appearance-none bg-[#FBF7F2] shadow-[inset_0_0_0_1px_rgba(34,27,22,0.14)] text-sm font-semibold text-center"
+            >
+              {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+          </label>
+        </div>
+      </div>
 
-                    {/* Price Range */}
-                    <div className="border-t border-gray-200 pt-8">
-                      <h3 className="font-semibold text-gray-900 mb-4">Max Price: GH₵{priceRange[1]}</h3>
-                      <div className="space-y-4">
-                        <input
-                          type="range"
-                          min="0"
-                          max="5000"
-                          step="50"
-                          value={priceRange[1]}
-                          onChange={(e) => {
-                            setPriceRange([0, parseInt(e.target.value)]);
-                            setPage(1);
-                          }}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-700"
-                        />
-                        <div className="flex items-center justify-between text-sm text-gray-600">
-                          <span>GH₵0</span>
-                          <span>GH₵5000+</span>
-                        </div>
-                      </div>
-                    </div>
+      {isFilterOpen && (
+        <div className="lg:hidden fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Filters">
+          <div className="absolute inset-0 bg-[#14100D]/50" onClick={() => setIsFilterOpen(false)} aria-hidden="true" />
+          <div className="absolute inset-x-0 bottom-0 max-h-[88dvh] flex flex-col rounded-t-[28px] bg-[#F5EDE4] animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between px-5 h-16 border-b border-[#221B16]/10">
+              <h2 className="font-serif text-2xl">Filters</h2>
+              <button type="button" onClick={() => setIsFilterOpen(false)} aria-label="Close filters" className="w-11 h-11 -mr-2 inline-flex items-center justify-center rounded-full">
+                <i className="ri-close-line text-2xl" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-6">{filters}</div>
+            <div className="flex gap-3 px-5 pt-3 pb-[max(16px,env(safe-area-inset-bottom))] border-t border-[#221B16]/10">
+              <button type="button" onClick={clearAll} className="h-14 px-6 rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.25)] font-semibold">Clear</button>
+              <button type="button" onClick={() => setIsFilterOpen(false)} className="flex-1 h-14 rounded-full bg-[#14100D] text-[#F5EDE4] font-semibold tabular-nums">
+                Show {totalProducts} {totalProducts === 1 ? 'product' : 'products'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                    {/* Rating */}
-                    <div className="border-t border-gray-200 pt-8">
-                      <h3 className="font-semibold text-gray-900 mb-4">Rating</h3>
-                      <div className="space-y-2">
-                        {[4, 3, 2, 1].map(rating => (
-                          <button
-                            key={rating}
-                            onClick={() => {
-                              setSelectedRating(rating === selectedRating ? 0 : rating);
-                              setPage(1);
-                            }}
-                            className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${selectedRating === rating
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'text-gray-700 hover:bg-gray-100'
-                              }`}
-                          >
-                            <div className="flex items-center space-x-2">
-                              {[1, 2, 3, 4, 5].map(star => (
-                                <i
-                                  key={star}
-                                  className={`${star <= rating ? 'ri-star-fill text-amber-400' : 'ri-star-line text-gray-300'} text-sm`}
-                                ></i>
-                              ))}
-                              <span className="text-sm">& Up</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+      <section className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 pt-4 lg:pt-10 pb-24 md:pb-32">
+        <div className="flex gap-12">
+          <aside className="hidden lg:block w-[260px] flex-none" aria-label="Filters">
+            <div className="sticky top-[112px]">{filters}</div>
+          </aside>
 
-                    <button
-                      onClick={() => {
-                        // Re-fetch handled by effect dependencies
-                        setIsFilterOpen(false);
-                      }}
-                      className="w-full bg-gray-900 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors whitespace-nowrap"
-                    >
-                      Show Results
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </aside>
-
-            <div className="flex-1">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-                <p className="text-gray-600">
-                  Showing <span className="font-semibold text-gray-900">{products.length}</span> of <span className="font-semibold text-gray-900">{totalProducts}</span> products
-                </p>
-
-                <div className="flex items-center space-x-3">
-                  <label className="text-sm text-gray-600 whitespace-nowrap">Sort by:</label>
+          <div className="flex-1 min-w-0">
+            <div className="hidden lg:flex items-center justify-between gap-4 mb-8 pb-5 border-b border-[#221B16]/12">
+              <p className="text-sm text-[#5E5148] tabular-nums">
+                Showing <span className="font-semibold text-[#221B16]">{products.length}</span> of <span className="font-semibold text-[#221B16]">{totalProducts}</span>
+              </p>
+              <label className="flex items-center gap-3 text-sm">
+                <span className="text-[#5E5148]">Sort by</span>
+                <span className="relative">
                   <select
                     value={sortBy}
                     onChange={(e) => {
                       setSortBy(e.target.value);
                       setPage(1);
                     }}
-                    className="px-4 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white cursor-pointer"
+                    className="h-11 pl-4 pr-10 rounded-full appearance-none bg-white shadow-[inset_0_0_0_1px_rgba(34,27,22,0.16)] font-semibold cursor-pointer"
                   >
-                    <option value="popular">Most Popular</option>
-                    <option value="new">Newest</option>
-                    <option value="price-low">Price: Low to High</option>
-                    <option value="price-high">Price: High to Low</option>
-                    <option value="rating">Highest Rated</option>
+                    {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
-                </div>
-              </div>
-
-              {loading ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-x-4 gap-y-8 md:gap-8">
-                  {[...Array(6)].map((_, i) => (
-                    <ProductCardSkeleton key={i} />
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" data-product-shop>
-                    {products.map(product => (
-                      <ProductCard key={product.id} {...product} />
-                    ))}
-                  </div>
-
-                  {products.length === 0 && (
-                    <div className="text-center py-20">
-                      <div className="w-20 h-20 flex items-center justify-center mx-auto mb-6 bg-gray-100 rounded-full">
-                        <i className="ri-inbox-line text-4xl text-gray-400"></i>
-                      </div>
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">No Products Found</h3>
-                      <p className="text-gray-600 mb-8">Try adjusting your filters to find what you're looking for</p>
-                      <button
-                        onClick={() => {
-                          setSelectedCategory('all');
-                          setPriceRange([0, 5000]);
-                          setSelectedRating(0);
-                          setPage(1);
-                        }}
-                        className="inline-flex items-center bg-gray-900 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap"
-                      >
-                        Clear All Filters
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-16 flex justify-center">
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="w-10 h-10 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <i className="ri-arrow-left-s-line text-xl text-gray-700"></i>
-                    </button>
-
-                    {/* Simple page numbers - condensed for brevity */}
-                    <span className="px-4 font-medium text-gray-700">
-                      Page {page} of {totalPages}
-                    </span>
-
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className="w-10 h-10 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <i className="ri-arrow-right-s-line text-xl text-gray-700"></i>
-                    </button>
-                  </div>
-                </div>
-              )}
+                  <i className="ri-arrow-down-s-line absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                </span>
+              </label>
             </div>
+
+            {loading ? (
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-8 sm:gap-x-6 sm:gap-y-12">
+                {[...Array(6)].map((_, i) => <ProductCardSkeleton key={i} />)}
+              </div>
+            ) : products.length > 0 ? (
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-8 sm:gap-x-6 sm:gap-y-12" data-product-shop>
+                {products.map((product) => <ProductCard key={product.id} {...product} />)}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-center gap-4 py-20 md:py-28 rounded-[28px] bg-[#FBF7F2]">
+                <p className="font-serif text-3xl md:text-4xl">Nothing matches yet</p>
+                <p className="max-w-sm text-[#5E5148]">Try another scent family, widen the price, or ask us on WhatsApp. We may have it in store.</p>
+                <button type="button" onClick={clearAll} className="mt-2 inline-flex items-center min-h-[52px] px-7 rounded-full bg-[#14100D] text-[#F5EDE4] font-semibold">
+                  Clear all filters
+                </button>
+              </div>
+            )}
+
+            {totalPages > 1 && (
+              <nav aria-label="Pages" className="mt-14 md:mt-20 flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  disabled={page === 1}
+                  aria-label="Previous page"
+                  className="w-12 h-12 inline-flex items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgba(34,27,22,0.2)] disabled:opacity-35"
+                >
+                  <i className="ri-arrow-left-line text-lg" aria-hidden="true" />
+                </button>
+                <span className="px-3 text-sm font-medium tabular-nums">Page {page} of {totalPages}</span>
+                <button
+                  type="button"
+                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  disabled={page === totalPages}
+                  aria-label="Next page"
+                  className="w-12 h-12 inline-flex items-center justify-center rounded-full bg-[#14100D] text-[#F5EDE4] disabled:opacity-35"
+                >
+                  <i className="ri-arrow-right-line text-lg" aria-hidden="true" />
+                </button>
+              </nav>
+            )}
           </div>
         </div>
       </section>
@@ -476,7 +489,7 @@ function ShopContent() {
 
 export default function ShopPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full animate-spin"></div></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#F5EDE4]" />}>
       <ShopContent />
     </Suspense>
   );
