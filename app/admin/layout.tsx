@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import AdminOrderBell from '@/components/admin/AdminOrderBell';
 import {
+import { SmsCreditDashboardCard } from '@/components/admin/SmsCreditDashboardCard';
   ADMIN_GROUPS,
   ADMIN_SCREENS,
   canOpen,
@@ -316,6 +317,7 @@ export default function AdminLayout({
           </div>
         </header>
 
+        <SmsCreditDashboardCard />
         <main className="p-4 lg:p-6">
           {children}
         </main>
