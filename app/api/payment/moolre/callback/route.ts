@@ -74,15 +74,14 @@ export async function POST(req: Request) {
         // ============================================================
         // SECURITY: Verify callback secret FIRST (mandatory)
         // ============================================================
+        // Moolre now sends the secret inside body.data (older payloads had it at the top level).
         const expectedSecret = process.env.MOOLRE_CALLBACK_SECRET || '';
-        const secretVerified = !!expectedSecret && secretsMatch(body.secret, expectedSecret);
-        if (expectedSecret && !secretVerified) {
-            console.error('[Callback] Secret mismatch or missing! Rejecting callback.');
-            return NextResponse.json({ success: false, message: 'Invalid callback signature' }, { status: 403 });
-        }
-        if (!expectedSecret) {
-            // Without a shared secret the body proves nothing; success is confirmed with Moolre below.
-            console.warn('[Callback] MOOLRE_CALLBACK_SECRET not configured; confirming with the Moolre API instead.');
+        const givenSecret = body.data?.secret ?? body.secret;
+        const secretVerified = !!expectedSecret && secretsMatch(givenSecret, expectedSecret);
+        if (!secretVerified) {
+            // An unverified body proves nothing: a success is confirmed with Moolre's status API
+            // below, and an unverified failure never changes the order.
+            console.warn('[Callback] Secret', expectedSecret ? (givenSecret ? 'mismatch' : 'missing') : 'not configured', '- confirming with the Moolre API instead.');
         }
 
         // ============================================================
@@ -114,7 +113,8 @@ export async function POST(req: Request) {
         // Payment status: body.status === 1 means API call succeeded,
         // body.data.txtstatus === 1 means transaction was successful
         const apiStatus = body.status;
-        const txStatus = data.txtstatus;
+        // Moolre documents data.txstatus (1 = successful, 0 = pending, 2 = failed); older payloads used txtstatus.
+        const txStatus = data.txstatus ?? data.txtstatus;
         const messageStr = String(body.message || '').toLowerCase();
 
         console.log('[Callback] Order ref:', merchantOrderRef,
@@ -136,11 +136,13 @@ export async function POST(req: Request) {
         // ============================================================
         const apiOk = (apiStatus === 1 || apiStatus === '1');
         const txOk = (txStatus === 1 || txStatus === '1');
-        const messageOk = messageStr.includes('successful') || messageStr.includes('success');
 
         // Require at least api status OR tx status to be explicitly successful
         // AND the message must not indicate failure
-        const isSuccess = (apiOk || txOk) && !messageStr.includes('fail') && !messageStr.includes('error');
+        const eventStr = String(body.event || '').toLowerCase();
+        const hasTx = txStatus !== undefined && txStatus !== null && txStatus !== '';
+        // When Moolre gives a transaction status it decides; otherwise fall back to the top-level status.
+        const isSuccess = (hasTx ? txOk : apiOk) && !eventStr.includes('failed') && !messageStr.includes('fail') && !messageStr.includes('error');
 
         if (isSuccess) {
             console.log(`[Callback] Payment SUCCESS for Order ${merchantOrderRef}`);

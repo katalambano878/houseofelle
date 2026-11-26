@@ -10,31 +10,28 @@ export function secretsMatch(given: unknown, expected: string): boolean {
 
 /**
  * Asks Moolre whether a payment reference was paid in full.
- * Returns true only on an explicit success (with a matching amount when Moolre reports one).
+ * Uses Moolre's Payment Status API (POST /open/transact/status, idtype 1 = our externalref).
+ * Returns true only when Moolre reports txstatus 1 (successful) with a matching amount.
  */
 export async function confirmMoolrePayment(externalref: string, expectedAmount: number): Promise<boolean> {
-  if (!process.env.MOOLRE_API_USER || !process.env.MOOLRE_API_PUBKEY || !externalref) return false;
+  if (!process.env.MOOLRE_API_USER || !process.env.MOOLRE_API_PUBKEY || !process.env.MOOLRE_ACCOUNT_NUMBER || !externalref) return false;
   try {
-    const res = await fetch('https://api.moolre.com/embed/status', {
+    const res = await fetch('https://api.moolre.com/open/transact/status', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-API-USER': process.env.MOOLRE_API_USER,
         'X-API-PUBKEY': process.env.MOOLRE_API_PUBKEY,
       },
-      body: JSON.stringify({ externalref }),
+      body: JSON.stringify({ type: 1, idtype: '1', id: externalref, accountnumber: process.env.MOOLRE_ACCOUNT_NUMBER }),
       cache: 'no-store',
     });
     const result = await res.json().catch(() => null);
-    const status = String(result?.data?.status || '').toLowerCase();
-    const paid =
-      result?.status === 1 &&
-      ['success', 'successful', 'completed', 'paid'].includes(status);
+    // txstatus: 1 = successful, 0 = pending, 2 = failed (3 = no such transaction).
+    const paid = String(result?.status) === '1' && String(result?.data?.txstatus) === '1';
     if (!paid) return false;
-    // The reference was created server-side for exactly this order total, so a
-    // missing amount is acceptable; a different amount is not.
     const amount = parseFloat(result?.data?.amount);
-    return !Number.isFinite(amount) || Math.abs(amount - expectedAmount) <= 0.01;
+    return Number.isFinite(amount) && Math.abs(amount - expectedAmount) <= 0.01;
   } catch (err) {
     console.warn('[Moolre] Status check failed:', err instanceof Error ? err.message : err);
     return false;
