@@ -3,6 +3,8 @@ import { createStorageClient } from "@/lib/db/storage";
 import { isPlainPostgres } from "@/lib/db/mode";
 import { isStaff, resolveCaller } from "@/lib/db/rest-policy";
 
+import { guardStorageWrite } from "@/lib/db/rest-guard";
+
 const BUCKETS = new Set(["products", "media"]);
 
 // The admin may be open on www.* while NEXT_PUBLIC_SUPABASE_URL points at the
@@ -52,7 +54,7 @@ export const runtime = "nodejs";
  *   POST /storage/v1/object/{bucket}/{path}
  *   body = raw file bytes
  */
-export async function POST(
+async function postUnguarded(
   req: NextRequest,
   ctx: { params: Promise<{ bucket: string; path: string[] }> }
 ) {
@@ -115,7 +117,7 @@ export async function POST(
   });
 }
 
-export async function DELETE(
+async function deleteUnguarded(
   req: NextRequest,
   ctx: { params: Promise<{ bucket: string; path: string[] }> }
 ) {
@@ -134,3 +136,6 @@ export async function DELETE(
   }
   return json({});
 }
+
+export const POST = guardStorageWrite(postUnguarded);
+export const DELETE = guardStorageWrite(deleteUnguarded);
