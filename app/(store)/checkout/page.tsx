@@ -1,5 +1,6 @@
 'use client';
 
+import PaymentChoice, { paymentEndpoint, usePaymentGateways, type PaymentGateway } from '@/components/PaymentChoice';
 import Link from 'next/link';
 import { money } from '@/lib/format-money';
 import { useState, useEffect } from 'react';
@@ -58,7 +59,11 @@ export default function CheckoutPage() {
   ];
 
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
-  const [paymentMethod, setPaymentMethod] = useState('moolre');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentGateway>('moolre');
+  const gateways = usePaymentGateways();
+  useEffect(() => {
+    if (!gateways.includes(paymentMethod)) setPaymentMethod(gateways[0]);
+  }, [gateways, paymentMethod]);
   const [errors, setErrors] = useState<any>({});
 
 
@@ -217,8 +222,8 @@ export default function CheckoutPage() {
         });
       }
 
-      // 2. Start Moolre payment (amount is read from the saved order)
-      const paymentRes = await fetch('/api/payment/moolre', {
+      // 2. Start the payment with the chosen gateway (amount is read from the saved order)
+      const paymentRes = await fetch(paymentEndpoint(paymentMethod), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId: created.id })
@@ -233,7 +238,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Clear cart before redirecting to Moolre
+      // Clear cart before redirecting to the payment page
       clearCart();
       window.location.href = paymentResult.url;
       return;
@@ -567,17 +572,7 @@ export default function CheckoutPage() {
                     <span className={stepNumClass}>3</span>
                     <span className="font-serif text-[24px] md:text-[26px] leading-none">Payment</span>
                   </h2>
-                  <div className="flex flex-col gap-3 p-6 rounded-[22px] bg-[#FBF6EF] shadow-[inset_0_0_0_2px_#2B0B12]">
-                    <span className="flex items-center gap-3">
-                      <span className="w-10 h-10 rounded-full bg-[#2B0B12] text-[#E5B65A] inline-flex items-center justify-center flex-none">
-                        <i className="ri-smartphone-line text-lg" aria-hidden="true"></i>
-                      </span>
-                      <span className="font-semibold text-[15px]">Mobile Money</span>
-                    </span>
-                    <p className="m-0 text-sm leading-relaxed text-[#4D3A3F]">
-                      When you tap pay, we save your order and take you to Moolre&apos;s secure page to pay with Mobile Money.
-                    </p>
-                  </div>
+                  <PaymentChoice available={gateways} value={paymentMethod} onChange={setPaymentMethod} />
 
                   <div className="flex flex-col-reverse md:flex-row gap-3 mt-2">
                     <button
@@ -603,7 +598,7 @@ export default function CheckoutPage() {
                           Processing...
                         </>
                       ) : (
-                        'Pay with Mobile Money'
+                        paymentMethod === 'zoepay' ? 'Pay by card or Mobile Money' : 'Pay with Mobile Money'
                       )}
                     </button>
                   </div>

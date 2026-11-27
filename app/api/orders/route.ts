@@ -15,7 +15,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_ITEMS = 50;
 const MAX_QTY = 1000;
-const PAYMENT_METHODS = new Set(['moolre']);
+const PAYMENT_METHODS = new Set(['moolre', 'zoepay']);
 
 type CartLine = { id?: unknown; variantId?: unknown; variant?: unknown; quantity?: unknown };
 

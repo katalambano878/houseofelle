@@ -80,7 +80,7 @@ export default function OrderSummary({ items, subtotal, shipping, tax, total, di
 
       <p className="m-0 flex gap-2.5 text-[13px] leading-relaxed text-[#6B565B]">
         <i className="ri-lock-line text-base text-[#2F6B3A] leading-none mt-0.5" aria-hidden="true"></i>
-        Secure checkout. Payments are processed by Moolre.
+        Secure checkout. Payments are processed by Moolre or Zoe Pay.
       </p>
     </aside>
   );

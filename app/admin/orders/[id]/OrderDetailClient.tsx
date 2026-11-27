@@ -319,12 +319,13 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
   const [resendingNotification, setResendingNotification] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
 
-  /** Asks Moolre whether an unpaid Mobile Money order has been paid, and marks it paid if so. */
+  /** Asks the order's gateway (Moolre or Zoe Pay) whether an unpaid order has been paid, and marks it paid if so. */
   const handleCheckPayment = async () => {
     if (!order?.order_number) return;
+    const gatewayName = order.payment_method === 'zoepay' ? 'Zoe Pay' : 'Moolre';
     setCheckingPayment(true);
     try {
-      const res = await fetch('/api/payment/moolre/verify', {
+      const res = await fetch(order.payment_method === 'zoepay' ? '/api/payment/zoepay/verify' : '/api/payment/moolre/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderNumber: order.order_number }),
@@ -332,9 +333,9 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
       const result = await res.json().catch(() => ({}));
       if (result?.success) {
         await fetchOrderDetails();
-        alert(result.message === 'Order already paid' ? 'This order is already paid.' : 'Payment confirmed by Moolre. The order is now marked paid.');
+        alert(result.message === 'Order already paid' ? 'This order is already paid.' : `Payment confirmed by ${gatewayName}. The order is now marked paid.`);
       } else {
-        alert(result?.message || 'Moolre has not confirmed a payment for this order yet.');
+        alert(result?.message || `${gatewayName} has not confirmed a payment for this order yet.`);
       }
     } catch (err: any) {
       alert(`Could not check the payment: ${err?.message || 'network error'}`);
@@ -770,14 +771,14 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                   </span>
                 </div>
               </div>
-              {order.payment_status !== 'paid' && order.payment_method === 'moolre' && order.status !== 'cancelled' && /^ORD-\d+-\d+$/.test(order.order_number || '') && (
+              {order.payment_status !== 'paid' && (order.payment_method === 'moolre' || order.payment_method === 'zoepay') && order.status !== 'cancelled' && /^ORD-\d+-\d+$/.test(order.order_number || '') && (
                 <button
                   onClick={handleCheckPayment}
                   disabled={checkingPayment}
                   className="w-full mt-4 border-2 border-blue-700 text-blue-700 hover:bg-blue-50 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   <i className={`${checkingPayment ? 'ri-loader-4-line animate-spin' : 'ri-refresh-line'} mr-2`}></i>
-                  {checkingPayment ? 'Checking with Moolre...' : 'Check Mobile Money payment'}
+                  {checkingPayment ? `Checking with ${order.payment_method === 'zoepay' ? 'Zoe Pay' : 'Moolre'}...` : order.payment_method === 'zoepay' ? 'Check Zoe Pay payment' : 'Check Mobile Money payment'}
                 </button>
               )}
             </div>

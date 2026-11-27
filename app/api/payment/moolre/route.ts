@@ -107,7 +107,7 @@ export async function POST(req: Request) {
             // Remember the reference so /verify can ask Moolre about this exact attempt.
             await supabaseAdmin
                 .from('orders')
-                .update({ metadata: { ...(order.metadata || {}), moolre_externalref: uniqueRef } })
+                .update({ payment_method: 'moolre', metadata: { ...(order.metadata || {}), payment_method: 'moolre', moolre_externalref: uniqueRef } })
                 .eq('id', order.id);
             return NextResponse.json({ success: true, url: result.data.authorization_url, reference: result.data.reference });
         } else {

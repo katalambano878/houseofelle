@@ -55,7 +55,7 @@ function OrderSuccessContent() {
 
         // If redirected from payment and order is still pending, try to verify
         if (paymentSuccess === 'true' && orderData && orderData.payment_status !== 'paid') {
-          verifyPayment(orderData.order_number);
+          verifyPayment(orderData.order_number, orderData.payment_method);
         }
       } catch (err) {
         console.error('Error fetching order:', err);
@@ -67,8 +67,8 @@ function OrderSuccessContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per order in the URL
   }, [orderNumber, orderId, paymentSuccess]);
 
-  // Payment verification - called when user is redirected from Moolre with payment_success=true
-  const verifyPayment = async (orderNum: string) => {
+  // Payment verification - called when the shopper returns from Moolre or Zoe Pay with payment_success=true
+  const verifyPayment = async (orderNum: string, gateway?: string) => {
     setVerifying(true);
 
     // Wait 3 seconds to give the callback a chance to process first
@@ -82,9 +82,9 @@ function OrderSuccessContent() {
       return;
     }
 
-    // Callback hasn't fired - verify via our endpoint (it asks Moolre directly)
+    // Callback hasn't fired - verify via our endpoint (it asks the gateway directly)
     try {
-      const res = await fetch('/api/payment/moolre/verify', {
+      const res = await fetch(gateway === 'zoepay' ? '/api/payment/zoepay/verify' : '/api/payment/moolre/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderNumber: orderNum })

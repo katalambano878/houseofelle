@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import PaymentChoice, { paymentEndpoint, usePaymentGateways, type PaymentGateway } from '@/components/PaymentChoice';
 
 export default function PaymentPage() {
   usePageTitle('Complete Payment');
@@ -17,6 +18,11 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const gateways = usePaymentGateways();
+  const [gateway, setGateway] = useState<PaymentGateway>('moolre');
+  useEffect(() => {
+    if (!gateways.includes(gateway)) setGateway(gateways[0]);
+  }, [gateways, gateway]);
 
   useEffect(() => {
     async function fetchOrder() {
@@ -68,7 +74,7 @@ export default function PaymentPage() {
     setError(null);
 
     try {
-      const paymentRes = await fetch('/api/payment/moolre', {
+      const paymentRes = await fetch(paymentEndpoint(gateway), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId: order.id })
@@ -80,7 +86,7 @@ export default function PaymentPage() {
         throw new Error(paymentResult.message || 'Payment initialization failed');
       }
 
-      // Redirect to Moolre payment page
+      // Redirect to the gateway's payment page
       window.location.href = paymentResult.url;
 
     } catch (err: any) {
@@ -181,6 +187,8 @@ export default function PaymentPage() {
           </div>
         )}
 
+        {gateways.length > 1 && <PaymentChoice available={gateways} value={gateway} onChange={setGateway} name="pay-gateway" />}
+
         {error && (
           <div role="alert" className="p-4 rounded-[18px] bg-[#A1271F]/[0.08] shadow-[inset_0_0_0_1px_rgba(161,39,31,0.3)]">
             <p className="text-sm text-[#7F1D17]">{error}</p>
@@ -202,13 +210,13 @@ export default function PaymentPage() {
               Processing...
             </>
           ) : (
-            <>Pay GH₵ {money(order?.total)} with Mobile Money</>
+            <>Pay GH₵ {money(order?.total)} {gateway === 'zoepay' ? 'by card or Mobile Money' : 'with Mobile Money'}</>
           )}
         </button>
 
         <p className="flex items-center justify-center gap-2 text-[13px] text-[#6B565B]">
           <i className="ri-lock-line text-base text-[#2F6B3A]" aria-hidden="true"></i>
-          Secure payment powered by Moolre
+          Secure payment powered by {gateway === 'zoepay' ? 'Zoe Pay' : 'Moolre'}
         </p>
 
         <p className="text-center text-sm text-[#6B565B]">
